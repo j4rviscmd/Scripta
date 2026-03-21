@@ -1,0 +1,19 @@
+[package]
+name = "scripta"
+version = "0.1.0"
+description = "The note app for everyone. A beautiful, lightweight AI-powered note-taking app."
+authors = ["j4rviscmd"]
+edition = "2021"
+
+[lib]
+name = "scripta_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = "2"
+
+[dependencies]
+tauri = "2"
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
