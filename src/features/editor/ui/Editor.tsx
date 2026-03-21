@@ -1,32 +1,20 @@
-import { useEffect, useState } from "react";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
 import "@blocknote/shadcn/style.css";
 import "@blocknote/core/fonts/inter.css";
+import { useAutoSave } from "../hooks/useAutoSave";
 
 /**
  * Rich-text editor component powered by BlockNote.
  *
- * Detects the user's system color-scheme preference and updates the
- * editor theme dynamically when it changes. Initializes the editor
- * with a welcome heading and placeholder paragraph.
+ * Initializes the editor with a welcome heading and placeholder paragraph.
+ * Auto-saves content to local SQLite storage with 500ms debounce
+ * via the BlockNote onChange callback.
  *
  * @returns The rendered editor view.
  */
 export function Editor() {
-  const [theme, setTheme] = useState<"light" | "dark">(
-    window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "dark"
-      : "light"
-  );
-
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = (e: MediaQueryListEvent) =>
-      setTheme(e.matches ? "dark" : "light");
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
+  const { scheduleSave } = useAutoSave(500);
 
   const editor = useCreateBlockNote({
     initialContent: [
@@ -44,7 +32,13 @@ export function Editor() {
 
   return (
     <main className="w-full min-h-screen overflow-y-auto p-8">
-      <BlockNoteView editor={editor} theme={theme} />
+      <BlockNoteView
+        editor={editor}
+        theme="light"
+        onChange={() => {
+          scheduleSave(JSON.stringify(editor.document));
+        }}
+      />
     </main>
   );
 }
