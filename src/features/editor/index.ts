@@ -12,3 +12,4 @@ export {
   updateNote,
   deleteNote,
 } from "./api/notes";
+export { DEFAULT_BLOCKS, DEFAULT_CONTENT } from "./lib/constants";
