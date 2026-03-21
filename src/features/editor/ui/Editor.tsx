@@ -1,6 +1,6 @@
 import { useCreateBlockNote } from "@blocknote/react";
-import { BlockNoteView } from "@blocknote/mantine";
-import "@blocknote/mantine/style.css";
+import { BlockNoteView } from "@blocknote/shadcn";
+import "@blocknote/shadcn/style.css";
 import "@blocknote/core/fonts/inter.css";
 import { useAutoSave } from "../hooks/useAutoSave";
 
