@@ -138,4 +138,7 @@
   html {
     @apply font-sans;
   }
+  .dark .bn-editor {
+    background-color: var(--background) !important;
+  }
 }
