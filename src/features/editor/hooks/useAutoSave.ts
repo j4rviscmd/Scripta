@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { createNote, updateNote } from "../api/notes";
 
 /** Union type representing a single inline element produced by BlockNote. */
@@ -65,6 +66,8 @@ function extractTitle(content: string): string {
  * flushed immediately to prevent data loss.
  *
  * @param delay - Debounce delay in milliseconds (default: 500)
+ * @param initialNoteId - If provided, skip the initial create and start updating this note.
+ * @param onNoteSaved - Called with the note ID after every successful save (create or update).
  * @returns An object containing:
  *   - `noteIdRef` - A React ref holding the current note UUID (or `null` before the first save).
  *   - `scheduleSave` - A callback that accepts the editor content string and schedules a debounced save.
@@ -78,11 +81,15 @@ function extractTitle(content: string): string {
  * };
  * ```
  */
-export function useAutoSave(delay = 500) {
+export function useAutoSave(
+  delay = 500,
+  initialNoteId?: string,
+  onNoteSaved?: (id: string) => void,
+) {
   const contentRef = useRef<string>("");
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isFirstSave = useRef(true);
-  const noteIdRef = useRef<string | null>(null);
+  const isFirstSave = useRef(!initialNoteId);
+  const noteIdRef = useRef<string | null>(initialNoteId ?? null);
   const savingRef = useRef(false);
 
   const save = useCallback(async () => {
@@ -96,15 +103,20 @@ export function useAutoSave(delay = 500) {
         const note = await createNote(title, content);
         noteIdRef.current = note.id;
         isFirstSave.current = false;
+        onNoteSaved?.(note.id);
+        toast.success("Note created");
       } else if (currentId) {
         await updateNote(currentId, title, content);
+        onNoteSaved?.(currentId);
+        toast.success("Saved", { duration: 1500 });
       }
     } catch (err) {
       console.error("Auto-save failed:", err);
+      toast.error("Auto-save failed");
     } finally {
       savingRef.current = false;
     }
-  }, [delay]);
+  }, [onNoteSaved]);
 
   const scheduleSave = useCallback(
     (content: string) => {
@@ -119,17 +131,8 @@ export function useAutoSave(delay = 500) {
 
   useEffect(() => {
     return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
-      const content = contentRef.current;
-      const currentId = noteIdRef.current;
-      const title = extractTitle(content);
-      if (isFirstSave.current) {
-        createNote(title, content).catch(console.error);
-      } else if (currentId) {
-        updateNote(currentId, title, content).catch(console.error);
-      }
+      if (timerRef.current) clearTimeout(timerRef.current);
+      save();
     };
   }, []);
 
