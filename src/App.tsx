@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { Editor } from "@/features/editor";
 import { NoteSidebar } from "@/features/sidebar";
 import { createNote, DEFAULT_CONTENT } from "@/features/editor";
+import { ThemeProvider } from "@/app/providers/theme-provider";
+import { ModeToggle } from "@/shared/ui/ModeToggle";
 
 /** localStorage key used to persist the last opened note ID across sessions. */
 const LAST_NOTE_KEY = "scripta:lastNoteId";
@@ -55,27 +57,31 @@ function App() {
   }, []);
 
   return (
-    <TooltipProvider>
-      <SidebarProvider>
-        <NoteSidebar
-          selectedNoteId={selectedNoteId}
-          onSelectNote={handleSelectNote}
-          onNewNote={handleNewNote}
-          refreshKey={refreshKey}
-        />
-        <SidebarInset>
-          <header className="flex h-12 items-center gap-2 border-b px-4">
-            <SidebarTrigger className="-ml-1" />
-          </header>
-          <Editor
-            key={selectedNoteId ?? "new"}
-            noteId={selectedNoteId}
-            onNoteSaved={handleNoteSaved}
+    <ThemeProvider defaultTheme="system" storageKey="scripta:theme">
+      <TooltipProvider>
+        <SidebarProvider>
+          <NoteSidebar
+            selectedNoteId={selectedNoteId}
+            onSelectNote={handleSelectNote}
+            onNewNote={handleNewNote}
+            refreshKey={refreshKey}
           />
-        </SidebarInset>
-      </SidebarProvider>
-      <Toaster position="bottom-right" />
-    </TooltipProvider>
+          <SidebarInset>
+            <header className="flex h-12 items-center gap-2 border-b px-4">
+              <SidebarTrigger className="-ml-1" />
+              <div className="flex-1" />
+              <ModeToggle />
+            </header>
+            <Editor
+              key={selectedNoteId ?? "new"}
+              noteId={selectedNoteId}
+              onNoteSaved={handleNoteSaved}
+            />
+          </SidebarInset>
+        </SidebarProvider>
+        <Toaster position="bottom-right" />
+      </TooltipProvider>
+    </ThemeProvider>
   );
 }
 

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { getNote } from "../api/notes";
 import { useAutoSave } from "../hooks/useAutoSave";
 import { DEFAULT_BLOCKS } from "../lib/constants";
+import { useTheme } from "@/app/providers/theme-provider";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const BLOCKS = DEFAULT_BLOCKS as any;
@@ -32,6 +33,7 @@ export function Editor({
   onNoteSaved?: (id: string) => void;
 }) {
   const loadingRef = useRef(true);
+  const { resolvedTheme } = useTheme();
 
   const { scheduleSave } = useAutoSave(500, noteId ?? undefined, onNoteSaved);
 
@@ -84,7 +86,7 @@ export function Editor({
     <main className="w-full min-h-screen overflow-y-auto p-8">
       <BlockNoteView
         editor={editor}
-        theme="light"
+        theme={resolvedTheme}
         onChange={handleChange}
       />
     </main>
