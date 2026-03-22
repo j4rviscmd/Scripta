@@ -45,7 +45,6 @@ export function useAutoSave(
   const noteIdRef = useRef<string | null>(initialNoteId ?? null);
   const savingRef = useRef(false);
   const dirtyRef = useRef(false);
-  const mountedRef = useRef(true);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
 
   /**
@@ -63,9 +62,8 @@ export function useAutoSave(
     async (silent = false) => {
       if (savingRef.current) return;
       savingRef.current = true;
-      if (!silent) setSaveStatus("saving");
 
-      const shouldNotify = !silent && mountedRef.current;
+      if (!silent) setSaveStatus("saving");
 
       try {
         const content = contentRef.current;
@@ -82,16 +80,14 @@ export function useAutoSave(
           savedId = noteIdRef.current;
         }
 
-        if (savedId) {
+        if (savedId && !silent) {
           dirtyRef.current = false;
-          if (shouldNotify) {
-            onNoteSaved?.(savedId);
-            setSaveStatus("saved");
-          }
+          onNoteSaved?.(savedId);
+          setSaveStatus("saved");
         }
       } catch (err) {
         console.error("Auto-save failed:", err);
-        if (shouldNotify) {
+        if (!silent) {
           setSaveStatus("error");
           toast.error("Auto-save failed");
         }
@@ -133,9 +129,7 @@ export function useAutoSave(
    * triggered immediately to prevent data loss.
    */
   useEffect(() => {
-    mountedRef.current = true;
     return () => {
-      mountedRef.current = false;
       clearTimeout(timerRef.current!);
       if (dirtyRef.current) {
         saveRef.current(true);

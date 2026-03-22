@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, AlertCircle } from "lucide-react";
 import type { SaveStatus } from "@/features/editor";
 
@@ -16,22 +16,25 @@ const SAVED_DISPLAY_MS = 3000;
  */
 export function SaveStatusIndicator({ status }: { status: SaveStatus }) {
   const [display, setDisplay] = useState<SaveStatus | null>(null);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (status === "saving" || status === "error") {
-      setDisplay(status);
+    clearTimeout(savedTimerRef.current!);
+
+    if (status === "idle") {
+      // Keep showing "saved" until its display timer expires
+      if (display !== "saved") {
+        setDisplay(null);
+      }
       return;
     }
+
+    setDisplay(status);
+
     if (status === "saved") {
-      setDisplay("saved");
-      const timer = setTimeout(() => setDisplay(null), SAVED_DISPLAY_MS);
-      return () => clearTimeout(timer);
+      savedTimerRef.current = setTimeout(() => setDisplay(null), SAVED_DISPLAY_MS);
     }
-    // idle – don't clear an active "saved" display
-    if (display !== "saved") {
-      setDisplay(null);
-    }
-  }, [status, display]);
+  }, [status]);
 
   if (!display) return null;
 
