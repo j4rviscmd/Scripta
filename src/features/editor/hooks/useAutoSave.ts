@@ -1,60 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { createNote, updateNote } from "../api/notes";
+import { extractTitle } from "../lib/constants";
 
 /** Possible auto-save statuses exposed for UI feedback. */
 export type SaveStatus = "idle" | "saving" | "saved" | "error";
-
-/** Union type representing a single inline element produced by BlockNote. */
-type InlineContent =
-  | string
-  | { type: string; text?: string; children?: InlineContent[] };
-
-/**
- * Recursively extracts plain text from BlockNote inline content.
- *
- * Handles three forms of inline content:
- * - A plain string literal.
- * - An object with a `text` property.
- * - An object with nested `children` arrays (e.g. bold / italic wrappers).
- *
- * @param content - An inline content node produced by BlockNote.
- * @returns The concatenated plain-text representation.
- */
-function inlineToText(content: InlineContent): string {
-  if (typeof content === "string") return content;
-  if (content.text) return content.text;
-  if (content.children) return content.children.map(inlineToText).join("");
-  return "";
-}
-
-/**
- * Extracts a title from the first heading block in BlockNote document JSON.
- *
- * The function parses the document JSON, locates the first block whose
- * `type` is `"heading"`, and concatenates its inline content into a plain
- * text string truncated to 200 characters. If no heading block exists or
- * the JSON cannot be parsed, the function falls back to `"Untitled"`.
- *
- * @param content - The raw BlockNote document JSON string.
- * @returns The extracted title, or `"Untitled"` as a default.
- */
-function extractTitle(content: string): string {
-  try {
-    const blocks = JSON.parse(content) as Array<{
-      type: string;
-      content?: InlineContent[];
-    }>;
-    const heading = blocks.find((b) => b.type === "heading");
-    if (heading?.content) {
-      const text = heading.content.map(inlineToText).join("");
-      return text.slice(0, 200) || "Untitled";
-    }
-  } catch {
-    // ignore parse errors
-  }
-  return "Untitled";
-}
 
 /**
  * Auto-save hook with configurable debounce delay.
@@ -169,9 +119,7 @@ export function useAutoSave(
       contentRef.current = content;
       dirtyRef.current = true;
       setSaveStatus("idle");
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
+      clearTimeout(timerRef.current!);
       timerRef.current = setTimeout(save, delay);
     },
     [save, delay],
@@ -188,7 +136,7 @@ export function useAutoSave(
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      if (timerRef.current) clearTimeout(timerRef.current);
+      clearTimeout(timerRef.current!);
       if (dirtyRef.current) {
         saveRef.current(true);
       }

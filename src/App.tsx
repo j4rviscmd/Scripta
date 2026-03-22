@@ -3,7 +3,7 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { Editor, createNote, deleteNote, listNotes, DEFAULT_CONTENT } from "@/features/editor";
+import { Editor, createNote, deleteNote, listNotes, DEFAULT_CONTENT, extractTitle } from "@/features/editor";
 import type { SaveStatus } from "@/features/editor";
 import { NoteSidebar } from "@/features/sidebar";
 import { ThemeProvider } from "@/app/providers/theme-provider";
@@ -63,7 +63,7 @@ function App() {
   /** Creates a brand-new note via the API and selects it immediately. */
   const handleNewNote = useCallback(async () => {
     try {
-      const note = await createNote("Untitled", DEFAULT_CONTENT);
+      const note = await createNote(extractTitle(DEFAULT_CONTENT), DEFAULT_CONTENT);
       setSelectedNoteId(note.id);
       setRefreshKey((v) => v + 1);
     } catch {
