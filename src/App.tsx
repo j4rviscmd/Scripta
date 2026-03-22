@@ -10,6 +10,8 @@ import { ThemeProvider } from "@/app/providers/theme-provider";
 import { ModeToggle } from "@/shared/ui/ModeToggle";
 import { SaveStatusIndicator } from "@/shared/ui/SaveStatusIndicator";
 import { useScrollDirection } from "@/shared/hooks/useScrollDirection";
+import { useScrollPosition } from "@/shared/hooks/useScrollPosition";
+import { ScrollToTopButton } from "@/shared/ui/ScrollToTopButton";
 import { cn } from "@/lib/utils";
 
 /** localStorage key used to persist the last opened note ID across sessions. */
@@ -41,6 +43,11 @@ function App() {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isHeaderHidden = useScrollDirection(scrollContainerRef);
+  const isScrolledDown = useScrollPosition(scrollContainerRef);
+
+  const scrollToTop = useCallback(() => {
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
   const selectNote = useCallback((id: string | null) => {
     setSelectedNoteId(id);
@@ -122,6 +129,9 @@ function App() {
                 onNoteSaved={handleNoteSaved}
                 onStatusChange={setSaveStatus}
               />
+              <div className="sticky bottom-5 z-10 flex justify-end pr-7 pointer-events-none">
+                <ScrollToTopButton visible={isScrolledDown} onClick={scrollToTop} />
+              </div>
             </div>
           </SidebarInset>
         </SidebarProvider>
