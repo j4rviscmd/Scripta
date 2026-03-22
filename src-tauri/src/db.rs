@@ -8,6 +8,10 @@ use tauri::Manager;
 /// Registered as Tauri managed state via [`init_db`] so that every
 /// [`#[tauri::command]`] handler can access the database through
 /// `tauri::State<DbState>`.
+///
+/// The inner [`Mutex`] is poisoned if a thread panics while holding the lock;
+/// all command handlers propagate the poison error as a `String` to the
+/// frontend.
 pub struct DbState(pub Mutex<rusqlite::Connection>);
 
 /// A single note stored in the database.
@@ -52,13 +56,17 @@ fn note_from_row(row: &rusqlite::Row) -> Result<Note, rusqlite::Error> {
 /// directory (e.g. `~/Library/Application Support/com.scripta.app/scripta.db`
 /// on macOS). The parent directory is created automatically if it does not
 /// exist.
+///
+/// # Errors
+///
+/// Returns a `String` if the application data directory cannot be resolved
+/// or the directory creation fails.
 fn db_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let app_dir = app
         .path()
         .app_data_dir()
         .map_err(|e| format!("failed to resolve app data dir: {e}"))?;
-    std::fs::create_dir_all(&app_dir)
-        .map_err(|e| format!("failed to create app data dir: {e}"))?;
+    std::fs::create_dir_all(&app_dir).map_err(|e| format!("failed to create app data dir: {e}"))?;
     Ok(app_dir.join("scripta.db"))
 }
 
@@ -94,7 +102,10 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
 
     // Migration: add is_pinned column if it does not exist (existing databases).
     if conn
-        .execute("ALTER TABLE notes ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0", [])
+        .execute(
+            "ALTER TABLE notes ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0",
+            [],
+        )
         .is_err()
     {
         // Column already exists — ignore the error.
@@ -122,7 +133,9 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
 pub fn get_note(state: tauri::State<DbState>, id: String) -> Result<Option<Note>, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare("SELECT id, title, content, created_at, updated_at, is_pinned FROM notes WHERE id = ?1")
+        .prepare(
+            "SELECT id, title, content, created_at, updated_at, is_pinned FROM notes WHERE id = ?1",
+        )
         .map_err(|e| e.to_string())?;
 
     let note = stmt.query_row([&id], note_from_row).ok();
@@ -132,13 +145,16 @@ pub fn get_note(state: tauri::State<DbState>, id: String) -> Result<Option<Note>
 
 /// Returns all notes sorted by most recently updated first.
 ///
+/// Pinned notes (`is_pinned = true`) are always placed at the top of the
+/// result set regardless of their `updated_at` value.
+///
 /// # Arguments
 ///
 /// * `state` - Managed database state injected by Tauri.
 ///
 /// # Returns
 ///
-/// A vector of [`Note`] entries ordered by `updated_at DESC`.
+/// A vector of [`Note`] entries ordered by `is_pinned DESC, updated_at DESC`.
 ///
 /// # Errors
 ///
@@ -267,11 +283,7 @@ pub fn update_note(
 /// Returns a `String` if the database lock is poisoned, the UPDATE fails,
 /// or the note is not found after the update.
 #[tauri::command]
-pub fn toggle_pin(
-    state: tauri::State<DbState>,
-    id: String,
-    pinned: bool,
-) -> Result<Note, String> {
+pub fn toggle_pin(state: tauri::State<DbState>, id: String, pinned: bool) -> Result<Note, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
 
     conn.execute(
