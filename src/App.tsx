@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
@@ -9,6 +9,8 @@ import { NoteSidebar } from "@/features/sidebar";
 import { ThemeProvider } from "@/app/providers/theme-provider";
 import { ModeToggle } from "@/shared/ui/ModeToggle";
 import { SaveStatusIndicator } from "@/shared/ui/SaveStatusIndicator";
+import { useScrollDirection } from "@/shared/hooks/useScrollDirection";
+import { cn } from "@/lib/utils";
 
 /** localStorage key used to persist the last opened note ID across sessions. */
 const LAST_NOTE_KEY = "scripta:lastNoteId";
@@ -37,6 +39,8 @@ function App() {
   );
   const [refreshKey, setRefreshKey] = useState(0);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isHeaderHidden = useScrollDirection(scrollContainerRef);
 
   const selectNote = useCallback((id: string | null) => {
     setSelectedNoteId(id);
@@ -96,13 +100,21 @@ function App() {
             refreshKey={refreshKey}
           />
           <SidebarInset className="overflow-hidden">
-            <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
+            <header
+              className={cn(
+                "flex h-12 shrink-0 items-center gap-2 border-b px-4",
+                "transition-[max-height,opacity,padding,border-width] duration-200 ease-in-out overflow-hidden",
+                isHeaderHidden
+                  ? "max-h-0 !border-b-0 py-0 px-4 opacity-0"
+                  : "max-h-12 opacity-100",
+              )}
+            >
               <SidebarTrigger className="-ml-1" />
               <div className="flex-1" />
               <SaveStatusIndicator status={saveStatus} />
               <ModeToggle />
             </header>
-            <div className="flex-1 overflow-y-auto">
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overscroll-none">
               <Editor
                 key={selectedNoteId ?? "new"}
                 noteId={selectedNoteId}
