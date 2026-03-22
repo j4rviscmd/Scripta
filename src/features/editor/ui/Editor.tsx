@@ -9,6 +9,14 @@ import { useAutoSave } from "../hooks/useAutoSave";
 import { DEFAULT_BLOCKS } from "../lib/constants";
 import { useTheme } from "@/app/providers/theme-provider";
 
+/**
+ * Default block content cast to the BlockNote generic type.
+ *
+ * BlockNote's `replaceBlocks` requires the content to match the
+ * generic type parameter of the editor. Since the default blocks
+ * are a plain JSON structure, we cast them to satisfy the type
+ * constraint.
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const BLOCKS = DEFAULT_BLOCKS as any;
 
@@ -41,34 +49,53 @@ export function Editor({
     initialContent: DEFAULT_BLOCKS,
   });
 
+  /**
+   * Loads note content into the BlockNote editor when `noteId` changes.
+   *
+   * - If no `noteId` is provided, the editor is reset to default blocks.
+   * - If a `noteId` is given, the persisted content is fetched and parsed.
+   *   If parsing fails (e.g. corrupted JSON), the editor falls back to
+   *   default blocks.  Network errors are surfaced via a toast notification.
+   *
+   * The `stale` flag guards against race conditions: when `noteId` changes
+   * rapidly, earlier fetch responses are discarded.  `loadingRef` is used
+   * by `handleChange` to suppress auto-save until the content has finished
+   * loading.
+   */
   useEffect(() => {
+    let stale = false;
     loadingRef.current = true;
     if (!noteId) {
       editor.replaceBlocks(editor.document, BLOCKS);
-      // Defer to next tick so the synchronous replaceBlocks doesn't
-      // accidentally trigger a save via the onChange callback.
       queueMicrotask(() => {
-        loadingRef.current = false;
+        if (!stale) loadingRef.current = false;
       });
       return;
     }
 
     getNote(noteId)
       .then((note) => {
+        if (stale) return;
         if (note) {
           try {
             editor.replaceBlocks(editor.document, JSON.parse(note.content) as any);
           } catch {
             editor.replaceBlocks(editor.document, BLOCKS);
           }
+        } else {
+          toast.error("Note not found");
         }
       })
       .catch(() => {
-        toast.error("Failed to load note");
+        if (!stale) toast.error("Failed to load note");
       })
       .finally(() => {
-        loadingRef.current = false;
+        if (!stale) loadingRef.current = false;
       });
+
+    return () => {
+      stale = true;
+    };
   }, [noteId, editor]);
 
   /**

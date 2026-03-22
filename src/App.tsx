@@ -28,6 +28,13 @@ function App() {
   );
   const [refreshKey, setRefreshKey] = useState(0);
 
+  /**
+   * Persists or clears the last opened note ID in localStorage.
+   *
+   * This effect ensures the selected note survives page reloads.
+   * When the user deselects all notes (selectedNoteId becomes null),
+   * the stored key is removed so the next session starts fresh.
+   */
   useEffect(() => {
     if (selectedNoteId) {
       localStorage.setItem(LAST_NOTE_KEY, selectedNoteId);
@@ -38,7 +45,13 @@ function App() {
 
   /** Updates the selected note and bumps the sidebar refresh counter after a save. */
   const handleNoteSaved = useCallback((id: string) => {
-    setSelectedNoteId(id);
+    setSelectedNoteId((current) => {
+      // 別のノートが既に選択されている場合は上書きしない。
+      // アンマウント時の遅延saveコールバックが、
+      // 切り替え先のノートIDを意図せず書き換えるのを防ぐ。
+      if (current === null || current === id) return id;
+      return current;
+    });
     setRefreshKey((v) => v + 1);
   }, []);
 
