@@ -145,6 +145,21 @@ body {
   }
 }
 
+/* Notion-style pastel inline code */
+.bn-inline-content code {
+  background-color: oklch(0.964 0.021 56);
+  padding: 0.15em 0.35em;
+  border-radius: 0.25em;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-size: 0.875em;
+}
+.dark .bn-inline-content code {
+  background-color: oklch(0.752 0.17 54 / 12%);
+  color: oklch(0.828 0.111 54);
+}
+
 /* Override BlockNote link color in dark mode (must be outside @layer base to win specificity) */
 .dark .bn-shadcn .bn-editor a {
   color: oklch(0.80 0.19 250);
