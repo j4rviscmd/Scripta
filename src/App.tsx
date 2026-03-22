@@ -3,10 +3,9 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { Editor } from "@/features/editor";
+import { Editor, createNote, deleteNote, listNotes, DEFAULT_CONTENT } from "@/features/editor";
 import type { SaveStatus } from "@/features/editor";
 import { NoteSidebar } from "@/features/sidebar";
-import { createNote, DEFAULT_CONTENT } from "@/features/editor";
 import { ThemeProvider } from "@/app/providers/theme-provider";
 import { ModeToggle } from "@/shared/ui/ModeToggle";
 import { SaveStatusIndicator } from "@/shared/ui/SaveStatusIndicator";
@@ -72,6 +71,24 @@ function App() {
     }
   }, []);
 
+  /** Deletes a note and selects the most recent remaining note if the deleted one was active. */
+  const handleDeleteNote = useCallback(
+    async (noteId: string) => {
+      try {
+        await deleteNote(noteId);
+        if (selectedNoteId === noteId) {
+          const notes = await listNotes();
+          setSelectedNoteId(notes.length > 0 ? notes[0].id : null);
+        }
+        setRefreshKey((v) => v + 1);
+        toast.success("Note deleted");
+      } catch {
+        toast.error("Failed to delete note");
+      }
+    },
+    [selectedNoteId],
+  );
+
   return (
     <ThemeProvider defaultTheme="system" storageKey="scripta:theme">
       <TooltipProvider>
@@ -80,6 +97,7 @@ function App() {
             selectedNoteId={selectedNoteId}
             onSelectNote={handleSelectNote}
             onNewNote={handleNewNote}
+            onDeleteNote={handleDeleteNote}
             refreshKey={refreshKey}
           />
           <SidebarInset>
