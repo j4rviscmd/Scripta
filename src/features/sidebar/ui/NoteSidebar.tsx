@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FileText, Plus } from "lucide-react";
+import { FileText, Plus, Trash2 } from "lucide-react";
 import { listNotes, type Note } from "@/features/editor";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,12 +13,23 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
-/** Number of milliseconds in one minute. */
-const MS_PER_MINUTE = 60_000;
-/** Number of milliseconds in one hour. */
-const MS_PER_HOUR = 3_600_000;
-/** Number of milliseconds in one day. */
 const MS_PER_DAY = 86_400_000;
 
 /**
@@ -33,15 +44,12 @@ const MS_PER_DAY = 86_400_000;
  */
 function formatDate(iso: string): string {
   const date = new Date(iso);
-  const diffMs = Date.now() - date.getTime();
-  const diffMin = Math.floor(diffMs / MS_PER_MINUTE);
-  const diffHr = Math.floor(diffMs / MS_PER_HOUR);
-  const diffDay = Math.floor(diffMs / MS_PER_DAY);
+  const diffMin = Math.floor((Date.now() - date.getTime()) / 60_000);
 
   if (diffMin < 1) return "Just now";
   if (diffMin < 60) return `${diffMin}m ago`;
-  if (diffHr < 24) return `${diffHr}h ago`;
-  if (diffDay < 7) return `${diffDay}d ago`;
+  if (diffMin < 1_440) return `${Math.floor(diffMin / 60)}h ago`;
+  if (diffMin < 10_080) return `${Math.floor(diffMin / 1_440)}d ago`;
   return date.toLocaleDateString();
 }
 
@@ -61,22 +69,20 @@ function groupNotes(notes: Note[]): { label: string; items: Note[] }[] {
   const yesterday = new Date(today.getTime() - MS_PER_DAY);
   const weekAgo = new Date(today.getTime() - 7 * MS_PER_DAY);
 
-  const groups: { label: string; items: Note[] }[] = [
-    { label: "Today", items: [] },
-    { label: "Yesterday", items: [] },
-    { label: "Previous 7 Days", items: [] },
-    { label: "Older", items: [] },
-  ];
+  const buckets: Note[][] = [[], [], [], []];
+  const labels = ["Today", "Yesterday", "Previous 7 Days", "Older"] as const;
 
   for (const note of notes) {
     const date = new Date(note.updatedAt);
-    if (date >= today) groups[0].items.push(note);
-    else if (date >= yesterday) groups[1].items.push(note);
-    else if (date >= weekAgo) groups[2].items.push(note);
-    else groups[3].items.push(note);
+    if (date >= today) buckets[0].push(note);
+    else if (date >= yesterday) buckets[1].push(note);
+    else if (date >= weekAgo) buckets[2].push(note);
+    else buckets[3].push(note);
   }
 
-  return groups.filter((g) => g.items.length > 0);
+  return labels
+    .map((label, i) => ({ label, items: buckets[i] }))
+    .filter((g) => g.items.length > 0);
 }
 
 /**
@@ -85,12 +91,14 @@ function groupNotes(notes: Note[]): { label: string; items: Note[] }[] {
  * @property selectedNoteId - The UUID of the currently active note, or `null` if none is selected.
  * @property onSelectNote - Callback invoked with the chosen note UUID when the user clicks a sidebar item.
  * @property onNewNote - Callback invoked when the user clicks the "new note" button in the sidebar header.
+ * @property onDeleteNote - Callback invoked with the note UUID when the user confirms deletion via the context menu.
  * @property refreshKey - A numeric counter that triggers a re-fetch of the note list whenever it changes.
  */
 interface NoteSidebarProps {
   selectedNoteId: string | null;
   onSelectNote: (noteId: string | null) => void;
   onNewNote: () => void;
+  onDeleteNote: (noteId: string) => void;
   refreshKey: number;
 }
 
@@ -107,9 +115,11 @@ export function NoteSidebar({
   selectedNoteId,
   onSelectNote,
   onNewNote,
+  onDeleteNote,
   refreshKey,
 }: NoteSidebarProps) {
   const [notes, setNotes] = useState<Note[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   useEffect(() => {
     listNotes().then(setNotes).catch(console.error);
@@ -141,20 +151,33 @@ export function NoteSidebar({
                 <SidebarMenu>
                   {group.items.map((note) => (
                     <SidebarMenuItem key={note.id}>
-                      <SidebarMenuButton
-                        isActive={note.id === selectedNoteId}
-                        onClick={() => onSelectNote(note.id)}
-                      >
-                        <FileText className="h-4 w-4 shrink-0" />
-                        <div className="flex flex-col overflow-hidden">
-                          <span className="truncate text-sm">
-                            {note.title}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {formatDate(note.updatedAt)}
-                          </span>
-                        </div>
-                      </SidebarMenuButton>
+                      <ContextMenu>
+                        <ContextMenuTrigger>
+                          <SidebarMenuButton
+                            isActive={note.id === selectedNoteId}
+                            onClick={() => onSelectNote(note.id)}
+                          >
+                            <FileText className="h-4 w-4 shrink-0" />
+                            <div className="flex flex-col overflow-hidden">
+                              <span className="truncate text-sm">
+                                {note.title}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {formatDate(note.updatedAt)}
+                              </span>
+                            </div>
+                          </SidebarMenuButton>
+                        </ContextMenuTrigger>
+                        <ContextMenuContent>
+                          <ContextMenuItem
+                            variant="destructive"
+                            onClick={() => setDeleteTarget(note.id)}
+                          >
+                            <Trash2 />
+                            Delete
+                          </ContextMenuItem>
+                        </ContextMenuContent>
+                      </ContextMenu>
                     </SidebarMenuItem>
                   ))}
                 </SidebarMenu>
@@ -163,6 +186,30 @@ export function NoteSidebar({
           ))
         )}
       </SidebarContent>
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete note?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteTarget) onDeleteNote(deleteTarget);
+                setDeleteTarget(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sidebar>
   );
 }
