@@ -1,9 +1,10 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { Editor, createNote, deleteNote, listNotes, togglePinNote, DEFAULT_CONTENT, extractTitle } from "@/features/editor";
+import { Editor, createNote, deleteNote, listNotes, togglePinNote, getNote, DEFAULT_CONTENT, extractTitle } from "@/features/editor";
 import type { SaveStatus } from "@/features/editor";
 import { NoteSidebar } from "@/features/sidebar";
 import { ThemeProvider } from "@/app/providers/theme-provider";
@@ -53,6 +54,24 @@ function App() {
     setSelectedNoteId(id);
     updateStoredNoteId(id);
   }, []);
+
+  useEffect(() => {
+    const appWindow = getCurrentWindow();
+    if (!selectedNoteId) {
+      appWindow.setTitle("Scripta - Untitled");
+      return;
+    }
+    let stale = false;
+    getNote(selectedNoteId)
+      .then((note) => {
+        if (stale) return;
+        appWindow.setTitle(note ? `Scripta - ${note.title}` : "Scripta - Untitled");
+      })
+      .catch(() => {
+        if (!stale) console.error("Failed to load note for window title");
+      });
+    return () => { stale = true; };
+  }, [selectedNoteId, refreshKey]);
 
   /** Updates the selected note and bumps the sidebar refresh counter after a save. */
   const handleNoteSaved = useCallback((id: string) => {
