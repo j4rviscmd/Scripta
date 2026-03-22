@@ -142,3 +142,11 @@
     background-color: var(--background) !important;
   }
 }
+
+/* Override BlockNote link color in dark mode (must be outside @layer base to win specificity) */
+.dark .bn-shadcn .bn-editor a {
+  color: oklch(0.80 0.19 250);
+}
+.dark .bn-shadcn .bn-editor a:hover {
+  color: oklch(0.85 0.21 250);
+}
