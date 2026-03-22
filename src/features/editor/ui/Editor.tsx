@@ -1,14 +1,20 @@
 import { useCallback, useEffect, useRef } from "react";
-import { useCreateBlockNote } from "@blocknote/react";
+import {
+  FormattingToolbar,
+  FormattingToolbarController,
+  getFormattingToolbarItems,
+  useCreateBlockNote,
+} from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
 import "@blocknote/shadcn/style.css";
 import "@blocknote/core/fonts/inter.css";
 import { toast } from "sonner";
 import { getNote } from "../api/notes";
 import { useAutoSave } from "../hooks/useAutoSave";
-import type { SaveStatus } from "..";
 import { DEFAULT_BLOCKS } from "../lib/constants";
 import { useTheme } from "@/app/providers/theme-provider";
+import type { SaveStatus } from "../hooks/useAutoSave";
+import { HighlightButton } from "./HighlightButton";
 
 /**
  * Default block content cast to the BlockNote generic type.
@@ -22,6 +28,45 @@ import { useTheme } from "@/app/providers/theme-provider";
 const BLOCKS = DEFAULT_BLOCKS as any;
 
 /**
+ * Props for the {@link Editor} component.
+ *
+ * @property noteId - The UUID of the note to edit, or `null` to create a new note.
+ * @property onNoteSaved - Optional callback invoked with the note ID after each successful auto-save.
+ * @property onStatusChange - Optional callback invoked whenever the save status changes (e.g. saving, saved, error).
+ */
+interface EditorProps {
+  noteId: string | null;
+  onNoteSaved?: (id: string) => void;
+  onStatusChange?: (status: SaveStatus) => void;
+}
+
+/**
+ * Builds the array of formatting toolbar items with the custom
+ * {@link HighlightButton} injected after the built-in color-style button.
+ *
+ * The highlight button is placed immediately after the `colorStyleButton`
+ * so that it appears grouped with the other style-related controls.  If
+ * the color-style button is not found in the default items, the original
+ * item list is returned unchanged.
+ *
+ * @returns An array of JSX elements representing the formatting toolbar items.
+ */
+function buildFormattingToolbarItems() {
+  const items = getFormattingToolbarItems();
+  const colorIndex = items.findIndex(
+    (item) => item.key === "colorStyleButton",
+  );
+  if (colorIndex === -1) return items;
+  return [
+    ...items.slice(0, colorIndex + 1),
+    <HighlightButton key="highlightButton" />,
+    ...items.slice(colorIndex + 1),
+  ];
+}
+
+const formattingToolbarItems = buildFormattingToolbarItems();
+
+/**
  * Rich-text editor component powered by BlockNote.
  *
  * When a `noteId` is provided the editor loads the persisted content
@@ -32,17 +77,14 @@ const BLOCKS = DEFAULT_BLOCKS as any;
  * @param props - Editor component props.
  * @param props.noteId - The UUID of the note to edit, or `null` to start a new note.
  * @param props.onNoteSaved - Callback invoked with the note ID after each successful auto-save.
+ * @param props.onStatusChange - Callback invoked whenever the save status changes (e.g. saving, saved, error).
  * @returns The rendered editor view.
  */
 export function Editor({
   noteId,
   onNoteSaved,
   onStatusChange,
-}: {
-  noteId: string | null;
-  onNoteSaved?: (id: string) => void;
-  onStatusChange?: (status: SaveStatus) => void;
-}) {
+}: EditorProps) {
   const loadingRef = useRef(true);
   const { resolvedTheme } = useTheme();
 
@@ -121,7 +163,16 @@ export function Editor({
         editor={editor}
         theme={resolvedTheme}
         onChange={handleChange}
-      />
+        formattingToolbar={false}
+      >
+        <FormattingToolbarController
+          formattingToolbar={() => (
+            <FormattingToolbar blockTypeSelectItems={[]}>
+              {formattingToolbarItems}
+            </FormattingToolbar>
+          )}
+        />
+      </BlockNoteView>
     </div>
   );
 }
