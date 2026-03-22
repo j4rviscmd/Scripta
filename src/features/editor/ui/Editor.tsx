@@ -111,18 +111,17 @@ export function Editor({
    * has finished loading (guarded by `loadingRef`).
    */
   const handleChange = useCallback(() => {
-    if (!loadingRef.current) {
-      scheduleSave(JSON.stringify(editor.document));
-    }
+    if (loadingRef.current) return;
+    scheduleSave(JSON.stringify(editor.document));
   }, [editor, scheduleSave]);
 
   return (
-    <main className="w-full min-h-screen overflow-y-auto p-8">
+    <div className="w-full p-8">
       <BlockNoteView
         editor={editor}
         theme={resolvedTheme}
         onChange={handleChange}
       />
-    </main>
+    </div>
   );
 }
