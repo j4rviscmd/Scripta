@@ -52,7 +52,7 @@ export function SaveStatusIndicator({ status }: { status: SaveStatus }) {
       {display === "saving" && (
         <span className="h-2 w-2 rounded-full bg-muted-foreground animate-pulse" />
       )}
-      {display === "saved" && <Check className="h-3.5 w-3.5" />}
+      {display === "saved" && <Check className="h-3.5 w-3.5 text-success" />}
       {display === "error" && (
         <>
           <AlertCircle className="h-3.5 w-3.5 text-destructive" />
