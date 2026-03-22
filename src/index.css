@@ -8,6 +8,11 @@
 
 @custom-variant dark (&:is(.dark *));
 
+html,
+body {
+  overflow: hidden;
+}
+
 /* Light theme ShadCN CSS variables. */
 :root {
   --radius: 0.625rem;
