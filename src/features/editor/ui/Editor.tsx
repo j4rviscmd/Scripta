@@ -6,6 +6,7 @@ import "@blocknote/core/fonts/inter.css";
 import { toast } from "sonner";
 import { getNote } from "../api/notes";
 import { useAutoSave } from "../hooks/useAutoSave";
+import type { SaveStatus } from "..";
 import { DEFAULT_BLOCKS } from "../lib/constants";
 import { useTheme } from "@/app/providers/theme-provider";
 
@@ -36,14 +37,20 @@ const BLOCKS = DEFAULT_BLOCKS as any;
 export function Editor({
   noteId,
   onNoteSaved,
+  onStatusChange,
 }: {
   noteId: string | null;
   onNoteSaved?: (id: string) => void;
+  onStatusChange?: (status: SaveStatus) => void;
 }) {
   const loadingRef = useRef(true);
   const { resolvedTheme } = useTheme();
 
-  const { scheduleSave } = useAutoSave(500, noteId ?? undefined, onNoteSaved);
+  const { scheduleSave, saveStatus } = useAutoSave(500, noteId ?? undefined, onNoteSaved);
+
+  useEffect(() => {
+    onStatusChange?.(saveStatus);
+  }, [saveStatus, onStatusChange]);
 
   const editor = useCreateBlockNote({
     initialContent: DEFAULT_BLOCKS,
