@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
@@ -12,6 +12,14 @@ import { SaveStatusIndicator } from "@/shared/ui/SaveStatusIndicator";
 
 /** localStorage key used to persist the last opened note ID across sessions. */
 const LAST_NOTE_KEY = "scripta:lastNoteId";
+
+function updateStoredNoteId(id: string | null): void {
+  if (id) {
+    localStorage.setItem(LAST_NOTE_KEY, id);
+  } else {
+    localStorage.removeItem(LAST_NOTE_KEY);
+  }
+}
 
 /**
  * Root component of the application.
@@ -30,20 +38,10 @@ function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
 
-  /**
-   * Persists or clears the last opened note ID in localStorage.
-   *
-   * This effect ensures the selected note survives page reloads.
-   * When the user deselects all notes (selectedNoteId becomes null),
-   * the stored key is removed so the next session starts fresh.
-   */
-  useEffect(() => {
-    if (selectedNoteId) {
-      localStorage.setItem(LAST_NOTE_KEY, selectedNoteId);
-    } else {
-      localStorage.removeItem(LAST_NOTE_KEY);
-    }
-  }, [selectedNoteId]);
+  const selectNote = useCallback((id: string | null) => {
+    setSelectedNoteId(id);
+    updateStoredNoteId(id);
+  }, []);
 
   /** Updates the selected note and bumps the sidebar refresh counter after a save. */
   const handleNoteSaved = useCallback((id: string) => {
@@ -57,19 +55,16 @@ function App() {
     setRefreshKey((v) => v + 1);
   }, []);
 
-  /** Selects a note to display in the editor, forwarding directly to state. */
-  const handleSelectNote = useCallback(setSelectedNoteId, []);
-
   /** Creates a brand-new note via the API and selects it immediately. */
   const handleNewNote = useCallback(async () => {
     try {
       const note = await createNote(extractTitle(DEFAULT_CONTENT), DEFAULT_CONTENT);
-      setSelectedNoteId(note.id);
+      selectNote(note.id);
       setRefreshKey((v) => v + 1);
     } catch {
       toast.error("Failed to create note");
     }
-  }, []);
+  }, [selectNote]);
 
   /** Deletes a note and selects the most recent remaining note if the deleted one was active. */
   const handleDeleteNote = useCallback(
@@ -78,7 +73,7 @@ function App() {
         await deleteNote(noteId);
         if (selectedNoteId === noteId) {
           const notes = await listNotes();
-          setSelectedNoteId(notes.length > 0 ? notes[0].id : null);
+          selectNote(notes.length > 0 ? notes[0].id : null);
         }
         setRefreshKey((v) => v + 1);
         toast.success("Note deleted");
@@ -86,33 +81,35 @@ function App() {
         toast.error("Failed to delete note");
       }
     },
-    [selectedNoteId],
+    [selectedNoteId, selectNote],
   );
 
   return (
     <ThemeProvider defaultTheme="system" storageKey="scripta:theme">
       <TooltipProvider>
-        <SidebarProvider>
+        <SidebarProvider className="h-svh">
           <NoteSidebar
             selectedNoteId={selectedNoteId}
-            onSelectNote={handleSelectNote}
+            onSelectNote={selectNote}
             onNewNote={handleNewNote}
             onDeleteNote={handleDeleteNote}
             refreshKey={refreshKey}
           />
-          <SidebarInset>
-            <header className="flex h-12 items-center gap-2 border-b px-4">
+          <SidebarInset className="overflow-hidden">
+            <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
               <SidebarTrigger className="-ml-1" />
               <div className="flex-1" />
               <SaveStatusIndicator status={saveStatus} />
               <ModeToggle />
             </header>
-            <Editor
-              key={selectedNoteId ?? "new"}
-              noteId={selectedNoteId}
-              onNoteSaved={handleNoteSaved}
-              onStatusChange={setSaveStatus}
-            />
+            <div className="flex-1 overflow-y-auto">
+              <Editor
+                key={selectedNoteId ?? "new"}
+                noteId={selectedNoteId}
+                onNoteSaved={handleNoteSaved}
+                onStatusChange={setSaveStatus}
+              />
+            </div>
           </SidebarInset>
         </SidebarProvider>
         <Toaster position="bottom-right" />
