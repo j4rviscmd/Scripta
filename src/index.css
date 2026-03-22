@@ -164,6 +164,9 @@ body {
 }
 
 /* Override BlockNote link color in dark mode (must be outside @layer base to win specificity) */
+.bn-shadcn .bn-editor a {
+  cursor: pointer;
+}
 .dark .bn-shadcn .bn-editor a {
   color: oklch(0.80 0.19 250);
 }

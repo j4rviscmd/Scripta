@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useRef } from "react";
-import { useCreateBlockNote } from "@blocknote/react";
+import { useCreateBlockNote, LinkToolbarController } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
+import { CustomLinkToolbar } from "./CustomLinkToolbar";
 import "@blocknote/shadcn/style.css";
 import "@blocknote/core/fonts/inter.css";
 import { toast } from "sonner";
 import { getNote } from "../api/notes";
 import { useAutoSave } from "../hooks/useAutoSave";
+import { useLinkPreview } from "../hooks/useLinkPreview";
+import { useLinkClickHandler } from "../hooks/useLinkClickHandler";
 import type { SaveStatus } from "..";
 import { DEFAULT_BLOCKS } from "../lib/constants";
 import { useTheme } from "@/app/providers/theme-provider";
@@ -47,6 +50,7 @@ export function Editor({
   const { resolvedTheme } = useTheme();
 
   const { scheduleSave, saveStatus } = useAutoSave(500, noteId ?? undefined, onNoteSaved);
+  const pasteHandler = useLinkPreview();
 
   useEffect(() => {
     onStatusChange?.(saveStatus);
@@ -54,7 +58,10 @@ export function Editor({
 
   const editor = useCreateBlockNote({
     initialContent: DEFAULT_BLOCKS,
+    pasteHandler,
   });
+
+  useLinkClickHandler(editor);
 
   /**
    * Loads note content into the BlockNote editor when `noteId` changes.
@@ -121,7 +128,12 @@ export function Editor({
         editor={editor}
         theme={resolvedTheme}
         onChange={handleChange}
-      />
+        linkToolbar={false}
+      >
+        <LinkToolbarController
+          linkToolbar={CustomLinkToolbar}
+        />
+      </BlockNoteView>
     </div>
   );
 }
