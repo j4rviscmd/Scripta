@@ -11,6 +11,7 @@ export {
   createNote,
   updateNote,
   deleteNote,
+  togglePinNote,
 } from "./api/notes";
 export { DEFAULT_BLOCKS, DEFAULT_CONTENT, extractTitle } from "./lib/constants";
 export type { SaveStatus } from "./hooks/useAutoSave";

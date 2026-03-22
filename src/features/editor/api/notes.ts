@@ -12,6 +12,7 @@ export interface Note {
   content: string;
   createdAt: string;
   updatedAt: string;
+  isPinned: boolean;
 }
 
 /**
@@ -68,4 +69,15 @@ export async function updateNote(
  */
 export async function deleteNote(id: string): Promise<void> {
   return invoke<void>("delete_note", { id });
+}
+
+/**
+ * Toggles the pinned state of a note.
+ *
+ * @param id - The UUID of the note to pin or unpin.
+ * @param pinned - `true` to pin, `false` to unpin.
+ * @returns The updated note as it exists in the database after the write.
+ */
+export async function togglePinNote(id: string, pinned: boolean): Promise<Note> {
+  return invoke<Note>("toggle_pin", { id, pinned });
 }

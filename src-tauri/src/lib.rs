@@ -23,6 +23,7 @@ pub fn run() {
             db::create_note,
             db::update_note,
             db::delete_note,
+            db::toggle_pin,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
