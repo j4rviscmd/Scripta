@@ -91,36 +91,75 @@ export function useAutoSave(
   const isFirstSave = useRef(!initialNoteId);
   const noteIdRef = useRef<string | null>(initialNoteId ?? null);
   const savingRef = useRef(false);
+  const dirtyRef = useRef(false);
+  const mountedRef = useRef(true);
 
-  const save = useCallback(async () => {
-    if (savingRef.current) return;
-    savingRef.current = true;
-    try {
-      const content = contentRef.current;
-      const title = extractTitle(content);
-      const currentId = noteIdRef.current;
-      if (isFirstSave.current) {
-        const note = await createNote(title, content);
-        noteIdRef.current = note.id;
-        isFirstSave.current = false;
-        onNoteSaved?.(note.id);
-        toast.success("Note created");
-      } else if (currentId) {
-        await updateNote(currentId, title, content);
-        onNoteSaved?.(currentId);
-        toast.success("Saved", { duration: 1500 });
+  /**
+   * Persists the current editor content to the backend.
+   *
+   * On the first save, a new note is created via `createNote`.
+   * On subsequent saves, the existing note is updated via `updateNote`.
+   * A `savingRef` guard prevents concurrent executions.
+   *
+   * @param silent - When `true`, suppresses toast notifications and the
+   *   `onNoteSaved` callback (used during unmount flush to avoid updating
+   *   unmounted components).
+   */
+  const save = useCallback(
+    async (silent = false) => {
+      if (savingRef.current) return;
+      savingRef.current = true;
+
+      const shouldNotify = !silent && mountedRef.current;
+
+      try {
+        const content = contentRef.current;
+        const title = extractTitle(content);
+        const currentId = noteIdRef.current;
+
+        if (isFirstSave.current) {
+          const note = await createNote(title, content);
+          noteIdRef.current = note.id;
+          isFirstSave.current = false;
+          dirtyRef.current = false;
+          if (shouldNotify) {
+            onNoteSaved?.(note.id);
+            toast.success("Note created");
+          }
+        } else if (currentId) {
+          await updateNote(currentId, title, content);
+          dirtyRef.current = false;
+          if (shouldNotify) {
+            onNoteSaved?.(currentId);
+            toast.success("Saved", { duration: 1500 });
+          }
+        }
+      } catch (err) {
+        console.error("Auto-save failed:", err);
+        if (shouldNotify) toast.error("Auto-save failed");
+      } finally {
+        savingRef.current = false;
       }
-    } catch (err) {
-      console.error("Auto-save failed:", err);
-      toast.error("Auto-save failed");
-    } finally {
-      savingRef.current = false;
-    }
-  }, [onNoteSaved]);
+    },
+    [onNoteSaved],
+  );
 
+  // Keep a stable ref to save so the cleanup effect doesn't need save in its deps.
+  const saveRef = useRef(save);
+  saveRef.current = save;
+
+  /**
+   * Schedules a debounced save of the given editor content.
+   *
+   * Any previously scheduled save is cancelled so that only the
+   * most recent content is persisted after the debounce delay.
+   *
+   * @param content - The serialized BlockNote document JSON string.
+   */
   const scheduleSave = useCallback(
     (content: string) => {
       contentRef.current = content;
+      dirtyRef.current = true;
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
@@ -129,10 +168,21 @@ export function useAutoSave(
     [save, delay],
   );
 
+  /**
+   * Cleanup effect that flushes unsaved content on unmount.
+   *
+   * When the component unmounts, any pending debounce timer is cleared.
+   * If there is dirty (unsaved) content, a final silent save is
+   * triggered immediately to prevent data loss.
+   */
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       if (timerRef.current) clearTimeout(timerRef.current);
-      save();
+      if (dirtyRef.current) {
+        saveRef.current(true);
+      }
     };
   }, []);
 
