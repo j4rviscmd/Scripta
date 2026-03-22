@@ -1,5 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
+/** localStorage key used to persist the header hidden/shown state across sessions. */
+const HEADER_HIDDEN_KEY = "scripta:headerHidden";
+
+/**
+ * Configuration options for {@link useScrollDirection}.
+ */
 interface ScrollDirectionOptions {
   /** Minimum scroll delta (px) before toggling header visibility. */
   threshold?: number;
@@ -21,7 +27,21 @@ export function useScrollDirection(
   options: ScrollDirectionOptions = {},
 ) {
   const { threshold = 10 } = options;
-  const [isHidden, setIsHidden] = useState(false);
+  const [isHidden, setIsHidden] = useState(() => {
+    try {
+      return localStorage.getItem(HEADER_HIDDEN_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  /** Updates the hidden state and persists it to localStorage. Silently ignores storage errors. */
+  const setHidden = useCallback((value: boolean) => {
+    setIsHidden(value);
+    try {
+      localStorage.setItem(HEADER_HIDDEN_KEY, String(value));
+    } catch { /* noop */ }
+  }, []);
   const accumulatedDelta = useRef(0);
   const ticking = useRef(false);
   const clickLock = useRef(false);
@@ -32,11 +52,18 @@ export function useScrollDirection(
     const container = containerRef.current;
     if (!container) return;
 
+    /** Locks wheel-based scroll detection for 200 ms after a mouse click to prevent accidental toggles. */
     const handleMouseDown = () => {
       clickLock.current = true;
       clickTimer.current = setTimeout(() => { clickLock.current = false; }, 200);
     };
 
+    /**
+     * Accumulates vertical wheel delta and, once it exceeds the threshold within a
+     * single animation frame, toggles header visibility. Skips processing when the
+     * container is already at the top or bottom edge, when a click lock is active,
+     * or when the delta is purely horizontal.
+     */
     const handleWheel = (e: WheelEvent) => {
       if (clickLock.current) return;
       if (e.deltaY === 0) return;
@@ -54,7 +81,7 @@ export function useScrollDirection(
 
       rafId.current = requestAnimationFrame(() => {
         if (Math.abs(accumulatedDelta.current) >= threshold) {
-          setIsHidden(accumulatedDelta.current > 0);
+          setHidden(accumulatedDelta.current > 0);
           accumulatedDelta.current = 0;
         }
 
@@ -62,9 +89,10 @@ export function useScrollDirection(
       });
     };
 
+    /** Forces the header to become visible when the container is scrolled back to the very top. */
     const handleScroll = () => {
       if (container.scrollTop <= 0) {
-        setIsHidden(false);
+        setHidden(false);
         accumulatedDelta.current = 0;
       }
     };
@@ -79,7 +107,7 @@ export function useScrollDirection(
       cancelAnimationFrame(rafId.current);
       clearTimeout(clickTimer.current);
     };
-  }, [containerRef, threshold]);
+  }, [containerRef, threshold, setHidden]);
 
   return isHidden;
 }
