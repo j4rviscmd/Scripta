@@ -116,7 +116,7 @@ export function Editor({
   }, [editor, scheduleSave]);
 
   return (
-    <div className="w-full p-8">
+    <div className="w-full px-8 pb-8">
       <BlockNoteView
         editor={editor}
         theme={resolvedTheme}
