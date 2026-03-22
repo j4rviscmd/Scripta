@@ -4,10 +4,12 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { Editor } from "@/features/editor";
+import type { SaveStatus } from "@/features/editor";
 import { NoteSidebar } from "@/features/sidebar";
 import { createNote, DEFAULT_CONTENT } from "@/features/editor";
 import { ThemeProvider } from "@/app/providers/theme-provider";
 import { ModeToggle } from "@/shared/ui/ModeToggle";
+import { SaveStatusIndicator } from "@/shared/ui/SaveStatusIndicator";
 
 /** localStorage key used to persist the last opened note ID across sessions. */
 const LAST_NOTE_KEY = "scripta:lastNoteId";
@@ -27,6 +29,7 @@ function App() {
     localStorage.getItem(LAST_NOTE_KEY),
   );
   const [refreshKey, setRefreshKey] = useState(0);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
 
   /**
    * Persists or clears the last opened note ID in localStorage.
@@ -83,12 +86,14 @@ function App() {
             <header className="flex h-12 items-center gap-2 border-b px-4">
               <SidebarTrigger className="-ml-1" />
               <div className="flex-1" />
+              <SaveStatusIndicator status={saveStatus} />
               <ModeToggle />
             </header>
             <Editor
               key={selectedNoteId ?? "new"}
               noteId={selectedNoteId}
               onNoteSaved={handleNoteSaved}
+              onStatusChange={setSaveStatus}
             />
           </SidebarInset>
         </SidebarProvider>

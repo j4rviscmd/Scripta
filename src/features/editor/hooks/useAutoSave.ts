@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { createNote, updateNote } from "../api/notes";
+
+/** Possible auto-save statuses exposed for UI feedback. */
+export type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 /** Union type representing a single inline element produced by BlockNote. */
 type InlineContent =
@@ -93,6 +96,7 @@ export function useAutoSave(
   const savingRef = useRef(false);
   const dirtyRef = useRef(false);
   const mountedRef = useRef(true);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
 
   /**
    * Persists the current editor content to the backend.
@@ -109,34 +113,38 @@ export function useAutoSave(
     async (silent = false) => {
       if (savingRef.current) return;
       savingRef.current = true;
+      if (!silent) setSaveStatus("saving");
 
       const shouldNotify = !silent && mountedRef.current;
 
       try {
         const content = contentRef.current;
         const title = extractTitle(content);
-        const currentId = noteIdRef.current;
+        let savedId: string | null = null;
 
         if (isFirstSave.current) {
           const note = await createNote(title, content);
           noteIdRef.current = note.id;
           isFirstSave.current = false;
+          savedId = note.id;
+        } else if (noteIdRef.current) {
+          await updateNote(noteIdRef.current, title, content);
+          savedId = noteIdRef.current;
+        }
+
+        if (savedId) {
           dirtyRef.current = false;
           if (shouldNotify) {
-            onNoteSaved?.(note.id);
-            toast.success("Note created");
-          }
-        } else if (currentId) {
-          await updateNote(currentId, title, content);
-          dirtyRef.current = false;
-          if (shouldNotify) {
-            onNoteSaved?.(currentId);
-            toast.success("Saved", { duration: 1500 });
+            onNoteSaved?.(savedId);
+            setSaveStatus("saved");
           }
         }
       } catch (err) {
         console.error("Auto-save failed:", err);
-        if (shouldNotify) toast.error("Auto-save failed");
+        if (shouldNotify) {
+          setSaveStatus("error");
+          toast.error("Auto-save failed");
+        }
       } finally {
         savingRef.current = false;
       }
@@ -160,6 +168,7 @@ export function useAutoSave(
     (content: string) => {
       contentRef.current = content;
       dirtyRef.current = true;
+      setSaveStatus("idle");
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
@@ -186,5 +195,5 @@ export function useAutoSave(
     };
   }, []);
 
-  return { noteIdRef, scheduleSave };
+  return { noteIdRef, scheduleSave, saveStatus };
 }
