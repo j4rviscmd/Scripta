@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, AlertCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { SaveStatus } from "@/features/editor";
 
 /** Duration in milliseconds to keep the "saved" indicator visible before fading out. */
@@ -16,14 +17,14 @@ const SAVED_DISPLAY_MS = 3000;
  */
 export function SaveStatusIndicator({ status }: { status: SaveStatus }) {
   const [display, setDisplay] = useState<SaveStatus | null>(null);
-  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const isTimerActiveRef = useRef(false);
 
   useEffect(() => {
-    clearTimeout(savedTimerRef.current!);
+    clearTimeout(savedTimerRef.current);
 
     if (status === "idle") {
-      // Keep showing "saved" until its display timer expires
-      if (display !== "saved") {
+      if (!isTimerActiveRef.current) {
         setDisplay(null);
       }
       return;
@@ -32,14 +33,22 @@ export function SaveStatusIndicator({ status }: { status: SaveStatus }) {
     setDisplay(status);
 
     if (status === "saved") {
-      savedTimerRef.current = setTimeout(() => setDisplay(null), SAVED_DISPLAY_MS);
+      isTimerActiveRef.current = true;
+      savedTimerRef.current = setTimeout(() => {
+        setDisplay(null);
+        isTimerActiveRef.current = false;
+      }, SAVED_DISPLAY_MS);
     }
   }, [status]);
 
-  if (!display) return null;
-
   return (
-    <span className="inline-flex items-center text-xs text-muted-foreground">
+    <span
+      className={cn(
+        "inline-flex h-4 items-center text-xs text-muted-foreground",
+        !display && "invisible",
+      )}
+      aria-hidden={!display}
+    >
       {display === "saving" && (
         <span className="h-2 w-2 rounded-full bg-muted-foreground animate-pulse" />
       )}

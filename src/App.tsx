@@ -104,17 +104,18 @@ function App() {
               className={cn(
                 "flex h-12 shrink-0 items-center gap-2 border-b px-4",
                 "transition-[max-height,opacity,padding,border-width] duration-200 ease-in-out overflow-hidden",
-                isHeaderHidden
-                  ? "max-h-0 !border-b-0 py-0 px-4 opacity-0"
-                  : "max-h-12 opacity-100",
+                "max-h-12 opacity-100",
+                isHeaderHidden && "max-h-0 !border-b-0 py-0 opacity-0",
               )}
             >
               <SidebarTrigger className="-ml-1" />
               <div className="flex-1" />
-              <SaveStatusIndicator status={saveStatus} />
               <ModeToggle />
             </header>
             <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overscroll-none">
+              <div className="sticky top-5 z-10 flex justify-end pr-7 pointer-events-none">
+                <SaveStatusIndicator status={saveStatus} />
+              </div>
               <Editor
                 key={selectedNoteId ?? "new"}
                 noteId={selectedNoteId}
