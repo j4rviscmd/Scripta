@@ -131,9 +131,6 @@ body {
 
 /* Applies some additional necessary border styles within the editor. */
 @layer base {
-  .bn-shadcn * {
-    @apply border-border outline-ring/50;
-  }
   * {
     @apply border-border outline-ring/50;
   }
@@ -154,4 +151,17 @@ body {
 }
 .dark .bn-shadcn .bn-editor a:hover {
   color: oklch(0.85 0.21 250);
+}
+
+/* PIN固定時のアイコンパルスアニメーション */
+@keyframes pin-bounce {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.3); }
+  50%  { transform: scale(0.9); }
+  70%  { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+@utility animate-pin-bounce {
+  animation: pin-bounce 0.4s ease-out;
 }

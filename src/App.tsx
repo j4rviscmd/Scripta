@@ -3,7 +3,7 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { Editor, createNote, deleteNote, listNotes, DEFAULT_CONTENT, extractTitle } from "@/features/editor";
+import { Editor, createNote, deleteNote, listNotes, togglePinNote, DEFAULT_CONTENT, extractTitle } from "@/features/editor";
 import type { SaveStatus } from "@/features/editor";
 import { NoteSidebar } from "@/features/sidebar";
 import { ThemeProvider } from "@/app/providers/theme-provider";
@@ -20,9 +20,9 @@ const LAST_NOTE_KEY = "scripta:lastNoteId";
 function updateStoredNoteId(id: string | null): void {
   if (id) {
     localStorage.setItem(LAST_NOTE_KEY, id);
-  } else {
-    localStorage.removeItem(LAST_NOTE_KEY);
+    return;
   }
+  localStorage.removeItem(LAST_NOTE_KEY);
 }
 
 /**
@@ -95,6 +95,19 @@ function App() {
     [selectedNoteId, selectNote],
   );
 
+  /** Toggles the pinned state of a note. */
+  const handleTogglePin = useCallback(
+    async (noteId: string, pinned: boolean) => {
+      try {
+        await togglePinNote(noteId, pinned);
+        setRefreshKey((v) => v + 1);
+      } catch {
+        toast.error("Failed to toggle pin");
+      }
+    },
+    [],
+  );
+
   return (
     <ThemeProvider defaultTheme="system" storageKey="scripta:theme">
       <TooltipProvider>
@@ -104,6 +117,7 @@ function App() {
             onSelectNote={selectNote}
             onNewNote={handleNewNote}
             onDeleteNote={handleDeleteNote}
+            onTogglePin={handleTogglePin}
             refreshKey={refreshKey}
           />
           <SidebarInset className="overflow-hidden">

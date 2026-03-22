@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { FileText, Plus, Search, Trash2, X } from "lucide-react";
+import { FileText, Pin, PinOff, Plus, Search, Trash2, X } from "lucide-react";
 import { listNotes, type Note } from "@/features/editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,11 +13,13 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarSeparator,
 } from "@/components/ui/sidebar";
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import {
@@ -30,6 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { cn } from "@/lib/utils";
 import { useDebounce } from "..";
 
 const MS_PER_DAY = 86_400_000;
@@ -103,12 +106,88 @@ function groupNotes(notes: Note[]): { label: string; items: Note[] }[] {
 }
 
 /**
+ * Props for the {@link NoteItem} component.
+ */
+interface NoteItemProps {
+  note: Note;
+  selectedNoteId: string | null;
+  onSelectNote: (id: string) => void;
+  onTogglePin: (id: string, pinned: boolean) => void;
+  onDeleteNote: () => void;
+  justPinnedId: string | null;
+}
+
+/**
+ * A single note item in the sidebar, used in both pinned and date groups.
+ */
+function NoteItem({
+  note,
+  selectedNoteId,
+  onSelectNote,
+  onTogglePin,
+  onDeleteNote,
+  justPinnedId,
+}: NoteItemProps) {
+  return (
+    <SidebarMenuItem className="animate-in fade-in-0 slide-in-from-top-1 duration-200 fill-mode-both py-px">
+      <ContextMenu>
+        <ContextMenuTrigger>
+          <SidebarMenuButton
+            isActive={note.id === selectedNoteId}
+            onClick={() => onSelectNote(note.id)}
+            className={cn(note.isPinned && "hover:bg-primary/5")}
+          >
+            {note.isPinned ? (
+              <Pin
+                className={cn(
+                  "h-4 w-4 shrink-0 text-primary fill-primary/20",
+                  justPinnedId === note.id && "animate-pin-bounce",
+                )}
+              />
+            ) : (
+              <FileText className="h-4 w-4 shrink-0" />
+            )}
+            <div className="flex flex-col overflow-hidden">
+              <span className="truncate text-sm">{note.title}</span>
+              <span className="text-xs text-muted-foreground">
+                {formatDate(note.updatedAt)}
+              </span>
+            </div>
+          </SidebarMenuButton>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onClick={() => onTogglePin(note.id, !note.isPinned)}>
+            {note.isPinned ? (
+              <>
+                <PinOff className="h-4 w-4" />
+                Unpin
+              </>
+            ) : (
+              <>
+                <Pin className="h-4 w-4" />
+                Pin to top
+              </>
+            )}
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem variant="destructive" onClick={onDeleteNote}>
+            <Trash2 />
+            Delete
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+    </SidebarMenuItem>
+  );
+}
+
+/**
  * Props for the {@link NoteSidebar} component.
  *
  * @property selectedNoteId - The UUID of the currently active note, or `null` if none is selected.
  * @property onSelectNote - Callback invoked with the chosen note UUID when the user clicks a sidebar item.
  * @property onNewNote - Callback invoked when the user clicks the "new note" button in the sidebar header.
  * @property onDeleteNote - Callback invoked with the note UUID when the user confirms deletion via the context menu.
+ * @property onTogglePin - Callback invoked with the note UUID and new pinned state when the user toggles pin.
  * @property refreshKey - A numeric counter that triggers a re-fetch of the note list whenever it changes.
  */
 interface NoteSidebarProps {
@@ -116,15 +195,16 @@ interface NoteSidebarProps {
   onSelectNote: (noteId: string | null) => void;
   onNewNote: () => void;
   onDeleteNote: (noteId: string) => void;
+  onTogglePin: (noteId: string, pinned: boolean) => void;
   refreshKey: number;
 }
 
 /**
- * Sidebar component displaying notes grouped by relative date.
+ * Sidebar component displaying notes with pinned section and date grouping.
  *
  * Fetches the full note list on mount and whenever `refreshKey` changes,
- * then groups the notes into a timeline layout (Today / Yesterday /
- * Previous 7 Days / Older) via {@link groupNotes}.
+ * then separates pinned notes (displayed at the top) from unpinned notes
+ * (grouped by relative date via {@link groupNotes}).
  *
  * A search input in the header allows filtering notes by title in
  * real-time with a 300 ms debounce.
@@ -136,11 +216,13 @@ export function NoteSidebar({
   onSelectNote,
   onNewNote,
   onDeleteNote,
+  onTogglePin,
   refreshKey,
 }: NoteSidebarProps) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [justPinnedId, setJustPinnedId] = useState<string | null>(null);
 
   const debouncedQuery = useDebounce(searchQuery);
 
@@ -154,11 +236,18 @@ export function NoteSidebar({
     return notes.filter((note) => note.title.toLowerCase().includes(q));
   }, [notes, debouncedQuery]);
 
-  const groups = groupNotes(filteredNotes);
   const isSearching = debouncedQuery.trim().length > 0;
 
+  const handleTogglePin = (noteId: string, pinned: boolean) => {
+    onTogglePin(noteId, pinned);
+    if (pinned) {
+      setJustPinnedId(noteId);
+      setTimeout(() => setJustPinnedId(null), 400);
+    }
+  };
+
   function renderSidebarBody(): React.ReactNode {
-    if (isSearching && groups.length === 0) {
+    if (isSearching && filteredNotes.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground">
           <Search className="h-8 w-8" />
@@ -167,50 +256,70 @@ export function NoteSidebar({
       );
     }
 
-    if (groups.length === 0) {
+    // During search: hide pinned section, show all results in date groups
+    const pinnedNotes = isSearching ? [] : filteredNotes.filter((n) => n.isPinned);
+    const unpinnedNotes = isSearching
+      ? filteredNotes
+      : filteredNotes.filter((n) => !n.isPinned);
+    const groups = groupNotes(unpinnedNotes);
+
+    if (pinnedNotes.length === 0 && groups.length === 0) {
       return <p className="p-4 text-sm text-muted-foreground">No notes yet</p>;
     }
 
-    return groups.map((group) => (
-      <SidebarGroup key={group.label}>
-        <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
-        <SidebarGroupContent>
-          <SidebarMenu>
-            {group.items.map((note) => (
-              <SidebarMenuItem key={note.id}>
-                <ContextMenu>
-                  <ContextMenuTrigger>
-                    <SidebarMenuButton
-                      isActive={note.id === selectedNoteId}
-                      onClick={() => onSelectNote(note.id)}
-                    >
-                      <FileText className="h-4 w-4 shrink-0" />
-                      <div className="flex flex-col overflow-hidden">
-                        <span className="truncate text-sm">
-                          {note.title}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {formatDate(note.updatedAt)}
-                        </span>
-                      </div>
-                    </SidebarMenuButton>
-                  </ContextMenuTrigger>
-                  <ContextMenuContent>
-                    <ContextMenuItem
-                      variant="destructive"
-                      onClick={() => setDeleteTarget(note.id)}
-                    >
-                      <Trash2 />
-                      Delete
-                    </ContextMenuItem>
-                  </ContextMenuContent>
-                </ContextMenu>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarGroupContent>
-      </SidebarGroup>
-    ));
+    return (
+      <>
+        {/* Pinned section */}
+        {pinnedNotes.length > 0 && (
+          <>
+            <SidebarGroup className="animate-in fade-in-0 slide-in-from-top-2 duration-300">
+              <SidebarGroupLabel className="flex items-center gap-1 text-[10px] [&>svg]:!size-2.5">
+                <Pin className="fill-primary text-primary" />
+                Pinned
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {pinnedNotes.map((note) => (
+                    <NoteItem
+                      key={note.id}
+                      note={note}
+                      selectedNoteId={selectedNoteId}
+                      onSelectNote={onSelectNote}
+                      onTogglePin={handleTogglePin}
+                      onDeleteNote={() => setDeleteTarget(note.id)}
+                      justPinnedId={justPinnedId}
+                    />
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+            <SidebarSeparator className="mx-3 animate-in fade-in-0 duration-500 delay-150" />
+          </>
+        )}
+
+        {/* Date groups */}
+        {groups.map((group) => (
+          <SidebarGroup key={group.label}>
+            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((note) => (
+                  <NoteItem
+                    key={note.id}
+                    note={note}
+                    selectedNoteId={selectedNoteId}
+                    onSelectNote={onSelectNote}
+                    onTogglePin={handleTogglePin}
+                    onDeleteNote={() => setDeleteTarget(note.id)}
+                    justPinnedId={justPinnedId}
+                  />
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
+      </>
+    );
   }
 
   return (

@@ -27,12 +27,14 @@ pub struct Note {
     pub created_at: String,
     /// RFC 3339 timestamp of when the note was last modified.
     pub updated_at: String,
+    /// Whether the note is pinned to the top of the sidebar.
+    pub is_pinned: bool,
 }
 
 /// Maps a single result row from the `notes` table to a [`Note`] struct.
 ///
 /// Column order must match the projection used in every SELECT that calls
-/// this function: `id, title, content, created_at, updated_at`.
+/// this function: `id, title, content, created_at, updated_at, is_pinned`.
 fn note_from_row(row: &rusqlite::Row) -> Result<Note, rusqlite::Error> {
     Ok(Note {
         id: row.get(0)?,
@@ -40,6 +42,7 @@ fn note_from_row(row: &rusqlite::Row) -> Result<Note, rusqlite::Error> {
         content: row.get(2)?,
         created_at: row.get(3)?,
         updated_at: row.get(4)?,
+        is_pinned: row.get(5)?,
     })
 }
 
@@ -83,10 +86,19 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
              title       TEXT NOT NULL DEFAULT '',
              content     TEXT NOT NULL DEFAULT '[]',
              created_at  TEXT NOT NULL,
-             updated_at  TEXT NOT NULL
+             updated_at  TEXT NOT NULL,
+             is_pinned   INTEGER NOT NULL DEFAULT 0
          );",
     )
     .map_err(|e| format!("failed to init schema: {e}"))?;
+
+    // Migration: add is_pinned column if it does not exist (existing databases).
+    if conn
+        .execute("ALTER TABLE notes ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0", [])
+        .is_err()
+    {
+        // Column already exists — ignore the error.
+    }
 
     app.manage(DbState(Mutex::new(conn)));
     Ok(())
@@ -110,7 +122,7 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
 pub fn get_note(state: tauri::State<DbState>, id: String) -> Result<Option<Note>, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare("SELECT id, title, content, created_at, updated_at FROM notes WHERE id = ?1")
+        .prepare("SELECT id, title, content, created_at, updated_at, is_pinned FROM notes WHERE id = ?1")
         .map_err(|e| e.to_string())?;
 
     let note = stmt.query_row([&id], note_from_row).ok();
@@ -136,7 +148,7 @@ pub fn list_notes(state: tauri::State<DbState>) -> Result<Vec<Note>, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, title, content, created_at, updated_at FROM notes ORDER BY updated_at DESC",
+            "SELECT id, title, content, created_at, updated_at, is_pinned FROM notes ORDER BY is_pinned DESC, updated_at DESC",
         )
         .map_err(|e| e.to_string())?;
 
@@ -176,7 +188,7 @@ pub fn create_note(
     let now = chrono::Utc::now().to_rfc3339();
 
     conn.execute(
-        "INSERT INTO notes (id, title, content, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO notes (id, title, content, created_at, updated_at, is_pinned) VALUES (?1, ?2, ?3, ?4, ?5, 0)",
         rusqlite::params![id, title, content, now, now],
     )
     .map_err(|e| e.to_string())?;
@@ -187,6 +199,7 @@ pub fn create_note(
         content,
         created_at: now.clone(),
         updated_at: now,
+        is_pinned: false,
     })
 }
 
@@ -228,7 +241,48 @@ pub fn update_note(
 
     let note = conn
         .query_row(
-            "SELECT id, title, content, created_at, updated_at FROM notes WHERE id = ?1",
+            "SELECT id, title, content, created_at, updated_at, is_pinned FROM notes WHERE id = ?1",
+            rusqlite::params![id],
+            note_from_row,
+        )
+        .map_err(|e| e.to_string())?;
+
+    Ok(note)
+}
+
+/// Toggles the pinned state of a note.
+///
+/// # Arguments
+///
+/// * `state` - Managed database state injected by Tauri.
+/// * `id` - The UUID of the note to pin or unpin.
+/// * `pinned` - `true` to pin, `false` to unpin.
+///
+/// # Returns
+///
+/// The updated [`Note`] as it exists in the database after the write.
+///
+/// # Errors
+///
+/// Returns a `String` if the database lock is poisoned, the UPDATE fails,
+/// or the note is not found after the update.
+#[tauri::command]
+pub fn toggle_pin(
+    state: tauri::State<DbState>,
+    id: String,
+    pinned: bool,
+) -> Result<Note, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+
+    conn.execute(
+        "UPDATE notes SET is_pinned = ?1 WHERE id = ?2",
+        rusqlite::params![pinned as i32, id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    let note = conn
+        .query_row(
+            "SELECT id, title, content, created_at, updated_at, is_pinned FROM notes WHERE id = ?1",
             rusqlite::params![id],
             note_from_row,
         )
