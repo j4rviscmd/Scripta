@@ -3,8 +3,17 @@ import { useCallback, useEffect, useRef } from "react";
 /** localStorage key for per-note scroll position map. */
 const SCROLL_POSITIONS_KEY = "scripta:scrollPositions";
 
+/**
+ * Maps note IDs to their last-visible BlockNote block `data-id` values.
+ * Used as the in-memory representation of persisted scroll positions.
+ */
 type ScrollPositions = Record<string, string>;
 
+/**
+ * Loads the persisted scroll-position map from localStorage.
+ *
+ * @returns The parsed map, or an empty object if parsing fails or no data exists.
+ */
 function loadPositions(): ScrollPositions {
   try {
     const raw = localStorage.getItem(SCROLL_POSITIONS_KEY);
@@ -14,18 +23,37 @@ function loadPositions(): ScrollPositions {
   }
 }
 
+/**
+ * Persists the scroll-position map to localStorage.
+ * Silently ignores storage errors (e.g. quota exceeded).
+ *
+ * @param map - The scroll-position map to persist.
+ */
 function savePositions(map: ScrollPositions): void {
   try {
     localStorage.setItem(SCROLL_POSITIONS_KEY, JSON.stringify(map));
   } catch { /* noop */ }
 }
 
+/**
+ * Persists the visible block ID for a single note.
+ * Merges into the existing position map to avoid overwriting other notes' data.
+ *
+ * @param noteId - The note whose scroll position is being saved.
+ * @param blockId - The `data-id` of the currently visible BlockNote block.
+ */
 function saveScrollBlockId(noteId: string, blockId: string): void {
   const map = loadPositions();
   map[noteId] = blockId;
   savePositions(map);
 }
 
+/**
+ * Retrieves the persisted block ID for a given note.
+ *
+ * @param noteId - The note whose scroll position is being retrieved.
+ * @returns The saved block `data-id`, or `null` if no position was stored.
+ */
 function loadScrollBlockId(noteId: string): string | null {
   return loadPositions()[noteId] ?? null;
 }
@@ -33,6 +61,13 @@ function loadScrollBlockId(noteId: string): string | null {
 /**
  * Returns the `data-id` of the first BlockNote block whose top edge
  * is visible inside the given scroll container.
+ *
+ * Iterates over all `[data-node-type="blockContainer"][data-id]` elements
+ * and returns the first one whose top coordinate falls within the
+ * container's visible vertical range.
+ *
+ * @param container - The scrollable container element to inspect.
+ * @returns The `data-id` of the first visible block, or `null` if none is found.
  */
 function findFirstVisibleBlockId(container: HTMLElement): string | null {
   const containerRect = container.getBoundingClientRect();
@@ -53,6 +88,12 @@ function findFirstVisibleBlockId(container: HTMLElement): string | null {
   return null;
 }
 
+/**
+ * Options for the {@link useBlockScrollMemory} hook.
+ *
+ * @property containerRef - Ref to the scrollable container element.
+ * @property noteId - The currently active note ID, or `null` when no note is selected.
+ */
 interface UseBlockScrollMemoryOptions {
   containerRef: React.RefObject<HTMLElement | null>;
   noteId: string | null;
@@ -72,6 +113,13 @@ interface UseBlockScrollMemoryOptions {
  * (a microtask after `replaceBlocks`), so the browser never paints the
  * intermediate top-of-document state. Falls back to the top when the
  * block no longer exists.
+ *
+ * @param options - Hook configuration options.
+ * @param options.containerRef - Ref to the scrollable container element.
+ * @param options.noteId - The currently active note ID, or `null`.
+ * @returns An object containing:
+ *   - `onContentLoaded` - Callback to invoke after editor content has been loaded.
+ *   - `saveScrollPosition` - Imperative function to save scroll position for a given note.
  */
 export function useBlockScrollMemory({
   containerRef,
@@ -81,23 +129,8 @@ export function useBlockScrollMemory({
   const rafId = useRef<number>(0);
   const restoredRef = useRef<string | null>(null);
 
-  /** Persists the first visible block ID for the current note. */
-  const saveCurrentPosition = useCallback(() => {
-    const container = containerRef.current;
-    if (!container || !noteId) return;
-
-    const blockId = findFirstVisibleBlockId(container);
-    if (blockId) {
-      saveScrollBlockId(noteId, blockId);
-    }
-  }, [containerRef, noteId]);
-
-  /**
-   * Imperatively saves the scroll position for a given note.
-   * Call this BEFORE updating `noteId` state so the DOM still
-   * contains the correct block elements.
-   */
-  const saveScrollPosition = useCallback(
+  /** Persists the first visible block ID for the given note. */
+  const savePositionForNote = useCallback(
     (targetNoteId: string) => {
       const container = containerRef.current;
       if (!container) return;
@@ -108,6 +141,24 @@ export function useBlockScrollMemory({
       }
     },
     [containerRef],
+  );
+
+  /** Persists the first visible block ID for the current note. */
+  const saveCurrentPosition = useCallback(() => {
+    if (!noteId) return;
+    savePositionForNote(noteId);
+  }, [noteId, savePositionForNote]);
+
+  /**
+   * Imperatively saves the scroll position for a given note.
+   * Call this BEFORE updating `noteId` state so the DOM still
+   * contains the correct block elements.
+   */
+  const saveScrollPosition = useCallback(
+    (targetNoteId: string) => {
+      savePositionForNote(targetNoteId);
+    },
+    [savePositionForNote],
   );
 
   /** Scrolls to the saved block for the given note. */
@@ -128,7 +179,6 @@ export function useBlockScrollMemory({
         const blockTop = blockEl.getBoundingClientRect().top;
         const containerTop = container.getBoundingClientRect().top;
         const offset = blockTop - containerTop + container.scrollTop;
-
         container.scrollTo({ top: offset });
       }
     },

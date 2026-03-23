@@ -17,6 +17,7 @@ import { useLinkPreview } from "../hooks/useLinkPreview";
 import { useLinkClickHandler } from "../hooks/useLinkClickHandler";
 import type { SaveStatus } from "..";
 import { DEFAULT_BLOCKS } from "../lib/constants";
+import { cursorCenteringExtension } from "..";
 import { useTheme } from "@/app/providers/theme-provider";
 import { HighlightButton } from "./HighlightButton";
 
@@ -31,6 +32,14 @@ import { HighlightButton } from "./HighlightButton";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const BLOCKS = DEFAULT_BLOCKS as any;
 
+/**
+ * Props for the {@link Editor} component.
+ *
+ * @property noteId - The UUID of the note to edit, or `null` to start a new note.
+ * @property onNoteSaved - Callback invoked with the note ID after each successful auto-save.
+ * @property onStatusChange - Callback invoked when the save status changes.
+ * @property onContentLoaded - Called after the note content has been loaded into the editor (or defaults applied).
+ */
 interface EditorProps {
   noteId: string | null;
   onNoteSaved?: (id: string) => void;
@@ -42,6 +51,8 @@ interface EditorProps {
 /**
  * Builds the array of formatting toolbar items with the custom
  * {@link HighlightButton} injected after the built-in color-style button.
+ *
+ * @returns The augmented array of formatting toolbar items.
  */
 function buildFormattingToolbarItems() {
   const items = getFormattingToolbarItems();
@@ -90,6 +101,7 @@ export function Editor({
   const editor = useCreateBlockNote({
     initialContent: DEFAULT_BLOCKS,
     pasteHandler,
+    extensions: [cursorCenteringExtension],
   });
 
   useLinkClickHandler(editor);
@@ -160,7 +172,7 @@ export function Editor({
   }, [editor, scheduleSave]);
 
   return (
-    <div className="w-full px-8 pb-8">
+    <div className="w-full px-8 pb-[60vh]">
       <BlockNoteView
         editor={editor}
         theme={resolvedTheme}
