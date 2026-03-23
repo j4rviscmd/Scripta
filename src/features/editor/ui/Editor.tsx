@@ -35,6 +35,8 @@ interface EditorProps {
   noteId: string | null;
   onNoteSaved?: (id: string) => void;
   onStatusChange?: (status: SaveStatus) => void;
+  /** Called after the note content has been loaded into the editor (or defaults applied). */
+  onContentLoaded?: () => void;
 }
 
 /**
@@ -73,6 +75,7 @@ export function Editor({
   noteId,
   onNoteSaved,
   onStatusChange,
+  onContentLoaded,
 }: EditorProps) {
   const loadingRef = useRef(true);
   const { resolvedTheme } = useTheme();
@@ -110,7 +113,10 @@ export function Editor({
     if (!noteId) {
       editor.replaceBlocks(editor.document, BLOCKS);
       queueMicrotask(() => {
-        if (!stale) loadingRef.current = false;
+        if (!stale) {
+          loadingRef.current = false;
+          onContentLoaded?.();
+        }
       });
       return;
     }
@@ -132,7 +138,10 @@ export function Editor({
         if (!stale) toast.error("Failed to load note");
       })
       .finally(() => {
-        if (!stale) loadingRef.current = false;
+        if (!stale) {
+          loadingRef.current = false;
+          onContentLoaded?.();
+        }
       });
 
     return () => {
