@@ -1,62 +1,16 @@
 import { useCallback, useEffect, useRef } from "react";
-
-/** localStorage key for per-note scroll position map. */
-const SCROLL_POSITIONS_KEY = "scripta:scrollPositions";
+import { useAppStore } from "@/app/providers/store-provider";
 
 /**
  * Maps note IDs to their last-visible BlockNote block `data-id` values.
  * Used as the in-memory representation of persisted scroll positions.
+ *
+ * @example
+ * ```ts
+ * { "note-abc123": "block-xyz789" }
+ * ```
  */
 type ScrollPositions = Record<string, string>;
-
-/**
- * Loads the persisted scroll-position map from localStorage.
- *
- * @returns The parsed map, or an empty object if parsing fails or no data exists.
- */
-function loadPositions(): ScrollPositions {
-  try {
-    const raw = localStorage.getItem(SCROLL_POSITIONS_KEY);
-    return raw ? (JSON.parse(raw) as ScrollPositions) : {};
-  } catch {
-    return {};
-  }
-}
-
-/**
- * Persists the scroll-position map to localStorage.
- * Silently ignores storage errors (e.g. quota exceeded).
- *
- * @param map - The scroll-position map to persist.
- */
-function savePositions(map: ScrollPositions): void {
-  try {
-    localStorage.setItem(SCROLL_POSITIONS_KEY, JSON.stringify(map));
-  } catch { /* noop */ }
-}
-
-/**
- * Persists the visible block ID for a single note.
- * Merges into the existing position map to avoid overwriting other notes' data.
- *
- * @param noteId - The note whose scroll position is being saved.
- * @param blockId - The `data-id` of the currently visible BlockNote block.
- */
-function saveScrollBlockId(noteId: string, blockId: string): void {
-  const map = loadPositions();
-  map[noteId] = blockId;
-  savePositions(map);
-}
-
-/**
- * Retrieves the persisted block ID for a given note.
- *
- * @param noteId - The note whose scroll position is being retrieved.
- * @returns The saved block `data-id`, or `null` if no position was stored.
- */
-function loadScrollBlockId(noteId: string): string | null {
-  return loadPositions()[noteId] ?? null;
-}
 
 /**
  * Returns the `data-id` of the first BlockNote block whose top edge
@@ -101,8 +55,12 @@ interface UseBlockScrollMemoryOptions {
 
 /**
  * Persists the currently visible BlockNote block ID per note in
- * localStorage, and restores the scroll position when a note's
+ * tauri-plugin-store, and restores the scroll position when a note's
  * content has finished loading.
+ *
+ * Uses an in-memory cache (`useRef`) for synchronous reads during
+ * scroll restoration, and asynchronously persists changes to the
+ * store (fire-and-forget).
  *
  * **Save triggers**:
  * - Debounced scroll (500 ms) during normal scrolling
@@ -125,9 +83,27 @@ export function useBlockScrollMemory({
   containerRef,
   noteId,
 }: UseBlockScrollMemoryOptions) {
+  const { editorState: editorStore } = useAppStore();
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rafId = useRef<number>(0);
   const restoredRef = useRef<string | null>(null);
+  const positionsRef = useRef<ScrollPositions>({});
+
+  // Load persisted scroll positions from the store on first mount.
+  useEffect(() => {
+    editorStore.get<ScrollPositions>("scrollPositions").then((map) => {
+      if (map) positionsRef.current = map;
+    }).catch((err) => {
+      console.error("Failed to load scrollPositions:", err);
+    });
+  }, [editorStore]);
+
+  /** Persists the in-memory position map to the store (fire-and-forget). */
+  const persistPositions = useCallback(() => {
+    editorStore.set("scrollPositions", { ...positionsRef.current }).catch((err) => {
+      console.error("Failed to persist scrollPositions:", err);
+    });
+  }, [editorStore]);
 
   /** Persists the first visible block ID for the given note. */
   const savePositionForNote = useCallback(
@@ -137,10 +113,11 @@ export function useBlockScrollMemory({
 
       const blockId = findFirstVisibleBlockId(container);
       if (blockId) {
-        saveScrollBlockId(targetNoteId, blockId);
+        positionsRef.current[targetNoteId] = blockId;
+        persistPositions();
       }
     },
-    [containerRef],
+    [containerRef, persistPositions],
   );
 
   /** Persists the first visible block ID for the current note. */
@@ -154,12 +131,7 @@ export function useBlockScrollMemory({
    * Call this BEFORE updating `noteId` state so the DOM still
    * contains the correct block elements.
    */
-  const saveScrollPosition = useCallback(
-    (targetNoteId: string) => {
-      savePositionForNote(targetNoteId);
-    },
-    [savePositionForNote],
-  );
+  const saveScrollPosition = savePositionForNote;
 
   /** Scrolls to the saved block for the given note. */
   const restoreScrollPosition = useCallback(
@@ -167,7 +139,7 @@ export function useBlockScrollMemory({
       const container = containerRef.current;
       if (!container) return;
 
-      const savedBlockId = loadScrollBlockId(targetNoteId);
+      const savedBlockId = positionsRef.current[targetNoteId];
       if (!savedBlockId) return;
 
       const escaped = CSS.escape(savedBlockId);

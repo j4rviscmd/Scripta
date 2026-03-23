@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-
-/** localStorage key used to persist the header hidden/shown state across sessions. */
-const HEADER_HIDDEN_KEY = "scripta:headerHidden";
+import { useAppStore } from "@/app/providers/store-provider";
 
 /**
  * Custom event name dispatched by the cursor-centering ProseMirror
@@ -13,6 +11,8 @@ const CENTERING_EVENT = "scripta:centering";
 
 /**
  * Configuration options for {@link useScrollDirection}.
+ *
+ * @property threshold - Minimum accumulated scroll delta (px) before toggling header visibility. Defaults to `10`.
  */
 interface ScrollDirectionOptions {
   /** Minimum scroll delta (px) before toggling header visibility. */
@@ -41,21 +41,25 @@ export function useScrollDirection(
   options: ScrollDirectionOptions = {},
 ) {
   const { threshold = 10 } = options;
-  const [isHidden, setIsHidden] = useState(() => {
-    try {
-      return localStorage.getItem(HEADER_HIDDEN_KEY) === "true";
-    } catch {
-      return false;
-    }
-  });
+  const { editorState: editorStore } = useAppStore();
+  const [isHidden, setIsHidden] = useState(false);
 
-  /** Updates the hidden state and persists it to localStorage. Silently ignores storage errors. */
+  // Load persisted header hidden state from the store on first mount.
+  useEffect(() => {
+    editorStore.get<boolean>("headerHidden").then((val) => {
+      if (val !== undefined) setIsHidden(val);
+    }).catch((err) => {
+      console.error("Failed to load headerHidden:", err);
+    });
+  }, [editorStore]);
+
+  /** Updates the hidden state and persists it to the store. */
   const setHidden = useCallback((value: boolean) => {
     setIsHidden(value);
-    try {
-      localStorage.setItem(HEADER_HIDDEN_KEY, String(value));
-    } catch { /* noop */ }
-  }, []);
+    editorStore.set("headerHidden", value).catch((err) => {
+      console.error("Failed to persist headerHidden:", err);
+    });
+  }, [editorStore]);
   const accumulatedDelta = useRef(0);
   const ticking = useRef(false);
   const clickLock = useRef(false);

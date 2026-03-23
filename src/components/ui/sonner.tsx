@@ -1,7 +1,25 @@
-import { useTheme } from "next-themes"
+import { useTheme } from "@/app/providers/theme-provider"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
 
+/**
+ * Themed toast notification component built on top of Sonner.
+ *
+ * Automatically syncs its visual theme with the application's current
+ * theme via `{@link useTheme}`. Uses CSS custom properties from the
+ * design system for background, text, and border colors so the toast
+ * appearance stays consistent across light and dark modes.
+ *
+ * @param props - Standard Sonner `ToasterProps` spread onto the underlying component.
+ *
+ * @example
+ * ```tsx
+ * import { Toaster } from "@/components/ui/sonner";
+ *
+ * // Place once at the root of your application:
+ * <Toaster position="bottom-right" />
+ * ```
+ */
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme()
 
