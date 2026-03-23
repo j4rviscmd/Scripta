@@ -1,23 +1,34 @@
 import { useEffect } from "react";
 
+/**
+ * Options for the {@link useScrollIsolation} hook.
+ *
+ * @property selectors - CSS selectors for elements whose scroll events
+ *   should be isolated from the parent scroll container.
+ *   - **Inline elements** (via GenericPopover): rendered directly inside
+ *     the scroll container; handled with `stopPropagation`.
+ *   - **Portal elements** (via Radix Portal): rendered under `document.body`;
+ *     handled by locking the scroll container with `overflow: hidden` while
+ *     the portal is present.
+ */
 interface ScrollIsolationOptions {
-  /**
-   * スクロール伝播を防止する要素のCSSセレクタ。
-   *
-   * - インライン要素（GenericPopover経由）:
-   *   スクロールコンテナ内に直接レンダリングされ、stopPropagationで対応
-   * - Portal要素（Radix Portal経由）:
-   *   document.bodyにレンダリングされ、出現中はスクロールコンテナを
-   *   overflow:hiddenでロックして対応
-   */
   selectors: string[];
 }
 
 const marker = "scrollIsolated";
 
 /**
- * スクロールコンテナ内の要素: stopPropagationでバブルアップを阻止。
- * GenericPopover経由の要素（スラッシュメニュー等）を対象とする。
+ * Applies scroll isolation to an inline element inside the scroll container.
+ *
+ * Prevents wheel events from bubbling up to the scroll container by calling
+ * `stopPropagation`, and sets `overscroll-behavior: contain` to block the
+ * browser's native scroll chaining.  Intended for elements rendered via
+ * GenericPopover (e.g. the slash command menu).
+ *
+ * Each element is only processed once; subsequent calls are no-ops thanks
+ * to a `data-scrollIsolated` marker attribute.
+ *
+ * @param el - The element to isolate.
  */
 function isolateInline(el: HTMLElement) {
   if (el.dataset[marker]) return;
@@ -26,6 +37,17 @@ function isolateInline(el: HTMLElement) {
   el.addEventListener("wheel", (e) => e.stopPropagation(), { passive: true });
 }
 
+/**
+ * Observes the container for dynamically added elements matching `selector`
+ * and applies inline scroll isolation to each of them.
+ *
+ * Uses a `MutationObserver` to catch elements added after the initial
+ * query (e.g. popups opened by user interaction).
+ *
+ * @param container - The parent element to observe for new children.
+ * @param selector - CSS selector for elements that should be isolated.
+ * @returns The `MutationObserver` instance (call `disconnect()` to clean up).
+ */
 function observeInlineElements(
   container: HTMLElement,
   selector: string,
@@ -48,21 +70,37 @@ function observeInlineElements(
 }
 
 /**
- * Portal要素（document.body配下）の出現を監視し、
- * スクロールコンテナをoverflow:hiddenでロックする。
+ * Monitors `document.body` for Portal elements matching `portalSelector`
+ * and locks the scroll container with `overflow: hidden` while they exist.
  *
- * ChromiumのcompositorスレッドはJSイベントとは独立して
- * scroll chainingを処理するため、preventDefaultでは防げない。
- * overflow:hiddenで物理的にスクロールを禁止する。
+ * Chromium's compositor thread processes scroll chaining independently
+ * from JS events, so `preventDefault` alone cannot prevent it.
+ * `overflow: hidden` physically disables scrolling on the container.
+ *
+ * While locked, an `requestAnimationFrame` poll runs to catch Portal
+ * elements removed by Radix animation teardown (which may bypass
+ * `MutationObserver` detection).
+ *
+ * @param container - The scrollable container to lock/unlock.
+ * @param portalSelector - CSS selector for Portal elements rendered under `document.body`.
+ * @returns A cleanup function that disconnects the observer, cancels
+ *   the polling loop, and unlocks the container.
  */
 function createPortalScrollLock(
   container: HTMLElement,
   portalSelector: string,
 ) {
+  let locked = false;
+  let rafId = 0;
+
   const lock = () => {
+    if (locked) return;
+    locked = true;
     container.style.overflowY = "hidden";
   };
   const unlock = () => {
+    if (!locked) return;
+    locked = false;
     container.style.overflowY = "";
   };
 
@@ -74,27 +112,46 @@ function createPortalScrollLock(
     }
   };
 
-  const observer = new MutationObserver(check);
-  observer.observe(document.body, { childList: true });
+  /**
+   * While locked, poll every animation frame so that a Portal element
+   * removed by Radix animation teardown (which may bypass MutationObserver
+   * detection) is caught promptly and the container is unlocked.
+   */
+  const startPoll = () => {
+    cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(() => {
+      if (!locked) return;
+      check();
+      startPoll();
+    });
+  };
+
+  const observer = new MutationObserver(() => {
+    check();
+    if (locked) startPoll();
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
   check();
 
   return () => {
     observer.disconnect();
+    cancelAnimationFrame(rafId);
     unlock();
   };
 }
 
 /**
- * スクロールコンテナ内およびdocument.body配下のフローティングUI要素に対して
- * スクロール伝播防止を適用する。
+ * Applies scroll propagation prevention to floating UI elements both
+ * inside the scroll container and under `document.body`.
  *
- * - GenericPopover経由の要素（スラッシュメニュー等）:
- *   stopPropagation + overscroll-behavior: contain
- * - Radix Portal経由の要素（Select/DropdownMenu等）:
- *   Portal出現中はスクロールコンテナをoverflow:hiddenでロック
+ * - **GenericPopover elements** (slash command menu, etc.):
+ *   `stopPropagation` + `overscroll-behavior: contain`.
+ * - **Radix Portal elements** (Select / DropdownMenu, etc.):
+ *   Locks the scroll container with `overflow: hidden` while the portal is present.
  *
- * @param containerRef - スクロール可能な親コンテナのref
- * @param options - 伝播防止対象のCSSセレクタ配列
+ * @param containerRef - Ref to the scrollable parent container.
+ * @param options - Configuration for which selectors to isolate.
+ * @param options.selectors - CSS selectors for elements whose scroll events should be isolated.
  */
 export function useScrollIsolation(
   containerRef: React.RefObject<HTMLElement | null>,
