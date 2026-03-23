@@ -8,6 +8,7 @@ import { Editor, createNote, deleteNote, listNotes, togglePinNote, getNote, DEFA
 import type { SaveStatus } from "@/features/editor";
 import { NoteSidebar } from "@/features/sidebar";
 import { ThemeProvider } from "@/app/providers/theme-provider";
+import { useAppStore } from "@/app/providers/store-provider";
 import { ModeToggle } from "@/shared/ui/ModeToggle";
 import { SaveStatusIndicator } from "@/shared/ui/SaveStatusIndicator";
 import { useScrollDirection } from "@/shared/hooks/useScrollDirection";
@@ -17,31 +18,19 @@ import { useBlockScrollMemory } from "@/shared/hooks/useBlockScrollMemory";
 import { ScrollToTopButton } from "@/shared/ui/ScrollToTopButton";
 import { cn } from "@/lib/utils";
 
-/** localStorage key used to persist the last opened note ID across sessions. */
-const LAST_NOTE_KEY = "scripta:lastNoteId";
-
-function updateStoredNoteId(id: string | null): void {
-  if (id) {
-    localStorage.setItem(LAST_NOTE_KEY, id);
-    return;
-  }
-  localStorage.removeItem(LAST_NOTE_KEY);
-}
-
 /**
  * Root component of the application.
  *
  * Manages the selected note state and renders the sidebar alongside
  * the editor.  A shared `refreshKey` counter ensures the sidebar
  * re-fetches its note list whenever a note is saved.  The last opened
- * note ID is persisted in localStorage so it can be restored on startup.
+ * note ID is persisted in tauri-plugin-store so it can be restored on startup.
  *
  * @returns The rendered application tree.
  */
 function App() {
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(() =>
-    localStorage.getItem(LAST_NOTE_KEY),
-  );
+  const { editorState: editorStore } = useAppStore();
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -67,13 +56,32 @@ function App() {
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
+  // Restore the last opened note ID from the store on first mount.
+  useEffect(() => {
+    editorStore.get<string>("lastNoteId").then((id) => {
+      if (id) setSelectedNoteId(id);
+    }).catch((err) => {
+      console.error("Failed to load lastNoteId:", err);
+    });
+  }, [editorStore]);
+
+  /** Persists or clears the last opened note ID in the store. */
+  const persistLastNoteId = useCallback((id: string | null) => {
+    const action = id
+      ? editorStore.set("lastNoteId", id)
+      : editorStore.delete("lastNoteId");
+    action.catch((err) => {
+      console.error(`Failed to ${id ? "persist" : "delete"} lastNoteId:`, err);
+    });
+  }, [editorStore]);
+
   const selectNote = useCallback((id: string | null) => {
     if (selectedNoteId) {
       saveScrollPosition(selectedNoteId);
     }
     setSelectedNoteId(id);
-    updateStoredNoteId(id);
-  }, [selectedNoteId, saveScrollPosition]);
+    persistLastNoteId(id);
+  }, [selectedNoteId, saveScrollPosition, persistLastNoteId]);
 
   useEffect(() => {
     const appWindow = getCurrentWindow();
@@ -148,7 +156,7 @@ function App() {
   );
 
   return (
-    <ThemeProvider defaultTheme="system" storageKey="scripta:theme">
+    <ThemeProvider defaultTheme="system">
       <TooltipProvider>
         <SidebarProvider className="h-svh">
           <NoteSidebar
