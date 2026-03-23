@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { CursorCenteringOption } from "./CursorCenteringOption";
 import { ThemeOption } from "./ThemeOption";
 
 /**
@@ -47,6 +48,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           <ThemeOption value="dark" label="Dark" icon={<Moon className="h-5 w-5" />} />
           <ThemeOption value="system" label="System" icon={<Monitor className="h-5 w-5" />} />
         </div>
+        <Separator />
+        <CursorCenteringOption />
         <Separator />
       </DialogContent>
     </Dialog>

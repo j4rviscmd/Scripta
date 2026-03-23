@@ -17,7 +17,7 @@ import { useLinkPreview } from "../hooks/useLinkPreview";
 import { useLinkClickHandler } from "../hooks/useLinkClickHandler";
 import type { SaveStatus } from "..";
 import { DEFAULT_BLOCKS } from "../lib/constants";
-import { cursorCenteringExtension } from "..";
+import { cursorCenteringExtension, useCursorCentering } from "..";
 import { useTheme } from "@/app/providers/theme-provider";
 import { HighlightButton } from "./HighlightButton";
 
@@ -37,14 +37,15 @@ const BLOCKS = DEFAULT_BLOCKS as any;
  *
  * @property noteId - The UUID of the note to edit, or `null` to start a new note.
  * @property onNoteSaved - Callback invoked with the note ID after each successful auto-save.
- * @property onStatusChange - Callback invoked when the save status changes.
- * @property onContentLoaded - Called after the note content has been loaded into the editor (or defaults applied).
+ * @property onStatusChange - Callback invoked when the save status changes
+ *   (e.g. `"saving"`, `"saved"`, `"error"`).
+ * @property onContentLoaded - Called after the note content has been loaded
+ *   into the editor (or defaults applied).
  */
 interface EditorProps {
   noteId: string | null;
   onNoteSaved?: (id: string) => void;
   onStatusChange?: (status: SaveStatus) => void;
-  /** Called after the note content has been loaded into the editor (or defaults applied). */
   onContentLoaded?: () => void;
 }
 
@@ -80,6 +81,10 @@ const formattingToolbarItems = buildFormattingToolbarItems();
  * @param props - Editor component props.
  * @param props.noteId - The UUID of the note to edit, or `null` to start a new note.
  * @param props.onNoteSaved - Callback invoked with the note ID after each successful auto-save.
+ * @param props.onStatusChange - Callback invoked when the save status changes
+ *   (e.g. `"saving"`, `"saved"`, `"error"`).
+ * @param props.onContentLoaded - Called after the note content has been loaded
+ *   into the editor (or defaults applied).
  * @returns The rendered editor view.
  */
 export function Editor({
@@ -90,6 +95,9 @@ export function Editor({
 }: EditorProps) {
   const loadingRef = useRef(true);
   const { resolvedTheme } = useTheme();
+
+  // Ensure persisted cursor-centering config is synced to the mutable module object on mount.
+  useCursorCentering();
 
   const { scheduleSave, saveStatus } = useAutoSave(500, noteId ?? undefined, onNoteSaved);
   const pasteHandler = useLinkPreview();

@@ -1,18 +1,8 @@
 import { createExtension } from "@blocknote/core";
 import { Plugin } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
-
-/**
- * Ratio of the scroll-container height at which the cursor should be
- * positioned when centering is triggered (0.4 = 40 % from the top).
- *
- * Shared with {@link useBlockScrollMemory} so that both real-time
- * centering and position restoration target the same vertical offset.
- */
-export const CURSOR_TARGET_RATIO = 0.6;
-
-/** Custom event dispatched on `document` when centering is triggered. */
-export const CENTERING_EVENT = "scripta:centering";
+import { cursorCenteringConfig } from "./cursorCenteringConfig";
+import { CENTERING_EVENT } from "@/shared/lib/events";
 
 /**
  * Bottom scroll-margin (px) passed to ProseMirror so that
@@ -42,15 +32,13 @@ function findScrollContainer(el: HTMLElement): HTMLElement | null {
 
 /**
  * Smoothly scrolls the container so that the cursor sits at
- * {@link CURSOR_TARGET_RATIO} from the top of the visible area.
+ * the configured target ratio from the top of the visible area.
  *
  * Does nothing when the cursor is already above the target or when
  * the calculated scroll offset is within 2 px of the current one.
  *
  * @param view - The current ProseMirror editor view.
  * @returns `true` if a scroll was scheduled, `false` otherwise.
- *
- * @see findScrollContainer - used to locate the scrollable ancestor.
  */
 function centerCursorIfBelowTarget(view: EditorView): boolean {
   const container = findScrollContainer(view.dom);
@@ -62,7 +50,7 @@ function centerCursorIfBelowTarget(view: EditorView): boolean {
   const coords = view.coordsAtPos(from);
   const rect = container.getBoundingClientRect();
 
-  const targetY = rect.top + rect.height * CURSOR_TARGET_RATIO;
+  const targetY = rect.top + rect.height * cursorCenteringConfig.targetRatio;
   const scrollTop = container.scrollTop;
   const desired = scrollTop + (coords.top - targetY);
 
@@ -93,11 +81,12 @@ function centerCursorIfBelowTarget(view: EditorView): boolean {
 let docChangedInLastTr = false;
 
 /**
- * BlockNote extension that keeps the text cursor at approximately
- * 40 % from the top of the scroll container **only during typing**.
+ * BlockNote extension that keeps the text cursor at the configured
+ * position from the top of the scroll container **only during typing**.
  *
  * Cursor-only moves (arrow keys, clicks) and manual scrolling do
- * not trigger centering.
+ * not trigger centering. The feature can be disabled entirely via
+ * {@link cursorCenteringConfig.enabled}.
  *
  * **How it works:**
  * - Plugin state `apply()` records `tr.docChanged` into a module-level
@@ -107,9 +96,6 @@ let docChangedInLastTr = false;
  *   the document actually changed (i.e. the user typed something).
  * - The scroll offset is clamped to `[0, maxScroll]` so that short
  *   documents keep the cursor near the top (no centre-jump).
- *
- * @see CURSOR_TARGET_RATIO - vertical position ratio used for centering.
- * @see CENTERING_EVENT - custom event dispatched when centering fires.
  */
 export const cursorCenteringExtension = createExtension({
   key: "cursorCentering",
@@ -132,6 +118,7 @@ export const cursorCenteringExtension = createExtension({
           left: 0,
         },
         handleScrollToSelection(view: EditorView): boolean {
+          if (!cursorCenteringConfig.enabled) return false;
           if (!docChangedInLastTr) return false;
           docChangedInLastTr = false;
           document.dispatchEvent(new CustomEvent(CENTERING_EVENT));

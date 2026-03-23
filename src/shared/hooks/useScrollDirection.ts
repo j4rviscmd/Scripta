@@ -1,21 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAppStore } from "@/app/providers/store-provider";
-
-/**
- * Custom event name dispatched by the cursor-centering ProseMirror
- * plugin when a centering scroll is triggered (typing only).
- * Listening for this event hides the header, matching the natural
- * "scroll down → header hides" behaviour.
- */
-const CENTERING_EVENT = "scripta:centering";
+import { CENTERING_EVENT } from "@/shared/lib/events";
 
 /**
  * Configuration options for {@link useScrollDirection}.
- *
- * @property threshold - Minimum accumulated scroll delta (px) before toggling header visibility. Defaults to `10`.
  */
 interface ScrollDirectionOptions {
-  /** Minimum scroll delta (px) before toggling header visibility. */
+  /** Minimum accumulated scroll delta (px) before toggling header visibility. Defaults to `10`. */
   threshold?: number;
 }
 
@@ -32,8 +23,7 @@ interface ScrollDirectionOptions {
  * is scrolled back to the very top.
  *
  * @param containerRef - Ref to the scrollable container element.
- * @param options - Configuration options.
- * @param options.threshold - Minimum accumulated scroll delta (px) before toggling visibility. Defaults to `10`.
+ * @param options - Configuration options. See {@link ScrollDirectionOptions}.
  * @returns `true` when the header should be hidden, `false` otherwise.
  */
 export function useScrollDirection(
