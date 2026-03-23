@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { FileText, Pin, PinOff, Plus, Search, Trash2, X } from "lucide-react";
+import { FileText, Pin, PinOff, Plus, Search, Settings, Trash2, X } from "lucide-react";
 import { listNotes, type Note } from "@/features/editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -34,10 +35,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { useDebounce } from "..";
+import { SettingsDialog } from "@/features/settings";
 
+/** Number of milliseconds in one day. */
 const MS_PER_DAY = 86_400_000;
+/** Number of minutes in one hour. */
 const MINUTES_PER_HOUR = 60;
+/** Number of minutes in one day. */
 const MINUTES_PER_DAY = 1_440;
+/** Number of minutes in one week. */
 const MINUTES_PER_WEEK = 10_080;
 
 /**
@@ -223,6 +229,7 @@ export function NoteSidebar({
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [justPinnedId, setJustPinnedId] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const debouncedQuery = useDebounce(searchQuery);
 
@@ -246,6 +253,22 @@ export function NoteSidebar({
     }
   };
 
+  /**
+   * Renders the main content area of the sidebar.
+   *
+   * Handles four display states:
+   *
+   * 1. **No search results** -- Shows a centered empty-state message
+   *    with the search query.
+   * 2. **Pinned + date groups** -- Pinned notes appear first in a
+   *    dedicated section (hidden during search), followed by unpinned
+   *    notes grouped by relative date via {@link groupNotes}.
+   * 3. **Search results only** -- During search, pinned section is
+   *    hidden and all matching notes are shown in date groups.
+   * 4. **No notes at all** -- Shows a simple "No notes yet" message.
+   *
+   * @returns The rendered sidebar body as a `React.ReactNode`.
+   */
   function renderSidebarBody(): React.ReactNode {
     if (isSearching && filteredNotes.length === 0) {
       return (
@@ -256,45 +279,43 @@ export function NoteSidebar({
       );
     }
 
-    // During search: hide pinned section, show all results in date groups
     const pinnedNotes = isSearching ? [] : filteredNotes.filter((n) => n.isPinned);
-    const unpinnedNotes = isSearching
-      ? filteredNotes
-      : filteredNotes.filter((n) => !n.isPinned);
-    const groups = groupNotes(unpinnedNotes);
+    const groups = groupNotes(isSearching ? filteredNotes : filteredNotes.filter((n) => !n.isPinned));
 
     if (pinnedNotes.length === 0 && groups.length === 0) {
       return <p className="p-4 text-sm text-muted-foreground">No notes yet</p>;
+    }
+
+    function renderNoteItem(note: Note) {
+      return (
+        <NoteItem
+          key={note.id}
+          note={note}
+          selectedNoteId={selectedNoteId}
+          onSelectNote={onSelectNote}
+          onTogglePin={handleTogglePin}
+          onDeleteNote={() => setDeleteTarget(note.id)}
+          justPinnedId={justPinnedId}
+        />
+      );
     }
 
     return (
       <>
         {/* Pinned section */}
         {pinnedNotes.length > 0 && (
-          <>
-            <SidebarGroup className="animate-in fade-in-0 slide-in-from-top-2 duration-300">
-              <SidebarGroupLabel className="flex items-center gap-1 text-[10px] [&>svg]:!size-2.5">
-                <Pin className="fill-primary text-primary" />
-                Pinned
-              </SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {pinnedNotes.map((note) => (
-                    <NoteItem
-                      key={note.id}
-                      note={note}
-                      selectedNoteId={selectedNoteId}
-                      onSelectNote={onSelectNote}
-                      onTogglePin={handleTogglePin}
-                      onDeleteNote={() => setDeleteTarget(note.id)}
-                      justPinnedId={justPinnedId}
-                    />
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-            <SidebarSeparator className="mx-3 animate-in fade-in-0 duration-500 delay-150" />
-          </>
+          <SidebarGroup className="animate-in fade-in-0 slide-in-from-top-2 duration-300">
+            <SidebarGroupLabel className="flex items-center gap-1 text-[10px] [&>svg]:!size-2.5">
+              <Pin className="fill-primary text-primary" />
+              Pinned
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>{pinnedNotes.map(renderNoteItem)}</SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+        {pinnedNotes.length > 0 && (
+          <SidebarSeparator className="mx-3 animate-in fade-in-0 duration-500 delay-150" />
         )}
 
         {/* Date groups */}
@@ -302,19 +323,7 @@ export function NoteSidebar({
           <SidebarGroup key={group.label}>
             <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu>
-                {group.items.map((note) => (
-                  <NoteItem
-                    key={note.id}
-                    note={note}
-                    selectedNoteId={selectedNoteId}
-                    onSelectNote={onSelectNote}
-                    onTogglePin={handleTogglePin}
-                    onDeleteNote={() => setDeleteTarget(note.id)}
-                    justPinnedId={justPinnedId}
-                  />
-                ))}
-              </SidebarMenu>
+              <SidebarMenu>{group.items.map(renderNoteItem)}</SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
         ))}
@@ -354,6 +363,18 @@ export function NoteSidebar({
         </Button>
       </SidebarHeader>
       <SidebarContent>{renderSidebarBody()}</SidebarContent>
+      <SidebarFooter>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start gap-2 text-muted-foreground"
+          onClick={() => setSettingsOpen(true)}
+        >
+          <Settings className="h-4 w-4" />
+          Settings
+        </Button>
+      </SidebarFooter>
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       <AlertDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
