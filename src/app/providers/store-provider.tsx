@@ -11,12 +11,33 @@ const configStore = new LazyStore("config.json");
 const editorStateStore = new LazyStore("editor-state.json");
 
 /**
- * Promise that resolves when all stores have been loaded from disk.
+ * Pre-fetched config defaults, populated during store initialization.
+ *
+ * Because these values are loaded inside {@link initPromise} (which is
+ * awaited by {@link StoreProvider} via `React.use()`), any component
+ * rendered below the `<Suspense>` boundary can read them synchronously
+ * in their `useState` initializers — avoiding the flash of a wrong
+ * default value.
+ */
+export const configDefaults = {
+  /** Whether the sidebar is open. Falls back to `true` if not persisted. */
+  sidebarOpen: true,
+};
+
+/**
+ * Promise that resolves when all stores have been loaded from disk and
+ * config defaults have been pre-fetched.
  *
  * Consumed by {@link StoreProvider} via `React.use()` to suspend rendering
  * until the stores are ready.
  */
-const initPromise = Promise.all([configStore.init(), editorStateStore.init()]);
+const initPromise = Promise.all([configStore.init(), editorStateStore.init()])
+  .then(async () => {
+    const stored = await configStore.get<boolean>("sidebarOpen");
+    if (stored != null) {
+      configDefaults.sidebarOpen = stored;
+    }
+  });
 
 /**
  * React context holding initialized store instances.
