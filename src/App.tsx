@@ -62,7 +62,6 @@ function App() {
       '[data-slot="dropdown-menu-content"]',
     ],
   });
-  });
 
   const scrollToTop = useCallback(() => {
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
