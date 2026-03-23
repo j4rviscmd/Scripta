@@ -152,6 +152,7 @@ body {
 .bn-inline-content code {
   background-color: oklch(0.964 0.021 56);
   padding: 0.15em 0.35em;
+  margin-right: 0.1em;
   border-radius: 0.25em;
   font-family:
     ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
@@ -161,6 +162,20 @@ body {
 .dark .bn-inline-content code {
   background-color: oklch(0.752 0.17 54 / 12%);
   color: oklch(0.828 0.111 54);
+}
+
+/* Highlighter marker (yellow) - light mode */
+span[data-style-type="backgroundColor"][data-value="yellow"] {
+  background-color: oklch(0.92 0.17 90) !important;
+  padding: 0.1em 0.15em;
+  margin-right: 0.1em;
+  border-radius: 0.2em;
+}
+
+/* Highlighter marker (yellow) - dark mode */
+.dark span[data-style-type="backgroundColor"][data-value="yellow"] {
+  background-color: oklch(0.55 0.18 85) !important;
+  color: oklch(0.25 0.05 85) !important;
 }
 
 /* Override BlockNote link color in dark mode (must be outside @layer base to win specificity) */

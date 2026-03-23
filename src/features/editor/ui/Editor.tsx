@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef } from "react";
-import { useCreateBlockNote, LinkToolbarController } from "@blocknote/react";
+import {
+  FormattingToolbar,
+  FormattingToolbarController,
+  getFormattingToolbarItems,
+  useCreateBlockNote,
+  LinkToolbarController,
+} from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
 import { CustomLinkToolbar } from "./CustomLinkToolbar";
 import "@blocknote/shadcn/style.css";
@@ -12,6 +18,7 @@ import { useLinkClickHandler } from "../hooks/useLinkClickHandler";
 import type { SaveStatus } from "..";
 import { DEFAULT_BLOCKS } from "../lib/constants";
 import { useTheme } from "@/app/providers/theme-provider";
+import { HighlightButton } from "./HighlightButton";
 
 /**
  * Default block content cast to the BlockNote generic type.
@@ -23,6 +30,31 @@ import { useTheme } from "@/app/providers/theme-provider";
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const BLOCKS = DEFAULT_BLOCKS as any;
+
+interface EditorProps {
+  noteId: string | null;
+  onNoteSaved?: (id: string) => void;
+  onStatusChange?: (status: SaveStatus) => void;
+}
+
+/**
+ * Builds the array of formatting toolbar items with the custom
+ * {@link HighlightButton} injected after the built-in color-style button.
+ */
+function buildFormattingToolbarItems() {
+  const items = getFormattingToolbarItems();
+  const colorIndex = items.findIndex(
+    (item) => item.key === "colorStyleButton",
+  );
+  if (colorIndex === -1) return items;
+  return [
+    ...items.slice(0, colorIndex + 1),
+    <HighlightButton key="highlightButton" />,
+    ...items.slice(colorIndex + 1),
+  ];
+}
+
+const formattingToolbarItems = buildFormattingToolbarItems();
 
 /**
  * Rich-text editor component powered by BlockNote.
@@ -41,11 +73,7 @@ export function Editor({
   noteId,
   onNoteSaved,
   onStatusChange,
-}: {
-  noteId: string | null;
-  onNoteSaved?: (id: string) => void;
-  onStatusChange?: (status: SaveStatus) => void;
-}) {
+}: EditorProps) {
   const loadingRef = useRef(true);
   const { resolvedTheme } = useTheme();
 
@@ -128,8 +156,16 @@ export function Editor({
         editor={editor}
         theme={resolvedTheme}
         onChange={handleChange}
+        formattingToolbar={false}
         linkToolbar={false}
       >
+        <FormattingToolbarController
+          formattingToolbar={() => (
+            <FormattingToolbar blockTypeSelectItems={[]}>
+              {formattingToolbarItems}
+            </FormattingToolbar>
+          )}
+        />
         <LinkToolbarController
           linkToolbar={CustomLinkToolbar}
         />
