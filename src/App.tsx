@@ -11,6 +11,7 @@ import { ThemeProvider } from "@/app/providers/theme-provider";
 import { ModeToggle } from "@/shared/ui/ModeToggle";
 import { SaveStatusIndicator } from "@/shared/ui/SaveStatusIndicator";
 import { useScrollDirection } from "@/shared/hooks/useScrollDirection";
+import { useScrollIsolation } from "@/shared/hooks/useScrollIsolation";
 import { useScrollPosition } from "@/shared/hooks/useScrollPosition";
 import { useBlockScrollMemory } from "@/shared/hooks/useBlockScrollMemory";
 import { ScrollToTopButton } from "@/shared/ui/ScrollToTopButton";
@@ -49,6 +50,18 @@ function App() {
   const { onContentLoaded, saveScrollPosition } = useBlockScrollMemory({
     containerRef: scrollContainerRef,
     noteId: selectedNoteId,
+  });
+  useScrollIsolation(scrollContainerRef, {
+    selectors: [
+      ".bn-suggestion-menu",
+      ".bn-link-toolbar",
+      ".bn-color-picker-dropdown",
+      ".bn-formatting-toolbar",
+      ".bn-table-handle-menu",
+      '[data-slot="select-content"]',
+      '[data-slot="dropdown-menu-content"]',
+    ],
+  });
   });
 
   const scrollToTop = useCallback(() => {
