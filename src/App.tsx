@@ -8,7 +8,7 @@ import { Editor, createNote, deleteNote, listNotes, togglePinNote, getNote, DEFA
 import type { SaveStatus } from "@/features/editor";
 import { NoteSidebar } from "@/features/sidebar";
 import { ThemeProvider } from "@/app/providers/theme-provider";
-import { useAppStore } from "@/app/providers/store-provider";
+import { useAppStore, configDefaults } from "@/app/providers/store-provider";
 import { ModeToggle } from "@/shared/ui/ModeToggle";
 import { SaveStatusIndicator } from "@/shared/ui/SaveStatusIndicator";
 import { useScrollDirection } from "@/shared/hooks/useScrollDirection";
@@ -29,8 +29,9 @@ import { cn } from "@/lib/utils";
  * @returns The rendered application tree.
  */
 function App() {
-  const { editorState: editorStore } = useAppStore();
+  const { config: configStore, editorState: editorStore } = useAppStore();
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(configDefaults.sidebarOpen);
   const [refreshKey, setRefreshKey] = useState(0);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -65,6 +66,14 @@ function App() {
     });
   }, [editorStore]);
 
+  /** Persists sidebar open state to the store. */
+  const handleSidebarOpenChange = useCallback((open: boolean) => {
+    setSidebarOpen(open);
+    configStore.set("sidebarOpen", open).catch((err) => {
+      console.error("Failed to persist sidebarOpen:", err);
+    });
+  }, [configStore]);
+
   /** Persists or clears the last opened note ID in the store. */
   const persistLastNoteId = useCallback((id: string | null) => {
     const action = id
@@ -75,6 +84,15 @@ function App() {
     });
   }, [editorStore]);
 
+  /**
+   * Selects a note by ID, saving the current scroll position first.
+   *
+   * When a different note is already selected, the scroll position of
+   * that note is persisted before switching. The new note ID is also
+   * saved as the last opened note for restoration on next launch.
+   *
+   * @param id - The ID of the note to select, or `null` to deselect.
+   */
   const selectNote = useCallback((id: string | null) => {
     if (selectedNoteId) {
       saveScrollPosition(selectedNoteId);
@@ -83,6 +101,9 @@ function App() {
     persistLastNoteId(id);
   }, [selectedNoteId, saveScrollPosition, persistLastNoteId]);
 
+  // Updates the native window title to reflect the currently selected note.
+  // Uses a stale guard to prevent race conditions when the selected note changes
+  // while a title fetch is still in flight.
   useEffect(() => {
     const appWindow = getCurrentWindow();
     if (!selectedNoteId) {
@@ -158,7 +179,7 @@ function App() {
   return (
     <ThemeProvider defaultTheme="system">
       <TooltipProvider>
-        <SidebarProvider className="h-svh">
+        <SidebarProvider className="h-svh" open={sidebarOpen} onOpenChange={handleSidebarOpenChange}>
           <NoteSidebar
             selectedNoteId={selectedNoteId}
             onSelectNote={selectNote}
