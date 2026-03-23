@@ -13,6 +13,7 @@ import { SaveStatusIndicator } from "@/shared/ui/SaveStatusIndicator";
 import { useScrollDirection } from "@/shared/hooks/useScrollDirection";
 import { useScrollIsolation } from "@/shared/hooks/useScrollIsolation";
 import { useScrollPosition } from "@/shared/hooks/useScrollPosition";
+import { useBlockScrollMemory } from "@/shared/hooks/useBlockScrollMemory";
 import { ScrollToTopButton } from "@/shared/ui/ScrollToTopButton";
 import { cn } from "@/lib/utils";
 
@@ -46,6 +47,10 @@ function App() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isHeaderHidden = useScrollDirection(scrollContainerRef);
   const isScrolledDown = useScrollPosition(scrollContainerRef);
+  const { onContentLoaded, saveScrollPosition } = useBlockScrollMemory({
+    containerRef: scrollContainerRef,
+    noteId: selectedNoteId,
+  });
   useScrollIsolation(scrollContainerRef, {
     selectors: [
       ".bn-suggestion-menu",
@@ -57,15 +62,19 @@ function App() {
       '[data-slot="dropdown-menu-content"]',
     ],
   });
+  });
 
   const scrollToTop = useCallback(() => {
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
   const selectNote = useCallback((id: string | null) => {
+    if (selectedNoteId) {
+      saveScrollPosition(selectedNoteId);
+    }
     setSelectedNoteId(id);
     updateStoredNoteId(id);
-  }, []);
+  }, [selectedNoteId, saveScrollPosition]);
 
   useEffect(() => {
     const appWindow = getCurrentWindow();
@@ -173,6 +182,7 @@ function App() {
                 noteId={selectedNoteId}
                 onNoteSaved={handleNoteSaved}
                 onStatusChange={setSaveStatus}
+                onContentLoaded={onContentLoaded}
               />
               <div className="sticky bottom-5 z-10 flex justify-end pr-7 pointer-events-none">
                 <ScrollToTopButton visible={isScrolledDown} onClick={scrollToTop} />
