@@ -15,4 +15,5 @@ export {
 } from "./api/notes";
 export { DEFAULT_BLOCKS, DEFAULT_CONTENT, extractTitle } from "./lib/constants";
 export { cursorCenteringExtension } from "./lib/cursorCentering";
+export { useCursorCentering } from "./hooks/useCursorCentering";
 export type { SaveStatus } from "./hooks/useAutoSave";
