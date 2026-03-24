@@ -8,6 +8,19 @@
     "opener:default",
     "core:window:allow-set-title",
     "store:default",
-    "dialog:default"
+    "dialog:default",
+    "fs:default",
+    {
+      "identifier": "fs:allow-write-file",
+      "allow": [{ "path": "$APPDATA/images" }, { "path": "$APPDATA/images/**" }]
+    },
+    {
+      "identifier": "fs:allow-mkdir",
+      "allow": [{ "path": "$APPDATA/images" }, { "path": "$APPDATA/images/**" }]
+    },
+    {
+      "identifier": "fs:allow-read-file",
+      "allow": [{ "path": "$APPDATA/images" }, { "path": "$APPDATA/images/**" }]
+    }
   ]
 }
