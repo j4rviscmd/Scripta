@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react";
 import {
   FormattingToolbar,
   FormattingToolbarController,
@@ -6,6 +6,7 @@ import {
   useCreateBlockNote,
   LinkToolbarController,
 } from "@blocknote/react";
+import type { BlockNoteEditor } from "@blocknote/core";
 import { BlockNoteView } from "@blocknote/shadcn";
 import { CustomLinkToolbar } from "./CustomLinkToolbar";
 import { SearchReplacePanel } from "./SearchReplacePanel";
@@ -44,6 +45,11 @@ interface EditorProps {
   onSuggestionMenuOpen?: (cursorClientY: number) => void;
 }
 
+export interface EditorHandle {
+  /** The underlying BlockNote editor instance. */
+  editor: BlockNoteEditor;
+}
+
 /**
  * Builds the formatting toolbar item list with a custom highlight button
  * injected after the color-style button.
@@ -74,13 +80,16 @@ const formattingToolbarItems = buildFormattingToolbarItems();
  * document. Changes are debounced and auto-saved via the
  * {@link useAutoSave} hook.
  */
-export function Editor({
-  noteId,
-  onNoteSaved,
-  onStatusChange,
-  onContentLoaded,
-  onSuggestionMenuOpen,
-}: EditorProps) {
+export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
+  {
+    noteId,
+    onNoteSaved,
+    onStatusChange,
+    onContentLoaded,
+    onSuggestionMenuOpen,
+  },
+  ref,
+) {
   const loadingRef = useRef(true);
   const { resolvedTheme } = useTheme();
   const { fontSize } = useEditorFontSize();
@@ -99,6 +108,8 @@ export function Editor({
     pasteHandler,
     extensions: [cursorCenteringExtension, searchExtension],
   });
+
+  useImperativeHandle(ref, () => ({ editor }), [editor]);
 
   useLinkClickHandler(editor);
 
@@ -247,4 +258,4 @@ export function Editor({
       <SearchReplacePanel {...search} />
     </>
   );
-}
+});

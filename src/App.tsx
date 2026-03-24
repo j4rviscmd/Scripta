@@ -1,11 +1,12 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { save, open } from "@tauri-apps/plugin-dialog";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { Editor, createNote, deleteNote, listNotes, togglePinNote, getNote, DEFAULT_CONTENT, extractTitle, useCommandPaletteScroll } from "@/features/editor";
-import type { SaveStatus } from "@/features/editor";
+import { Editor, createNote, deleteNote, listNotes, togglePinNote, getNote, DEFAULT_CONTENT, extractTitle, useCommandPaletteScroll, readTextFile, writeTextFile } from "@/features/editor";
+import type { SaveStatus, EditorHandle } from "@/features/editor";
 import { commandPaletteScrollConfig } from "@/features/editor/lib/commandPaletteScrollConfig";
 import { NoteSidebar } from "@/features/sidebar";
 import { ThemeProvider } from "@/app/providers/theme-provider";
@@ -20,6 +21,54 @@ import { useScrollPosition } from "@/shared/hooks/useScrollPosition";
 import { useBlockScrollMemory } from "@/shared/hooks/useBlockScrollMemory";
 import { ScrollToTopButton } from "@/shared/ui/ScrollToTopButton";
 import { cn } from "@/lib/utils";
+
+/** Matches a Markdown table separator row: `| --- | --- |` */
+const TABLE_SEPARATOR_RE = /^\|[\s\-:|]+\|$/;
+
+/** Matches a Markdown table row that contains only whitespace and pipes (no visible text). */
+const EMPTY_TABLE_ROW_RE = /^\|[\s|]*\|$/;
+
+/**
+ * Fixes BlockNote's table export where an empty header row is inserted
+ * above the actual header content.
+ *
+ * BlockNote `blocksToMarkdownLossy` outputs tables as:
+ * ```
+ * |         |         |         |
+ * | ------- | ------- | ------- |
+ * | header1 | header2 | header3 |
+ * | data1   | data2   | data3   |
+ * ```
+ *
+ * This function removes the empty first row and moves the separator
+ * to after the actual header row:
+ * ```
+ * | header1 | header2 | header3 |
+ * | ------- | ------- | ------- |
+ * | data1   | data2   | data3   |
+ * ```
+ */
+function fixBlockNoteTableExport(markdown: string): string {
+  const lines = markdown.split("\n");
+  const result: string[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    if (
+      i + 2 < lines.length &&
+      EMPTY_TABLE_ROW_RE.test(lines[i]) &&
+      TABLE_SEPARATOR_RE.test(lines[i + 1])
+    ) {
+      // Output actual header, then separator, skip the empty row
+      result.push(lines[i + 2]);
+      result.push(lines[i + 1]);
+      i += 3;
+    } else {
+      result.push(lines[i]);
+      i++;
+    }
+  }
+  return result.join("\n");
+}
 
 /**
  * Root application component.
@@ -37,6 +86,7 @@ function AppContent() {
   const [sidebarOpen, setSidebarOpen] = useState(configDefaults.sidebarOpen);
   const [refreshKey, setRefreshKey] = useState(0);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const editorRef = useRef<EditorHandle>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isHeaderHidden = useScrollDirection(scrollContainerRef);
   const isScrolledDown = useScrollPosition(scrollContainerRef);
@@ -219,6 +269,64 @@ function AppContent() {
     [],
   );
 
+  /** Exports the given note as a Markdown file via a native save dialog. */
+  const handleExportNote = useCallback(
+    async (noteId: string) => {
+      const editor = editorRef.current?.editor;
+      if (!editor) return;
+
+      try {
+        const note = await getNote(noteId);
+        if (!note) {
+          toast.error("Note not found");
+          return;
+        }
+
+        const safeName = note.title.replace(/[/\\?%*:|"<>]/g, "_") || "untitled";
+        const filePath = await save({
+          defaultPath: `${safeName}.md`,
+          filters: [{ name: "Markdown", extensions: ["md"] }],
+        });
+        if (!filePath) return;
+
+        const markdown = fixBlockNoteTableExport(
+          editor.blocksToMarkdownLossy(editor.document),
+        );
+        await writeTextFile(filePath, markdown);
+        toast.success("Exported as Markdown");
+      } catch {
+        toast.error("Failed to export note");
+      }
+    },
+    [],
+  );
+
+  /** Imports a Markdown file as a new note via a native open dialog. */
+  const handleImportNote = useCallback(async () => {
+    const editor = editorRef.current?.editor;
+    if (!editor) return;
+
+    try {
+      const filePath = await open({
+        multiple: false,
+        filters: [{ name: "Markdown", extensions: ["md"] }],
+      });
+      if (!filePath || typeof filePath !== "string") return;
+
+      const markdown = await readTextFile(filePath);
+      const blocks = editor.tryParseMarkdownToBlocks(markdown);
+      const content = JSON.stringify(blocks);
+      const title = extractTitle(content);
+
+      const note = await createNote(title, content);
+      selectNote(note.id);
+      setRefreshKey((v) => v + 1);
+      toast.success("Imported Markdown file");
+    } catch {
+      toast.error("Failed to import file");
+    }
+  }, [selectNote]);
+
   return (
     <TooltipProvider>
       <SidebarProvider className="h-svh" open={sidebarOpen} onOpenChange={handleSidebarOpenChange}>
@@ -228,6 +336,8 @@ function AppContent() {
           onNewNote={handleNewNote}
           onDeleteNote={handleDeleteNote}
           onTogglePin={handleTogglePin}
+          onExportNote={handleExportNote}
+          onImportNote={handleImportNote}
           refreshKey={refreshKey}
         />
         <SidebarInset className="overflow-hidden">
@@ -248,6 +358,7 @@ function AppContent() {
               <SaveStatusIndicator status={saveStatus} />
             </div>
             <Editor
+              ref={editorRef}
               key={selectedNoteId ?? "new"}
               noteId={selectedNoteId}
               onNoteSaved={handleNoteSaved}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { FileText, Pin, PinOff, Plus, Search, Settings, Trash2, X } from "lucide-react";
+import { Download, FileText, Pin, PinOff, Plus, Search, Settings, Trash2, Upload, X } from "lucide-react";
 import { listNotes, type Note } from "@/features/editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -120,6 +120,7 @@ interface NoteItemProps {
   onSelectNote: (id: string) => void;
   onTogglePin: (id: string, pinned: boolean) => void;
   onDeleteNote: () => void;
+  onExportNote: (noteId: string) => void;
   justPinnedId: string | null;
 }
 
@@ -132,6 +133,7 @@ function NoteItem({
   onSelectNote,
   onTogglePin,
   onDeleteNote,
+  onExportNote,
   justPinnedId,
 }: NoteItemProps) {
   return (
@@ -175,6 +177,10 @@ function NoteItem({
               </>
             )}
           </ContextMenuItem>
+          <ContextMenuItem onClick={() => onExportNote(note.id)}>
+            <Download className="h-4 w-4" />
+            Export as Markdown
+          </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem variant="destructive" onClick={onDeleteNote}>
             <Trash2 />
@@ -202,6 +208,8 @@ interface NoteSidebarProps {
   onNewNote: () => void;
   onDeleteNote: (noteId: string) => void;
   onTogglePin: (noteId: string, pinned: boolean) => void;
+  onExportNote: (noteId: string) => void;
+  onImportNote: () => void;
   refreshKey: number;
 }
 
@@ -223,6 +231,8 @@ export function NoteSidebar({
   onNewNote,
   onDeleteNote,
   onTogglePin,
+  onExportNote,
+  onImportNote,
   refreshKey,
 }: NoteSidebarProps) {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -295,6 +305,7 @@ export function NoteSidebar({
           onSelectNote={onSelectNote}
           onTogglePin={handleTogglePin}
           onDeleteNote={() => setDeleteTarget(note.id)}
+          onExportNote={onExportNote}
           justPinnedId={justPinnedId}
         />
       );
@@ -364,6 +375,15 @@ export function NoteSidebar({
       </SidebarHeader>
       <SidebarContent>{renderSidebarBody()}</SidebarContent>
       <SidebarFooter>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start gap-2 text-muted-foreground"
+          onClick={onImportNote}
+        >
+          <Upload className="h-4 w-4" />
+          Import Markdown
+        </Button>
         <Button
           variant="ghost"
           size="sm"
