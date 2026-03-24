@@ -40,6 +40,8 @@ interface EditorProps {
   onNoteSaved?: (id: string) => void;
   onStatusChange?: (status: SaveStatus) => void;
   onContentLoaded?: () => void;
+  /** Called with the cursor's clientY coordinate when the suggestion menu (slash command palette) opens. */
+  onSuggestionMenuOpen?: (cursorClientY: number) => void;
 }
 
 /**
@@ -77,6 +79,7 @@ export function Editor({
   onNoteSaved,
   onStatusChange,
   onContentLoaded,
+  onSuggestionMenuOpen,
 }: EditorProps) {
   const loadingRef = useRef(true);
   const { resolvedTheme } = useTheme();
@@ -99,8 +102,75 @@ export function Editor({
 
   useLinkClickHandler(editor);
 
+  /**
+   * Subscribes to the BlockNote SuggestionMenu extension store and calls
+   * `onSuggestionMenuOpen` whenever the suggestion menu becomes visible.
+   *
+   * The store state is `undefined` when the menu is closed, and contains
+   * position/query data when it is open.  We track the previous shown state
+   * to fire the callback only on the closed→open transition.
+   *
+   * We defer setup via `editor.onMount()` or immediately if the editor is
+   * already mounted, because extensions are registered inside the mount
+   * callback and may not yet be available when the React `useEffect` first runs.
+   */
+  useEffect(() => {
+    if (!onSuggestionMenuOpen) return;
+
+    const openCallback = onSuggestionMenuOpen;
+    let unsubscribeStore: (() => void) | undefined;
+
+    function setupStoreSubscription() {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ext = editor.getExtension("suggestionMenu") as { store: { state: unknown; subscribe: (cb: () => void) => () => void } } | undefined;
+      if (!ext) return;
+
+      // Start with wasShown = false regardless of the initial store state,
+      // so that the first transition to shown always triggers the callback.
+      let wasShown = false;
+      unsubscribeStore = ext.store.subscribe(() => {
+        const state = ext.store.state as { show?: boolean; referencePos?: DOMRect } | undefined;
+        // BlockNote's UiElementPosition always has a `show` boolean; use it
+        // instead of checking for undefined so we correctly track open/close.
+        const isShown = state?.show === true;
+        if (isShown && !wasShown) {
+          const cursorClientY = state?.referencePos?.top ?? 0;
+          // Defer the scroll so it runs after ProseMirror's own scrollIntoView
+          // (which fires synchronously on the same transaction).
+          requestAnimationFrame(() => openCallback(cursorClientY));
+        }
+        wasShown = isShown;
+      });
+    }
+
+    // editor.onMount() returns an unsubscribe function at runtime even though
+    // the TypeScript declaration says void. We cast to capture it for cleanup.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const unsubscribeMount = (editor.onMount as any)((_ctx: unknown) => {
+      setupStoreSubscription();
+    }) as (() => void) | void;
+
+    return () => {
+      if (typeof unsubscribeMount === "function") unsubscribeMount();
+      unsubscribeStore?.();
+    };
+  }, [editor, onSuggestionMenuOpen]);
+
   const search = useSearchReplace(editor);
 
+  /**
+   * Loads note content into the BlockNote editor when `noteId` changes.
+   *
+   * - If no `noteId` is provided, the editor is reset to default blocks.
+   * - If a `noteId` is given, the persisted content is fetched and parsed.
+   *   If parsing fails (e.g. corrupted JSON), the editor falls back to
+   *   default blocks.  Network errors are surfaced via a toast notification.
+   *
+   * The `stale` flag guards against race conditions: when `noteId` changes
+   * rapidly, earlier fetch responses are discarded.  `loadingRef` is used
+   * by `handleChange` to suppress auto-save until the content has finished
+   * loading.
+   */
   useEffect(() => {
     let stale = false;
     loadingRef.current = true;

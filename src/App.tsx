@@ -4,8 +4,9 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { Editor, createNote, deleteNote, listNotes, togglePinNote, getNote, DEFAULT_CONTENT, extractTitle } from "@/features/editor";
+import { Editor, createNote, deleteNote, listNotes, togglePinNote, getNote, DEFAULT_CONTENT, extractTitle, useCommandPaletteScroll } from "@/features/editor";
 import type { SaveStatus } from "@/features/editor";
+import { commandPaletteScrollConfig } from "@/features/editor/lib/commandPaletteScrollConfig";
 import { NoteSidebar } from "@/features/sidebar";
 import { ThemeProvider } from "@/app/providers/theme-provider";
 import { FontSizeProvider } from "@/app/providers/font-size-provider";
@@ -30,6 +31,8 @@ import { cn } from "@/lib/utils";
 function AppContent() {
   const { config: configStore, editorState: editorStore } = useAppStore();
   const { increase: increaseFontSize, decrease: decreaseFontSize } = useFontSize();
+  // Initialises commandPaletteScrollConfig from the persisted store on mount.
+  useCommandPaletteScroll();
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(configDefaults.sidebarOpen);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -55,7 +58,29 @@ function AppContent() {
 
   /** Smoothly scrolls the editor content area back to the top. */
   const scrollToTop = useCallback(() => {
-    scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    el.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
+  /**
+   * Scrolls the container so that the cursor is positioned near the top of
+   * the visible area (approximately 25% from the top).  Called when the
+   * suggestion menu opens so the command palette has more room to display.
+   */
+  const scrollCursorToTop = useCallback((cursorClientY: number) => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    // Skip if the feature is disabled by the user.
+    if (!commandPaletteScrollConfig.enabled) return;
+    const containerRect = el.getBoundingClientRect();
+    // Target: cursor should sit at the user-configured fraction from the top.
+    const targetFraction = commandPaletteScrollConfig.targetFraction;
+    const targetY = containerRect.top + containerRect.height * targetFraction;
+    const delta = cursorClientY - targetY;
+    // Only scroll down if the cursor is already below the target position.
+    if (delta <= 10) return;
+    el.scrollBy({ top: delta, behavior: "smooth" });
   }, []);
 
   useEffect(() => {
@@ -228,6 +253,7 @@ function AppContent() {
               onNoteSaved={handleNoteSaved}
               onStatusChange={setSaveStatus}
               onContentLoaded={onContentLoaded}
+              onSuggestionMenuOpen={scrollCursorToTop}
             />
             <div className="sticky bottom-5 z-10 flex justify-end pr-7 pointer-events-none">
               <ScrollToTopButton visible={isScrolledDown} onClick={scrollToTop} />

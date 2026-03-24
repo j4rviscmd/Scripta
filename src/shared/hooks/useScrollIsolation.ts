@@ -104,8 +104,21 @@ function createPortalScrollLock(
     container.style.overflowY = "";
   };
 
+  /**
+   * Returns true if there is a matching portal element that is NOT a descendant
+   * of the scroll container itself (i.e. it lives under document.body directly,
+   * outside the container).
+   */
+  const hasExternalPortal = () => {
+    const els = document.querySelectorAll(portalSelector);
+    for (const el of els) {
+      if (!container.contains(el)) return true;
+    }
+    return false;
+  };
+
   const check = () => {
-    if (document.querySelector(portalSelector)) {
+    if (hasExternalPortal()) {
       lock();
     } else {
       unlock();

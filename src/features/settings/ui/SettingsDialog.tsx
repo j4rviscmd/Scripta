@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { CursorCenteringOption } from "./CursorCenteringOption";
 import { FontSizeOption } from "./FontSizeOption";
 import { ThemeOption } from "./ThemeOption";
+import { CommandPaletteScrollOption } from "./CommandPaletteScrollOption";
 
 /**
  * Props for the {@link SettingsDialog} component.
@@ -51,6 +52,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         </div>
         <Separator />
         <CursorCenteringOption />
+        <Separator />
+        <CommandPaletteScrollOption />
         <Separator />
         <FontSizeOption />
         <Separator />

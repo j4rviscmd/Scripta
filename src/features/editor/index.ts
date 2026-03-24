@@ -25,6 +25,7 @@ export {
 } from "./lib/fontSizeConfig";
 export { useCursorCentering } from "./hooks/useCursorCentering";
 export { useEditorFontSize } from "./hooks/useEditorFontSize";
+export { useCommandPaletteScroll } from "./hooks/useCommandPaletteScroll";
 export { useSearchReplace } from "./hooks/useSearchReplace";
 export type { UseSearchReplaceReturn } from "./hooks/useSearchReplace";
 export type { SaveStatus } from "./hooks/useAutoSave";
