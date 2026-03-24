@@ -41,7 +41,7 @@ interface SearchReplacePanelProps {
  * Provides a search input with case-sensitivity and regex toggles,
  * match navigation (previous / next), and replace / replace-all actions.
  * Keyboard shortcuts (Enter / Shift+Enter for navigation, Escape to close)
- * are handled at the hook level.
+ * are handled at both the component and hook levels.
  *
  * The panel is conditionally rendered based on the `isOpen` prop.
  */
@@ -66,6 +66,16 @@ export function SearchReplacePanel({
 }: SearchReplacePanelProps) {
   if (!isOpen) return null;
 
+  function stopAndClose(e: React.KeyboardEvent) {
+    e.stopPropagation();
+    e.nativeEvent.stopImmediatePropagation();
+    close();
+  }
+
+  function stopPropagate(e: React.KeyboardEvent) {
+    e.stopPropagation();
+  }
+
   const matchLabel =
     matchCount === 0
       ? "No results"
@@ -73,7 +83,6 @@ export function SearchReplacePanel({
 
   return (
     <div className="search-panel sticky bottom-0 z-20 flex items-center gap-1 border-t border-border bg-background px-4 py-1.5">
-      {/* Search input */}
       <div className="relative w-48">
         <Search className="absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -83,14 +92,17 @@ export function SearchReplacePanel({
           placeholder="Find..."
           className="h-7 pl-7 pr-1 text-sm"
           onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              stopAndClose(e);
+              return;
+            }
             if (e.key === "Enter" && !e.nativeEvent.isComposing) {
               e.preventDefault();
-              e.stopPropagation();
               e.nativeEvent.stopImmediatePropagation();
               e.shiftKey ? goPrev() : goNext();
               return;
             }
-            e.stopPropagation();
+            stopPropagate(e);
           }}
         />
       </div>
@@ -136,10 +148,7 @@ export function SearchReplacePanel({
         <ArrowDown className="size-3.5" />
       </Button>
 
-      {/* Separator */}
       <div className="mx-1 h-4 w-px bg-border" />
-
-      {/* Replace input */}
       <div className="relative w-48">
         <Replace className="absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -147,7 +156,13 @@ export function SearchReplacePanel({
           onChange={(e) => setReplaceText(e.target.value)}
           placeholder="Replace..."
           className="h-7 pl-7 pr-1 text-sm"
-          onKeyDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              stopAndClose(e);
+              return;
+            }
+            stopPropagate(e);
+          }}
         />
       </div>
       <Button
