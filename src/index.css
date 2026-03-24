@@ -137,11 +137,11 @@ body {
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
   html {
     @apply font-sans;
+  }
+  body {
+    @apply bg-background text-foreground;
   }
   .dark .bn-editor {
     background-color: var(--background) !important;
@@ -208,23 +208,70 @@ span[data-style-type="backgroundColor"][data-value="yellow"] {
 }
 
 /* Search match highlight */
-.search-match {
-  background-color: oklch(0.88 0.08 155);
+.search-match,
+.search-match-current {
   border-radius: 2px;
   box-decoration-break: clone;
 }
 
-/* Current search match (focused) */
+.search-match {
+  background-color: oklch(0.88 0.08 155);
+}
+
 .search-match-current {
   background-color: oklch(0.7 0.18 155);
-  border-radius: 2px;
-  box-decoration-break: clone;
 }
 
 /* Dark mode search highlights */
 .dark .search-match {
   background-color: oklch(0.35 0.06 155 / 40%);
 }
+
 .dark .search-match-current {
   background-color: oklch(0.45 0.15 155 / 55%);
+}
+
+/*
+ * Theme-aware custom scrollbar (VS Code style).
+ *
+ * Uses -webkit-scrollbar pseudo-elements for WebKit/Blink (Tauri WKWebView).
+ * Includes standard scrollbar-color / scrollbar-width for progressive enhancement
+ * (currently effective only in Firefox; kept for future WebKit adoption).
+ * References existing theme variables so colours automatically follow the
+ * resolved light/dark theme.
+ */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted-foreground);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.custom-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Standard scrollbar properties (progressive enhancement – Firefox and future WebKit) */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.custom-scrollbar:hover {
+  scrollbar-color: var(--muted-foreground) transparent;
 }
