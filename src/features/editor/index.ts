@@ -19,6 +19,12 @@ export {
 export { DEFAULT_BLOCKS, DEFAULT_CONTENT, extractTitle } from "./lib/constants";
 export { cursorCenteringExtension } from "./lib/cursorCentering";
 export { searchExtension } from "./lib/searchExtension";
+export { uploadImage, resolveImageUrl } from "./api/imageUpload";
+export {
+  MAX_IMAGE_SIZE_BYTES,
+  IMAGE_DIR,
+  ALLOWED_IMAGE_TYPES,
+} from "./lib/imageUploadConfig";
 export {
   DEFAULT_FONT_SIZE,
   MIN_FONT_SIZE,
