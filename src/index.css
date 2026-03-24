@@ -1,3 +1,17 @@
+/*
+ * Global stylesheet and design token definitions.
+ *
+ * This file establishes the application's visual foundation:
+ *   1. Framework imports (Tailwind CSS, shadcn, animation utilities, Geist font)
+ *   2. Design tokens as CSS custom properties for light and dark themes
+ *   3. Tailwind theme extensions bridging CSS variables to utility classes
+ *   4. Base layer styles applied globally
+ *   5. Editor-specific overrides for BlockNote integration
+ *   6. Custom animations and utility classes
+ *   7. Search-match highlight styles
+ *   8. Theme-aware custom scrollbar styles (VS Code-like thin scrollbar)
+ */
+
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -8,12 +22,23 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Prevent scrollbars on the root document.
+ * The application manages scrolling internally via panel-level containers
+ * (e.g. sidebar, editor pane) to avoid layout shifts.
+ */
 html,
 body {
   overflow: hidden;
 }
 
-/* Light theme ShadCN CSS variables. */
+/*
+ * Light theme ShadCN CSS variables.
+ *
+ * All colours use the OKLCH colour space for perceptual uniformity.
+ * These tokens are referenced by Tailwind utilities via the `@theme inline`
+ * block below, and by the Sonner toast component for variant styling.
+ */
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
@@ -31,6 +56,7 @@ body {
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
+  --error-muted: oklch(0.977 0.02 27);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -48,9 +74,20 @@ body {
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
   --success: oklch(0.72 0.19 142);
+  --success-muted: oklch(0.96 0.04 142);
+  --warning: oklch(0.80 0.18 80);
+  --warning-muted: oklch(0.98 0.03 80);
+  --info: oklch(0.62 0.17 250);
+  --info-muted: oklch(0.96 0.03 250);
 }
 
-/* Dark theme ShadCN CSS variables. */
+/*
+ * Dark theme ShadCN CSS variables.
+ *
+ * Mirrors the light theme tokens with inverted lightness values.
+ * Muted / background tokens use semi-transparent whites (e.g. `oklch(1 0 0 / 10%)`)
+ * to create subtle borders that layer cleanly over dark backgrounds.
+ */
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
@@ -67,6 +104,7 @@ body {
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
+  --error-muted: oklch(0.22 0.06 27);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
@@ -84,9 +122,20 @@ body {
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
   --success: oklch(0.72 0.19 142);
+  --success-muted: oklch(0.22 0.06 142);
+  --warning: oklch(0.80 0.18 80);
+  --warning-muted: oklch(0.26 0.06 80);
+  --info: oklch(0.62 0.17 250);
+  --info-muted: oklch(0.22 0.05 250);
 }
 
-/* Extending Tailwind theme with ShadCN utility classes. */
+/*
+ * Extending Tailwind theme with ShadCN utility classes.
+ *
+ * Each `--color-*` token maps a CSS custom property to a Tailwind colour utility
+ * (e.g. `bg-background`, `text-foreground`). Radius tokens (`--radius-sm` through
+ * `--radius-4xl`) derive from the base `--radius` variable for consistent rounding.
+ */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -132,7 +181,14 @@ body {
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Applies some additional necessary border styles within the editor. */
+/*
+ * Base layer styles applied to every element.
+ *
+ * - Global border and outline colours use theme tokens for consistency.
+ * - The root `<html>` element applies the Geist Variable font stack.
+ * - BlockNote editor background is forced to match the dark theme variable
+ *   to prevent white flash on initial render in dark mode.
+ */
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -148,7 +204,13 @@ body {
   }
 }
 
-/* Notion-style pastel inline code */
+/*
+ * Notion-style pastel inline code.
+ *
+ * Applies a warm cream background to inline `<code>` elements inside BlockNote
+ * content. In dark mode the background switches to a low-opacity amber to
+ * maintain contrast without being overly bright.
+ */
 .bn-inline-content code {
   background-color: oklch(0.964 0.021 56);
   padding: 0.15em 0.35em;
@@ -164,7 +226,13 @@ body {
   color: oklch(0.828 0.111 54);
 }
 
-/* Highlighter marker (yellow) - light mode */
+/*
+ * Highlighter marker (yellow) - light mode.
+ *
+ * Targets BlockNote's background-colour attribute selector to render a
+ * yellow highlighter effect. Slight padding and rounding emulate a
+ * real highlighter stroke.
+ */
 span[data-style-type="backgroundColor"][data-value="yellow"] {
   background-color: oklch(0.92 0.17 90) !important;
   padding: 0.1em 0.15em;
@@ -172,13 +240,24 @@ span[data-style-type="backgroundColor"][data-value="yellow"] {
   border-radius: 0.2em;
 }
 
-/* Highlighter marker (yellow) - dark mode */
+/*
+ * Highlighter marker (yellow) - dark mode.
+ *
+ * Uses a deeper amber with forced dark text to ensure legibility
+ * when the highlighter is applied in dark mode.
+ */
 .dark span[data-style-type="backgroundColor"][data-value="yellow"] {
   background-color: oklch(0.55 0.18 85) !important;
   color: oklch(0.25 0.05 85) !important;
 }
 
-/* Override BlockNote link color in dark mode (must be outside @layer base to win specificity) */
+/*
+ * Override BlockNote link colour in dark mode.
+ *
+ * Must be placed outside `@layer base` to win specificity over
+ * BlockNote's default styles. Sets a distinct blue for links and a
+ * slightly lighter shade on hover.
+ */
 .bn-shadcn .bn-editor a {
   cursor: pointer;
 }
@@ -189,12 +268,25 @@ span[data-style-type="backgroundColor"][data-value="yellow"] {
   color: oklch(0.85 0.21 250);
 }
 
-/* Editor font size override using CSS custom property set by the Editor component */
+/*
+ * Editor font size override.
+ *
+ * The Editor component sets a `--editor-font-size` custom property on the
+ * `[data-editor-root]` element. This rule propagates that value into
+ * BlockNote's default styles so all editor content respects the user's
+ * chosen font size. Falls back to 16px when the property is not set.
+ */
 [data-editor-root] .bn-default-styles {
   font-size: var(--editor-font-size, 16px);
 }
 
-/* PIN固定時のアイコンパルスアニメーション */
+/*
+ * Pin-bounce animation.
+ *
+ * A multi-step scale keyframe that gives visual feedback when a note is
+ * pinned. The animation overshoots (1.3x) then settles with a slight
+ * undershoot (0.9x) before returning to rest, creating a spring-like feel.
+ */
 @keyframes pin-bounce {
   0%   { transform: scale(1); }
   30%  { transform: scale(1.3); }
@@ -203,11 +295,23 @@ span[data-style-type="backgroundColor"][data-value="yellow"] {
   100% { transform: scale(1); }
 }
 
+/*
+ * Tailwind utility wrapper for the pin-bounce animation.
+ *
+ * Usage: apply the `animate-pin-bounce` class to any element that should
+ * play the bounce keyframe on render (e.g. the pin icon when toggled).
+ */
 @utility animate-pin-bounce {
   animation: pin-bounce 0.4s ease-out;
 }
 
-/* Search match highlight */
+/*
+ * Search match highlight styles.
+ *
+ * Applied by the editor's search-and-replace feature. Uses `box-decoration-break: clone`
+ * so the highlight wraps cleanly across line breaks within a match.
+ * The `-current` variant uses a stronger colour to indicate the active match.
+ */
 .search-match,
 .search-match-current {
   border-radius: 2px;
@@ -222,7 +326,13 @@ span[data-style-type="backgroundColor"][data-value="yellow"] {
   background-color: oklch(0.7 0.18 155);
 }
 
-/* Dark mode search highlights */
+/*
+ * Dark mode search highlights.
+ *
+ * Uses semi-transparent greens so the highlights remain visible without
+ * overwhelming the dark background. Opacity values are tuned for
+ * comfortable reading over extended sessions.
+ */
 .dark .search-match {
   background-color: oklch(0.35 0.06 155 / 40%);
 }
@@ -258,8 +368,6 @@ span[data-style-type="backgroundColor"][data-value="yellow"] {
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background-color: var(--muted-foreground);
-  border: 2px solid transparent;
-  background-clip: content-box;
 }
 
 .custom-scrollbar::-webkit-scrollbar-corner {
