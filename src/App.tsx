@@ -8,6 +8,8 @@ import { Editor, createNote, deleteNote, listNotes, togglePinNote, getNote, DEFA
 import type { SaveStatus } from "@/features/editor";
 import { NoteSidebar } from "@/features/sidebar";
 import { ThemeProvider } from "@/app/providers/theme-provider";
+import { FontSizeProvider } from "@/app/providers/font-size-provider";
+import { useFontSize } from "@/app/providers/font-size-provider";
 import { useAppStore, configDefaults } from "@/app/providers/store-provider";
 import { ModeToggle } from "@/shared/ui/ModeToggle";
 import { SaveStatusIndicator } from "@/shared/ui/SaveStatusIndicator";
@@ -25,8 +27,9 @@ import { cn } from "@/lib/utils";
  * including the sidebar, header, editor, and scroll management. Persists
  * the last-opened note ID and sidebar visibility to `tauri-plugin-store`.
  */
-function App() {
+function AppContent() {
   const { config: configStore, editorState: editorStore } = useAppStore();
+  const { increase: increaseFontSize, decrease: decreaseFontSize } = useFontSize();
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(configDefaults.sidebarOpen);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -62,6 +65,23 @@ function App() {
       console.error("Failed to load lastNoteId:", err);
     });
   }, [editorStore]);
+
+  // Register keyboard shortcuts for editor font size (Cmd/Alt + Plus/Minus).
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isModifier = e.metaKey || e.altKey;
+      if (!isModifier) return;
+      if (e.key === "+" || e.key === "=") {
+        e.preventDefault();
+        increaseFontSize();
+      } else if (e.key === "-") {
+        e.preventDefault();
+        decreaseFontSize();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [increaseFontSize, decreaseFontSize]);
 
   /**
    * Persists the sidebar open/close state to the config store
@@ -175,49 +195,66 @@ function App() {
   );
 
   return (
-    <ThemeProvider defaultTheme="system">
-      <TooltipProvider>
-        <SidebarProvider className="h-svh" open={sidebarOpen} onOpenChange={handleSidebarOpenChange}>
-          <NoteSidebar
-            selectedNoteId={selectedNoteId}
-            onSelectNote={selectNote}
-            onNewNote={handleNewNote}
-            onDeleteNote={handleDeleteNote}
-            onTogglePin={handleTogglePin}
-            refreshKey={refreshKey}
-          />
-          <SidebarInset className="overflow-hidden">
-            <header
-              className={cn(
-                "flex h-12 shrink-0 items-center gap-2 border-b px-4",
-                "transition-[max-height,opacity,padding,border-width] duration-200 ease-in-out overflow-hidden",
-                "max-h-12 opacity-100",
-                isHeaderHidden && "max-h-0 !border-b-0 py-0 opacity-0",
-              )}
-            >
-              <SidebarTrigger className="-ml-1" />
-              <div className="flex-1" />
-              <ModeToggle />
-            </header>
-            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overscroll-none">
-              <div className="sticky top-5 z-10 flex justify-end pr-7 pointer-events-none">
-                <SaveStatusIndicator status={saveStatus} />
-              </div>
-              <Editor
-                key={selectedNoteId ?? "new"}
-                noteId={selectedNoteId}
-                onNoteSaved={handleNoteSaved}
-                onStatusChange={setSaveStatus}
-                onContentLoaded={onContentLoaded}
-              />
-              <div className="sticky bottom-5 z-10 flex justify-end pr-7 pointer-events-none">
-                <ScrollToTopButton visible={isScrolledDown} onClick={scrollToTop} />
-              </div>
+    <TooltipProvider>
+      <SidebarProvider className="h-svh" open={sidebarOpen} onOpenChange={handleSidebarOpenChange}>
+        <NoteSidebar
+          selectedNoteId={selectedNoteId}
+          onSelectNote={selectNote}
+          onNewNote={handleNewNote}
+          onDeleteNote={handleDeleteNote}
+          onTogglePin={handleTogglePin}
+          refreshKey={refreshKey}
+        />
+        <SidebarInset className="overflow-hidden">
+          <header
+            className={cn(
+              "flex h-12 shrink-0 items-center gap-2 border-b px-4",
+              "transition-[max-height,opacity,padding,border-width] duration-200 ease-in-out overflow-hidden",
+              "max-h-12 opacity-100",
+              isHeaderHidden && "max-h-0 !border-b-0 py-0 opacity-0",
+            )}
+          >
+            <SidebarTrigger className="-ml-1" />
+            <div className="flex-1" />
+            <ModeToggle />
+          </header>
+          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overscroll-none">
+            <div className="sticky top-5 z-10 flex justify-end pr-7 pointer-events-none">
+              <SaveStatusIndicator status={saveStatus} />
             </div>
-          </SidebarInset>
-        </SidebarProvider>
-        <Toaster position="bottom-right" />
-      </TooltipProvider>
+            <Editor
+              key={selectedNoteId ?? "new"}
+              noteId={selectedNoteId}
+              onNoteSaved={handleNoteSaved}
+              onStatusChange={setSaveStatus}
+              onContentLoaded={onContentLoaded}
+            />
+            <div className="sticky bottom-5 z-10 flex justify-end pr-7 pointer-events-none">
+              <ScrollToTopButton visible={isScrolledDown} onClick={scrollToTop} />
+            </div>
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+      <Toaster position="bottom-right" />
+    </TooltipProvider>
+  );
+}
+
+/**
+ * Root component of the application.
+ *
+ * Wraps {@link AppContent} with the {@link ThemeProvider} and
+ * {@link FontSizeProvider} so their context hooks are available
+ * throughout the component tree.
+ *
+ * @returns The rendered application tree.
+ */
+function App() {
+  return (
+    <ThemeProvider defaultTheme="system">
+      <FontSizeProvider>
+        <AppContent />
+      </FontSizeProvider>
     </ThemeProvider>
   );
 }

@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { CursorCenteringOption } from "./CursorCenteringOption";
+import { FontSizeOption } from "./FontSizeOption";
 import { ThemeOption } from "./ThemeOption";
 
 /**
@@ -50,6 +51,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         </div>
         <Separator />
         <CursorCenteringOption />
+        <Separator />
+        <FontSizeOption />
         <Separator />
       </DialogContent>
     </Dialog>

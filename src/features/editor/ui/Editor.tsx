@@ -20,6 +20,7 @@ import { useSearchReplace } from "../hooks/useSearchReplace";
 import type { SaveStatus } from "..";
 import { DEFAULT_BLOCKS } from "../lib/constants";
 import { cursorCenteringExtension, searchExtension, useCursorCentering } from "..";
+import { useEditorFontSize } from "../hooks/useEditorFontSize";
 import { useTheme } from "@/app/providers/theme-provider";
 import { HighlightButton } from "./HighlightButton";
 
@@ -79,6 +80,7 @@ export function Editor({
 }: EditorProps) {
   const loadingRef = useRef(true);
   const { resolvedTheme } = useTheme();
+  const { fontSize } = useEditorFontSize();
 
   useCursorCentering();
 
@@ -148,7 +150,11 @@ export function Editor({
 
   return (
     <>
-      <div className="w-full px-8 pb-[60vh]">
+      <div
+        className="w-full px-8 pb-[60vh]"
+        data-editor-root
+        style={{ "--editor-font-size": `${fontSize}px` } as React.CSSProperties}
+      >
         <BlockNoteView
           editor={editor}
           theme={resolvedTheme}
