@@ -353,7 +353,7 @@ function AppContent() {
             <div className="flex-1" />
             <ModeToggle />
           </header>
-          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overscroll-none">
+          <div ref={scrollContainerRef} className="custom-scrollbar flex-1 overflow-y-auto overscroll-none">
             <div className="sticky top-5 z-10 flex justify-end pr-7 pointer-events-none">
               <SaveStatusIndicator status={saveStatus} />
             </div>
