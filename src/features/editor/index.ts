@@ -4,6 +4,7 @@
  */
 
 export { Editor } from "./ui/Editor";
+export type { EditorHandle } from "./ui/Editor";
 export type { Note } from "./api/notes";
 export {
   getNote,
@@ -12,6 +13,8 @@ export {
   updateNote,
   deleteNote,
   togglePinNote,
+  readTextFile,
+  writeTextFile,
 } from "./api/notes";
 export { DEFAULT_BLOCKS, DEFAULT_CONTENT, extractTitle } from "./lib/constants";
 export { cursorCenteringExtension } from "./lib/cursorCentering";

@@ -81,3 +81,23 @@ export async function deleteNote(id: string): Promise<void> {
 export async function togglePinNote(id: string, pinned: boolean): Promise<Note> {
   return invoke<Note>("toggle_pin", { id, pinned });
 }
+
+/**
+ * Reads a text file and returns its content.
+ *
+ * @param path - Absolute path to the file.
+ * @returns The file content as a string.
+ */
+export async function readTextFile(path: string): Promise<string> {
+  return invoke<string>("read_text_file", { path });
+}
+
+/**
+ * Writes content to a text file, creating parent directories as needed.
+ *
+ * @param path - Absolute path to the file.
+ * @param content - The text content to write.
+ */
+export async function writeTextFile(path: string, content: string): Promise<void> {
+  return invoke<void>("write_text_file", { path, content });
+}

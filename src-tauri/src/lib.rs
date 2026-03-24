@@ -1,4 +1,5 @@
 mod db;
+mod file_io;
 mod link_preview;
 
 use tauri::Manager;
@@ -17,6 +18,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             db::init_db(&app.handle())?;
             app.manage(link_preview::LinkPreviewCache(std::sync::Mutex::new(
@@ -32,6 +34,8 @@ pub fn run() {
             db::delete_note,
             db::toggle_pin,
             link_preview::fetch_link_title,
+            file_io::read_text_file,
+            file_io::write_text_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
