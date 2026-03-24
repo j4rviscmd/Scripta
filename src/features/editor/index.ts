@@ -24,4 +24,5 @@ export {
 } from "./lib/fontSizeConfig";
 export { useCursorCentering } from "./hooks/useCursorCentering";
 export { useEditorFontSize } from "./hooks/useEditorFontSize";
+export { useCommandPaletteScroll } from "./hooks/useCommandPaletteScroll";
 export type { SaveStatus } from "./hooks/useAutoSave";
