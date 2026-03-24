@@ -189,6 +189,11 @@ span[data-style-type="backgroundColor"][data-value="yellow"] {
   color: oklch(0.85 0.21 250);
 }
 
+/* Editor font size override using CSS custom property set by the Editor component */
+[data-editor-root] .bn-default-styles {
+  font-size: var(--editor-font-size, 16px);
+}
+
 /* PIN固定時のアイコンパルスアニメーション */
 @keyframes pin-bounce {
   0%   { transform: scale(1); }
