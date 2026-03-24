@@ -17,6 +17,7 @@ export {
   writeTextFile,
 } from "./api/notes";
 export { DEFAULT_BLOCKS, DEFAULT_CONTENT, extractTitle } from "./lib/constants";
+export { exportToMarkdown, fixBlockNoteTableExport } from "./lib/markdown-export";
 export { cursorCenteringExtension } from "./lib/cursorCentering";
 export { searchExtension } from "./lib/searchExtension";
 export { uploadImage, resolveImageUrl } from "./api/imageUpload";

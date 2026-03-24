@@ -5,7 +5,7 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { Editor, createNote, deleteNote, listNotes, togglePinNote, getNote, DEFAULT_CONTENT, extractTitle, useCommandPaletteScroll, readTextFile, writeTextFile } from "@/features/editor";
+import { Editor, createNote, deleteNote, listNotes, togglePinNote, getNote, DEFAULT_CONTENT, extractTitle, useCommandPaletteScroll, readTextFile, writeTextFile, exportToMarkdown, fixBlockNoteTableExport } from "@/features/editor";
 import type { SaveStatus, EditorHandle } from "@/features/editor";
 import { commandPaletteScrollConfig } from "@/features/editor/lib/commandPaletteScrollConfig";
 import { NoteSidebar } from "@/features/sidebar";
@@ -21,54 +21,6 @@ import { useScrollPosition } from "@/shared/hooks/useScrollPosition";
 import { useBlockScrollMemory } from "@/shared/hooks/useBlockScrollMemory";
 import { ScrollToTopButton } from "@/shared/ui/ScrollToTopButton";
 import { cn } from "@/lib/utils";
-
-/** Matches a Markdown table separator row: `| --- | --- |` */
-const TABLE_SEPARATOR_RE = /^\|[\s\-:|]+\|$/;
-
-/** Matches a Markdown table row that contains only whitespace and pipes (no visible text). */
-const EMPTY_TABLE_ROW_RE = /^\|[\s|]*\|$/;
-
-/**
- * Fixes BlockNote's table export where an empty header row is inserted
- * above the actual header content.
- *
- * BlockNote `blocksToMarkdownLossy` outputs tables as:
- * ```
- * |         |         |         |
- * | ------- | ------- | ------- |
- * | header1 | header2 | header3 |
- * | data1   | data2   | data3   |
- * ```
- *
- * This function removes the empty first row and moves the separator
- * to after the actual header row:
- * ```
- * | header1 | header2 | header3 |
- * | ------- | ------- | ------- |
- * | data1   | data2   | data3   |
- * ```
- */
-function fixBlockNoteTableExport(markdown: string): string {
-  const lines = markdown.split("\n");
-  const result: string[] = [];
-  let i = 0;
-  while (i < lines.length) {
-    if (
-      i + 2 < lines.length &&
-      EMPTY_TABLE_ROW_RE.test(lines[i]) &&
-      TABLE_SEPARATOR_RE.test(lines[i + 1])
-    ) {
-      // Output actual header, then separator, skip the empty row
-      result.push(lines[i + 2]);
-      result.push(lines[i + 1]);
-      i += 3;
-    } else {
-      result.push(lines[i]);
-      i++;
-    }
-  }
-  return result.join("\n");
-}
 
 /**
  * Root application component.
@@ -289,9 +241,7 @@ function AppContent() {
         });
         if (!filePath) return;
 
-        const markdown = fixBlockNoteTableExport(
-          editor.blocksToMarkdownLossy(editor.document),
-        );
+        const markdown = fixBlockNoteTableExport(exportToMarkdown(editor));
         await writeTextFile(filePath, markdown);
         toast.success("Exported as Markdown");
       } catch {
