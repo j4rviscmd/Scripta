@@ -206,3 +206,25 @@ span[data-style-type="backgroundColor"][data-value="yellow"] {
 @utility animate-pin-bounce {
   animation: pin-bounce 0.4s ease-out;
 }
+
+/* Search match highlight */
+.search-match {
+  background-color: oklch(0.88 0.08 155);
+  border-radius: 2px;
+  box-decoration-break: clone;
+}
+
+/* Current search match (focused) */
+.search-match-current {
+  background-color: oklch(0.7 0.18 155);
+  border-radius: 2px;
+  box-decoration-break: clone;
+}
+
+/* Dark mode search highlights */
+.dark .search-match {
+  background-color: oklch(0.35 0.06 155 / 40%);
+}
+.dark .search-match-current {
+  background-color: oklch(0.45 0.15 155 / 55%);
+}

@@ -8,6 +8,7 @@ import {
 } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
 import { CustomLinkToolbar } from "./CustomLinkToolbar";
+import { SearchReplacePanel } from "./SearchReplacePanel";
 import "@blocknote/shadcn/style.css";
 import "@blocknote/core/fonts/inter.css";
 import { toast } from "sonner";
@@ -15,33 +16,24 @@ import { getNote } from "../api/notes";
 import { useAutoSave } from "../hooks/useAutoSave";
 import { useLinkPreview } from "../hooks/useLinkPreview";
 import { useLinkClickHandler } from "../hooks/useLinkClickHandler";
+import { useSearchReplace } from "../hooks/useSearchReplace";
 import type { SaveStatus } from "..";
 import { DEFAULT_BLOCKS } from "../lib/constants";
-import { cursorCenteringExtension, useCursorCentering } from "..";
+import { cursorCenteringExtension, searchExtension, useCursorCentering } from "..";
 import { useEditorFontSize } from "../hooks/useEditorFontSize";
 import { useTheme } from "@/app/providers/theme-provider";
 import { HighlightButton } from "./HighlightButton";
 
-/**
- * Default block content cast to the BlockNote generic type.
- *
- * BlockNote's `replaceBlocks` requires the content to match the
- * generic type parameter of the editor. Since the default blocks
- * are a plain JSON structure, we cast them to satisfy the type
- * constraint.
- */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const BLOCKS = DEFAULT_BLOCKS as any;
 
 /**
  * Props for the {@link Editor} component.
  *
- * @property noteId - The UUID of the note to edit, or `null` to start a new note.
- * @property onNoteSaved - Callback invoked with the note ID after each successful auto-save.
- * @property onStatusChange - Callback invoked when the save status changes
- *   (e.g. `"saving"`, `"saved"`, `"error"`).
- * @property onContentLoaded - Called after the note content has been loaded
- *   into the editor (or defaults applied).
+ * @property noteId - The ID of the note to load, or `null` for a new untitled note.
+ * @property onNoteSaved - Optional callback invoked after the note content is auto-saved.
+ * @property onStatusChange - Optional callback invoked whenever the save status changes.
+ * @property onContentLoaded - Optional callback invoked once the note content has finished loading.
  */
 interface EditorProps {
   noteId: string | null;
@@ -53,10 +45,10 @@ interface EditorProps {
 }
 
 /**
- * Builds the array of formatting toolbar items with the custom
- * {@link HighlightButton} injected after the built-in color-style button.
+ * Builds the formatting toolbar item list with a custom highlight button
+ * injected after the color-style button.
  *
- * @returns The augmented array of formatting toolbar items.
+ * @returns The augmented array of formatting toolbar React elements.
  */
 function buildFormattingToolbarItems() {
   const items = getFormattingToolbarItems();
@@ -74,21 +66,13 @@ function buildFormattingToolbarItems() {
 const formattingToolbarItems = buildFormattingToolbarItems();
 
 /**
- * Rich-text editor component powered by BlockNote.
+ * BlockNote-based rich-text editor with auto-save, link handling,
+ * and integrated search & replace.
  *
- * When a `noteId` is provided the editor loads the persisted content
- * and switches to update-mode for auto-save.  Without a `noteId` the
- * editor starts with default content and creates a new note on first
- * keystroke.
- *
- * @param props - Editor component props.
- * @param props.noteId - The UUID of the note to edit, or `null` to start a new note.
- * @param props.onNoteSaved - Callback invoked with the note ID after each successful auto-save.
- * @param props.onStatusChange - Callback invoked when the save status changes
- *   (e.g. `"saving"`, `"saved"`, `"error"`).
- * @param props.onContentLoaded - Called after the note content has been loaded
- *   into the editor (or defaults applied).
- * @returns The rendered editor view.
+ * When a `noteId` is provided the component fetches the persisted
+ * content from the backend; otherwise it renders the default blank
+ * document. Changes are debounced and auto-saved via the
+ * {@link useAutoSave} hook.
  */
 export function Editor({
   noteId,
@@ -101,7 +85,6 @@ export function Editor({
   const { resolvedTheme } = useTheme();
   const { fontSize } = useEditorFontSize();
 
-  // Ensure persisted cursor-centering config is synced to the mutable module object on mount.
   useCursorCentering();
 
   const { scheduleSave, saveStatus } = useAutoSave(500, noteId ?? undefined, onNoteSaved);
@@ -114,7 +97,7 @@ export function Editor({
   const editor = useCreateBlockNote({
     initialContent: DEFAULT_BLOCKS,
     pasteHandler,
-    extensions: [cursorCenteringExtension],
+    extensions: [cursorCenteringExtension, searchExtension],
   });
 
   useLinkClickHandler(editor);
@@ -173,6 +156,8 @@ export function Editor({
     };
   }, [editor, onSuggestionMenuOpen]);
 
+  const search = useSearchReplace(editor);
+
   /**
    * Loads note content into the BlockNote editor when `noteId` changes.
    *
@@ -228,40 +213,38 @@ export function Editor({
     };
   }, [noteId, editor]);
 
-  /**
-   * BlockNote change handler.  Serialises the current document and
-   * schedules a debounced save, but only after the initial content
-   * has finished loading (guarded by `loadingRef`).
-   */
   const handleChange = useCallback(() => {
     if (loadingRef.current) return;
     scheduleSave(JSON.stringify(editor.document));
   }, [editor, scheduleSave]);
 
   return (
-    <div
-      className="w-full px-8 pb-[60vh]"
-      data-editor-root
-      style={{ "--editor-font-size": `${fontSize}px` } as React.CSSProperties}
-    >
-      <BlockNoteView
-        editor={editor}
-        theme={resolvedTheme}
-        onChange={handleChange}
-        formattingToolbar={false}
-        linkToolbar={false}
+    <>
+      <div
+        className="w-full px-8 pb-[60vh]"
+        data-editor-root
+        style={{ "--editor-font-size": `${fontSize}px` } as React.CSSProperties}
       >
-        <FormattingToolbarController
-          formattingToolbar={() => (
-            <FormattingToolbar blockTypeSelectItems={[]}>
-              {formattingToolbarItems}
-            </FormattingToolbar>
-          )}
-        />
-        <LinkToolbarController
-          linkToolbar={CustomLinkToolbar}
-        />
-      </BlockNoteView>
-    </div>
+        <BlockNoteView
+          editor={editor}
+          theme={resolvedTheme}
+          onChange={handleChange}
+          formattingToolbar={false}
+          linkToolbar={false}
+        >
+          <FormattingToolbarController
+            formattingToolbar={() => (
+              <FormattingToolbar blockTypeSelectItems={[]}>
+                {formattingToolbarItems}
+              </FormattingToolbar>
+            )}
+          />
+          <LinkToolbarController
+            linkToolbar={CustomLinkToolbar}
+          />
+        </BlockNoteView>
+      </div>
+      <SearchReplacePanel {...search} />
+    </>
   );
 }

@@ -22,11 +22,11 @@ import { ScrollToTopButton } from "@/shared/ui/ScrollToTopButton";
 import { cn } from "@/lib/utils";
 
 /**
- * Inner application content.
+ * Root application component.
  *
- * Separated from the root {@link App} component so that hooks that require
- * {@link FontSizeProvider} (e.g. {@link useFontSize}) can be called here,
- * inside the provider boundary.
+ * Orchestrates note selection, CRUD operations, and the overall layout
+ * including the sidebar, header, editor, and scroll management. Persists
+ * the last-opened note ID and sidebar visibility to `tauri-plugin-store`.
  */
 function AppContent() {
   const { config: configStore, editorState: editorStore } = useAppStore();
@@ -56,6 +56,7 @@ function AppContent() {
     ],
   });
 
+  /** Smoothly scrolls the editor content area back to the top. */
   const scrollToTop = useCallback(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
@@ -82,7 +83,6 @@ function AppContent() {
     el.scrollBy({ top: delta, behavior: "smooth" });
   }, []);
 
-  // Restore the last opened note ID from the store on first mount.
   useEffect(() => {
     editorStore.get<string>("lastNoteId").then((id) => {
       if (id) setSelectedNoteId(id);
@@ -108,7 +108,10 @@ function AppContent() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [increaseFontSize, decreaseFontSize]);
 
-  /** Persists sidebar open state to the store. */
+  /**
+   * Persists the sidebar open/close state to the config store
+   * and updates the local UI state.
+   */
   const handleSidebarOpenChange = useCallback((open: boolean) => {
     setSidebarOpen(open);
     configStore.set("sidebarOpen", open).catch((err) => {
@@ -116,7 +119,10 @@ function AppContent() {
     });
   }, [configStore]);
 
-  /** Persists or clears the last opened note ID in the store. */
+  /**
+   * Persists the given note ID (or removes it when `null`) to the
+   * editor store so it can be restored on next app launch.
+   */
   const persistLastNoteId = useCallback((id: string | null) => {
     const action = id
       ? editorStore.set("lastNoteId", id)
@@ -127,13 +133,8 @@ function AppContent() {
   }, [editorStore]);
 
   /**
-   * Selects a note by ID, saving the current scroll position first.
-   *
-   * When a different note is already selected, the scroll position of
-   * that note is persisted before switching. The new note ID is also
-   * saved as the last opened note for restoration on next launch.
-   *
-   * @param id - The ID of the note to select, or `null` to deselect.
+   * Switches the active note. Saves the scroll position for the
+   * previously selected note and persists the new selection.
    */
   const selectNote = useCallback((id: string | null) => {
     if (selectedNoteId) {
@@ -143,9 +144,6 @@ function AppContent() {
     persistLastNoteId(id);
   }, [selectedNoteId, saveScrollPosition, persistLastNoteId]);
 
-  // Updates the native window title to reflect the currently selected note.
-  // Uses a stale guard to prevent race conditions when the selected note changes
-  // while a title fetch is still in flight.
   useEffect(() => {
     const appWindow = getCurrentWindow();
     if (!selectedNoteId) {
@@ -164,19 +162,19 @@ function AppContent() {
     return () => { stale = true; };
   }, [selectedNoteId, refreshKey]);
 
-  /** Updates the selected note and bumps the sidebar refresh counter after a save. */
+  /**
+   * Callback invoked after a note is auto-saved.
+   * Bumps the refresh key so the sidebar reflects the updated title.
+   */
   const handleNoteSaved = useCallback((id: string) => {
     setSelectedNoteId((current) => {
-      // 別のノートが既に選択されている場合は上書きしない。
-      // アンマウント時の遅延saveコールバックが、
-      // 切り替え先のノートIDを意図せず書き換えるのを防ぐ。
       if (current === null || current === id) return id;
       return current;
     });
     setRefreshKey((v) => v + 1);
   }, []);
 
-  /** Creates a brand-new note via the API and selects it immediately. */
+  /** Creates a new note with default content and selects it. */
   const handleNewNote = useCallback(async () => {
     try {
       const note = await createNote(extractTitle(DEFAULT_CONTENT), DEFAULT_CONTENT);
@@ -187,7 +185,10 @@ function AppContent() {
     }
   }, [selectNote]);
 
-  /** Deletes a note and selects the most recent remaining note if the deleted one was active. */
+  /**
+   * Deletes the specified note. If the deleted note was currently
+   * selected, falls back to the first remaining note or `null`.
+   */
   const handleDeleteNote = useCallback(
     async (noteId: string) => {
       try {
@@ -205,7 +206,7 @@ function AppContent() {
     [selectedNoteId, selectNote],
   );
 
-  /** Toggles the pinned state of a note. */
+  /** Toggles the pinned state of the given note and refreshes the sidebar. */
   const handleTogglePin = useCallback(
     async (noteId: string, pinned: boolean) => {
       try {
