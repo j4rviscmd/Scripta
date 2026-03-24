@@ -24,6 +24,7 @@ import { cursorCenteringExtension, searchExtension, useCursorCentering } from ".
 import { useEditorFontSize } from "../hooks/useEditorFontSize";
 import { useTheme } from "@/app/providers/theme-provider";
 import { HighlightButton } from "./HighlightButton";
+import { uploadImage, resolveImageUrl } from "..";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const BLOCKS = DEFAULT_BLOCKS as any;
@@ -107,6 +108,8 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     initialContent: DEFAULT_BLOCKS,
     pasteHandler,
     extensions: [cursorCenteringExtension, searchExtension],
+    uploadFile: uploadImage,
+    resolveFileUrl: resolveImageUrl,
   });
 
   useImperativeHandle(ref, () => ({ editor }), [editor]);
