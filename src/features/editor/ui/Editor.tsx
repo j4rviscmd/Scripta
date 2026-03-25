@@ -17,6 +17,7 @@ import { getNote } from "../api/notes";
 import { useAutoSave } from "../hooks/useAutoSave";
 import { useLinkPreview } from "../hooks/useLinkPreview";
 import { useLinkClickHandler } from "../hooks/useLinkClickHandler";
+import { useCopyToast } from "../hooks/useCopyToast";
 import { useSearchReplace } from "../hooks/useSearchReplace";
 import type { SaveStatus } from "..";
 import { DEFAULT_BLOCKS } from "../lib/constants";
@@ -115,6 +116,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   useImperativeHandle(ref, () => ({ editor }), [editor]);
 
   useLinkClickHandler(editor);
+  useCopyToast(editor);
 
   /**
    * Subscribes to the BlockNote SuggestionMenu extension store and calls
@@ -131,7 +133,8 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   useEffect(() => {
     if (!onSuggestionMenuOpen) return;
 
-    const openCallback = onSuggestionMenuOpen;
+    // Narrowed by the guard above — safe to capture in the closure.
+    const notifyOpen = onSuggestionMenuOpen;
     let unsubscribeStore: (() => void) | undefined;
 
     function setupStoreSubscription() {
@@ -151,7 +154,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
           const cursorClientY = state?.referencePos?.top ?? 0;
           // Defer the scroll so it runs after ProseMirror's own scrollIntoView
           // (which fires synchronously on the same transaction).
-          requestAnimationFrame(() => openCallback(cursorClientY));
+          requestAnimationFrame(() => notifyOpen(cursorClientY));
         }
         wasShown = isShown;
       });
@@ -160,12 +163,12 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     // editor.onMount() returns an unsubscribe function at runtime even though
     // the TypeScript declaration says void. We cast to capture it for cleanup.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const unsubscribeMount = (editor.onMount as any)((_ctx: unknown) => {
+    const unsubscribeMount = (editor.onMount as any)(() => {
       setupStoreSubscription();
     }) as (() => void) | void;
 
     return () => {
-      if (typeof unsubscribeMount === "function") unsubscribeMount();
+      unsubscribeMount?.();
       unsubscribeStore?.();
     };
   }, [editor, onSuggestionMenuOpen]);
