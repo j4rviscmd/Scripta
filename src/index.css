@@ -383,3 +383,24 @@ span[data-style-type="backgroundColor"][data-value="yellow"] {
 .custom-scrollbar:hover {
   scrollbar-color: var(--muted-foreground) transparent;
 }
+
+/*
+ * Image block hover area expansion.
+ *
+ * When an image block has no caption, the clickable/hoverable area is limited
+ * to the image itself. Moving the cursor down toward the formatting toolbar
+ * leaves the block's hover zone, causing the toolbar to disappear before it
+ * can be reached. This rule adds an invisible padding zone beneath the image
+ * via a `::after` pseudo-element so the mouse stays within the block wrapper
+ * long enough to interact with the toolbar.
+ *
+ * The `:has(.bn-visual-media-wrapper)` guard ensures this only applies to
+ * blocks that show a preview (images/videos) and not to file-upload buttons.
+ * The `:not(:has(.bn-file-caption))` guard skips blocks that already have a
+ * caption, since the caption element provides sufficient hover area on its own.
+ */
+[data-content-type="image"] > .bn-file-block-content-wrapper:has(.bn-visual-media-wrapper):not(:has(.bn-file-caption))::after {
+  content: "";
+  display: block;
+  height: 20px;
+}
