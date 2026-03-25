@@ -21,6 +21,7 @@ export { exportToMarkdown, fixBlockNoteTableExport } from "./lib/markdown-export
 export { cursorCenteringExtension } from "./lib/cursorCentering";
 export { searchExtension } from "./lib/searchExtension";
 export { uploadImage, resolveImageUrl } from "./api/imageUpload";
+export type { ImageUploadResult } from "./api/imageUpload";
 export {
   MAX_IMAGE_SIZE_BYTES,
   IMAGE_DIR,

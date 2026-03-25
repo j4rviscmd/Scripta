@@ -53,6 +53,15 @@ function validateImage(file: File): void {
   }
 }
 
+/** Return type of {@link uploadImage}, compatible with BlockNote's `uploadFile` interface. */
+export interface ImageUploadResult {
+  props: {
+    url: string;
+    name: string;
+    caption: string;
+  };
+}
+
 /**
  * Uploads an image file to the app's local data directory (`$APPDATA/images/`).
  *
@@ -61,19 +70,25 @@ function validateImage(file: File): void {
  * 2. Generates a collision-free filename via {@link generateUniqueFileName}.
  * 3. Ensures the target directory exists (created recursively if needed).
  * 4. Writes the file as raw bytes to disk.
- * 5. Returns a Tauri asset protocol URL (`asset://localhost/...`) for rendering.
+ * 5. Returns a BlockNote-compatible update object containing the asset URL,
+ *    original filename, and a caption (falls back to `"image"` when the
+ *    filename is unavailable).
+ *
+ * Returning an object (instead of a plain URL string) causes BlockNote to set
+ * the `caption` prop on the image block, which keeps the caption area visible
+ * so the bubble menu toolbar remains accessible (fixes issue #40).
  *
  * @param file - The image File from the browser's File API.
- * @returns A Tauri asset protocol URL that BlockNote can use as the image `src`.
+ * @returns A BlockNote block-update object with `url`, `name`, and `caption`.
  * @throws {Error} If validation fails or filesystem operations error.
  *
  * @example
  * ```typescript
- * const assetUrl = await uploadImage(file);
- * // e.g. "asset://localhost/Users/.../AppData/images/550e84.png"
+ * const result = await uploadImage(file);
+ * // { props: { url: "asset://...", name: "photo.jpg", caption: "photo.jpg" } }
  * ```
  */
-export async function uploadImage(file: File): Promise<string> {
+export async function uploadImage(file: File): Promise<ImageUploadResult> {
   validateImage(file);
 
   const fileName = generateUniqueFileName(file.name);
@@ -86,7 +101,16 @@ export async function uploadImage(file: File): Promise<string> {
   const filePath = await join(dirPath, fileName);
   await writeFile(filePath, new Uint8Array(await file.arrayBuffer()));
 
-  return convertFileSrc(filePath);
+  const url = convertFileSrc(filePath);
+  const caption = file.name || "image";
+
+  return {
+    props: {
+      url,
+      name: file.name,
+      caption,
+    },
+  };
 }
 
 /**
