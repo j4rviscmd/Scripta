@@ -32,10 +32,10 @@ export const configDefaults = {
  * Promise that resolves when all stores have been loaded from disk and
  * config defaults have been pre-fetched.
  *
- * Consumed by {@link StoreProvider} via `React.use()` to suspend rendering
- * until the stores are ready.
+ * Consumed internally by {@link StoreProvider} via `React.use()` and
+ * externally by the splash screen to coordinate its dismissal timing.
  */
-const initPromise = Promise.all([configStore.init(), editorStateStore.init()])
+export const storeInitPromise = Promise.all([configStore.init(), editorStateStore.init()])
   .then(async () => {
     const [storedSidebarOpen, storedWindowRestore] = await Promise.all([
       configStore.get<boolean>("sidebarOpen"),
@@ -85,7 +85,7 @@ const StoreContext = createContext<{
  * ```
  */
 export function StoreProvider({ children }: { children: ReactNode }) {
-  use(initPromise);
+  use(storeInitPromise);
 
   return (
     <StoreContext.Provider value={{ config: configStore, editorState: editorStateStore }}>
