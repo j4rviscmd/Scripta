@@ -119,6 +119,47 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   useCopyToast(editor);
 
   /**
+   * After every file upload completes, ensure the uploaded image block has a
+   * non-empty caption so the bubble menu hover-target area remains accessible
+   * (see issue #40).
+   *
+   * When images are pasted via the OS clipboard (e.g. right-click → Copy Image
+   * in Chrome), they arrive as `text/html` containing an `<img>` tag.
+   * BlockNote's paste handler prioritises `text/html` over `Files`, so the
+   * image block is created directly from the HTML without going through
+   * `uploadFile` — meaning `onUploadEnd` never fires for this path.
+   *
+   * This hook still covers the `uploadFile` code-path (e.g. screenshots)
+   * where `onUploadEnd` *is* called but the returned caption may not have
+   * been applied.
+   */
+  useEffect(() => {
+    const onUploadEnd = (blockId?: string) => {
+      if (!blockId) return;
+      const block = editor.getBlock(blockId);
+      if (
+        block &&
+        block.type === "image" &&
+        typeof block.props === "object" &&
+        block.props !== null &&
+        "caption" in block.props &&
+        (block.props as Record<string, unknown>).caption === ""
+      ) {
+        const name =
+          ("name" in block.props &&
+            typeof (block.props as Record<string, unknown>).name === "string" &&
+            (block.props as Record<string, unknown>).name) ||
+          "image";
+        editor.updateBlock(block, {
+          props: { caption: name as string },
+        } as any);
+      }
+    };
+
+    return editor.onUploadEnd(onUploadEnd);
+  }, [editor]);
+
+  /**
    * Subscribes to the BlockNote SuggestionMenu extension store and calls
    * `onSuggestionMenuOpen` whenever the suggestion menu becomes visible.
    *
@@ -180,8 +221,12 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
    * image block whose caption is empty.  This ensures hover-target areas
    * exist for the formatting toolbar (see issue #40).
    *
+   * When a `name` prop is available on the image block (e.g. the alt text
+   * extracted from `<img>` HTML), it is used as the caption.  Otherwise
+   * falls back to the literal string `"image"`.
+   *
    * Must be called while `loadingRef.current === true` so the auto-save
-   * guard in `handleChange` prevents unnecessary writes.
+   * guard in `handleChange` prevents unnecessary writes during initial load.
    */
   const backfillImageCaptions = useCallback(() => {
     const walk = (blocks: typeof editor.document) => {
@@ -193,7 +238,10 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
           "caption" in block.props &&
           (block.props as Record<string, unknown>).caption === ""
         ) {
-          editor.updateBlock(block, { props: { caption: "image" } } as any);
+          const props = block.props as Record<string, unknown>;
+          const caption =
+            (typeof props.name === "string" && props.name) || "image";
+          editor.updateBlock(block, { props: { caption } } as any);
         }
         if (block.children?.length) {
           walk(block.children);
@@ -262,8 +310,15 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 
   const handleChange = useCallback(() => {
     if (loadingRef.current) return;
+    // Ensure every image block has a non-empty caption so the bubble menu
+    // hover-target always exists (issue #40).  This covers the `text/html`
+    // paste path where `onUploadEnd` is not fired (e.g. right-click → Copy
+    // Image in Chrome).  `backfillImageCaptions` only calls `updateBlock`
+    // when it actually finds an empty caption, so the subsequent re-trigger
+    // of `onChange` is a no-op and does not cause an infinite loop.
+    backfillImageCaptions();
     scheduleSave(JSON.stringify(editor.document));
-  }, [editor, scheduleSave]);
+  }, [editor, scheduleSave, backfillImageCaptions]);
 
   return (
     <>
