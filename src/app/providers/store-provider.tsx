@@ -1,5 +1,7 @@
 import { createContext, useContext, use, type ReactNode } from "react";
 import { LazyStore } from "@tauri-apps/plugin-store";
+import { restoreStateCurrent, StateFlags } from "@tauri-apps/plugin-window-state";
+import { DEFAULT_WINDOW_STATE_RESTORE, WINDOW_STATE_STORE_KEY } from "@/features/settings/lib/windowStateConfig";
 
 /**
  * Module-scoped singleton store instances.
@@ -22,6 +24,8 @@ const editorStateStore = new LazyStore("editor-state.json");
 export const configDefaults = {
   /** Whether the sidebar is open. Falls back to `true` if not persisted. */
   sidebarOpen: true,
+  /** Whether to restore window position & size on launch. Falls back to `true` if not persisted. */
+  windowStateRestoreEnabled: DEFAULT_WINDOW_STATE_RESTORE,
 };
 
 /**
@@ -33,9 +37,21 @@ export const configDefaults = {
  */
 const initPromise = Promise.all([configStore.init(), editorStateStore.init()])
   .then(async () => {
-    const stored = await configStore.get<boolean>("sidebarOpen");
-    if (stored != null) {
-      configDefaults.sidebarOpen = stored;
+    const [storedSidebarOpen, storedWindowRestore] = await Promise.all([
+      configStore.get<boolean>("sidebarOpen"),
+      configStore.get<boolean>(WINDOW_STATE_STORE_KEY),
+    ]);
+    if (storedSidebarOpen != null) {
+      configDefaults.sidebarOpen = storedSidebarOpen;
+    }
+    const restoreEnabled = storedWindowRestore ?? DEFAULT_WINDOW_STATE_RESTORE;
+    configDefaults.windowStateRestoreEnabled = restoreEnabled;
+    if (restoreEnabled) {
+      try {
+        await restoreStateCurrent(StateFlags.POSITION | StateFlags.SIZE);
+      } catch (err) {
+        console.error("Failed to restore window state:", err);
+      }
     }
   });
 
