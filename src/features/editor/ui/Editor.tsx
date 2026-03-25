@@ -176,6 +176,34 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   const search = useSearchReplace(editor);
 
   /**
+   * Walks the editor document tree and sets `caption` to `"image"` on any
+   * image block whose caption is empty.  This ensures hover-target areas
+   * exist for the formatting toolbar (see issue #40).
+   *
+   * Must be called while `loadingRef.current === true` so the auto-save
+   * guard in `handleChange` prevents unnecessary writes.
+   */
+  const backfillImageCaptions = useCallback(() => {
+    const walk = (blocks: typeof editor.document) => {
+      for (const block of blocks) {
+        if (
+          block.type === "image" &&
+          typeof block.props === "object" &&
+          block.props !== null &&
+          "caption" in block.props &&
+          (block.props as Record<string, unknown>).caption === ""
+        ) {
+          editor.updateBlock(block, { props: { caption: "image" } } as any);
+        }
+        if (block.children?.length) {
+          walk(block.children);
+        }
+      }
+    };
+    walk(editor.document);
+  }, [editor]);
+
+  /**
    * Loads note content into the BlockNote editor when `noteId` changes.
    *
    * - If no `noteId` is provided, the editor is reset to default blocks.
@@ -193,6 +221,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     loadingRef.current = true;
     if (!noteId) {
       editor.replaceBlocks(editor.document, BLOCKS);
+      backfillImageCaptions();
       queueMicrotask(() => {
         if (!stale) {
           loadingRef.current = false;
@@ -211,6 +240,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
           } catch {
             editor.replaceBlocks(editor.document, BLOCKS);
           }
+          backfillImageCaptions();
         } else {
           toast.error("Note not found");
         }
@@ -228,7 +258,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     return () => {
       stale = true;
     };
-  }, [noteId, editor]);
+  }, [noteId, editor, backfillImageCaptions]);
 
   const handleChange = useCallback(() => {
     if (loadingRef.current) return;
