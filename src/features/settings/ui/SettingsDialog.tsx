@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { CursorCenteringOption } from "./CursorCenteringOption";
+import { EditorFontOption } from "./EditorFontOption";
 import { FontSizeOption } from "./FontSizeOption";
 import { ThemeOption } from "./ThemeOption";
 import { CommandPaletteScrollOption } from "./CommandPaletteScrollOption";
@@ -35,6 +36,7 @@ interface SettingsDialogProps {
  * - **Cursor centering** — Typewriter-style scroll behavior.
  * - **Command palette scroll** — Scroll-to-top on open.
  * - **Font size** — Editor font size adjustment.
+ * - **Editor font** — Editor font family selection (Google Fonts).
  * - **Window state** — Restore window position and size on launch.
  *
  * The dialog is controlled externally through the `open` and
@@ -64,6 +66,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         <CommandPaletteScrollOption />
         <Separator />
         <FontSizeOption />
+        <Separator />
+        <EditorFontOption />
         <Separator />
         <WindowStateOption />
       </DialogContent>

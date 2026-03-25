@@ -278,6 +278,7 @@ span[data-style-type="backgroundColor"][data-value="yellow"] {
  */
 [data-editor-root] .bn-default-styles {
   font-size: var(--editor-font-size, 16px);
+  font-family: var(--editor-font-family, 'Geist Variable', sans-serif);
 }
 
 /*
