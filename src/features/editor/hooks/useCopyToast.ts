@@ -3,12 +3,12 @@ import { useEffect } from 'react'
 import { toast } from 'sonner'
 
 /**
- * Shows a success toast whenever the user copies content in the
+ * Shows a success toast whenever the user copies or cuts content in the
  * BlockNote editor.
  *
- * Only reacts to the `copy` DOM event (Cmd/Ctrl+C); `cut` events
- * are intentionally ignored.  When the selection is collapsed
- * (nothing selected) no toast is shown.
+ * Reacts to both `copy` (Cmd/Ctrl+C) and `cut` (Cmd/Ctrl+X) DOM events.
+ * The `cut` listener uses the capture phase so the selection is checked
+ * before ProseMirror removes the content from the DOM.
  */
 export function useCopyToast(editor: BlockNoteEditor): void {
   useEffect(() => {
@@ -16,19 +16,23 @@ export function useCopyToast(editor: BlockNoteEditor): void {
     const tiptap = (editor as any)._tiptapEditor
     if (!tiptap) return
 
+    /** The underlying DOM element that hosts the ProseMirror editor view. */
     const editorDom = tiptap.view.dom as HTMLElement
 
-    const handleCopy = () => {
+    /** Displays a success toast when the user copies or cuts non-collapsed content. */
+    const handleCopyOrCut = (): void => {
       const selection = window.getSelection()
       if (!selection || selection.isCollapsed) return
 
       toast.success('Copied to clipboard')
     }
 
-    editorDom.addEventListener('copy', handleCopy)
+    editorDom.addEventListener('copy', handleCopyOrCut)
+    editorDom.addEventListener('cut', handleCopyOrCut, true)
 
     return () => {
-      editorDom.removeEventListener('copy', handleCopy)
+      editorDom.removeEventListener('copy', handleCopyOrCut)
+      editorDom.removeEventListener('cut', handleCopyOrCut, true)
     }
   }, [editor])
 }
