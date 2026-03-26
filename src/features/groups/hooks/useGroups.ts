@@ -18,13 +18,21 @@ import type { Group } from '../lib/types'
  *
  * @param refreshKey - Bumped externally to trigger a re-fetch.
  * @param onRefresh - Called after any mutation so the parent can bump its own refresh counter.
+ * @returns An object containing:
+ *   - `groups` – The current list of groups.
+ *   - `create` – Creates a new group with the given name.
+ *   - `rename` – Renames an existing group by id.
+ *   - `remove` – Deletes a group by id.
+ *   - `reorder` – Reorders groups with an optimistic local update.
+ *   - `moveNote` – Assigns or unassigns a note to/from a group.
  */
-export function useGroups(_refreshKey: number, onRefresh: () => void) {
+export function useGroups(refreshKey: number, onRefresh: () => void) {
   const [groups, setGroups] = useState<Group[]>([])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshKey is an intentional trigger to re-fetch
   useEffect(() => {
     listGroups().then(setGroups).catch(console.error)
-  }, [])
+  }, [refreshKey])
 
   const create = useCallback(
     async (name: string): Promise<Group> => {
@@ -52,7 +60,8 @@ export function useGroups(_refreshKey: number, onRefresh: () => void) {
   )
 
   const reorder = useCallback(async (orderedIds: string[]): Promise<void> => {
-    // Optimistic update
+    // Optimistic update: reorder the local state immediately so the UI
+    // reflects the new order before the backend call completes.
     setGroups((prev) => {
       const map = new Map(prev.map((g) => [g.id, g]))
       return orderedIds
