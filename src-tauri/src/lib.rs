@@ -1,5 +1,6 @@
 mod db;
 mod file_io;
+mod groups;
 mod link_preview;
 
 use tauri::Manager;
@@ -34,6 +35,12 @@ pub fn run() {
             db::update_note,
             db::delete_note,
             db::toggle_pin,
+            groups::list_groups,
+            groups::create_group,
+            groups::rename_group,
+            groups::delete_group,
+            groups::reorder_groups,
+            groups::set_note_group,
             link_preview::fetch_link_title,
             file_io::read_text_file,
             file_io::write_text_file,

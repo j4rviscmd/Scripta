@@ -289,6 +289,7 @@ function AppContent() {
           onExportNote={handleExportNote}
           onImportNote={handleImportNote}
           refreshKey={refreshKey}
+          onRefresh={() => setRefreshKey((v) => v + 1)}
         />
         <SidebarInset className="overflow-hidden">
           <header

@@ -1,206 +1,46 @@
-import { useEffect, useMemo, useState } from "react";
-import { Download, FileText, Pin, PinOff, Plus, Search, Settings, Trash2, Upload, X } from "lucide-react";
-import { listNotes, type Note } from "@/features/editor";
+import { useCallback, useState } from "react";
+import { Search, Settings, Upload, FolderCog } from "lucide-react";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import type { Note } from "@/features/editor";
+import {
+  useGroups,
+  useGroupCollapse,
+  bucketByDate,
+} from "@/features/groups";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { cn } from "@/lib/utils";
-import { useDebounce } from "..";
 import { SettingsDialog } from "@/features/settings";
-
-/** Number of milliseconds in one day. */
-const MS_PER_DAY = 86_400_000;
-/** Number of minutes in one hour. */
-const MINUTES_PER_HOUR = 60;
-/** Number of minutes in one day. */
-const MINUTES_PER_DAY = 1_440;
-/** Number of minutes in one week. */
-const MINUTES_PER_WEEK = 10_080;
-
-/**
- * Formats an ISO 8601 date string into a human-readable relative time.
- *
- * Returns compact labels such as `"Just now"`, `"5m ago"`, `"3h ago"`,
- * `"2d ago"`, or a locale-formatted absolute date for anything older
- * than seven days.
- *
- * @param iso - An ISO 8601 date string (e.g. `"2026-03-21T12:00:00Z"`).
- * @returns A human-readable relative time string.
- */
-function formatDate(iso: string): string {
-  const date = new Date(iso);
-  const diffMin = Math.floor((Date.now() - date.getTime()) / 60_000);
-
-  if (diffMin < 1) return "Just now";
-  if (diffMin < MINUTES_PER_HOUR) return `${diffMin}m ago`;
-  if (diffMin < MINUTES_PER_DAY) return `${Math.floor(diffMin / MINUTES_PER_HOUR)}h ago`;
-  if (diffMin < MINUTES_PER_WEEK) return `${Math.floor(diffMin / MINUTES_PER_DAY)}d ago`;
-  return date.toLocaleDateString();
-}
-
-/**
- * Groups notes by relative date for timeline-style display.
- *
- * Notes are bucketed into four fixed groups -- "Today", "Yesterday",
- * "Previous 7 Days", and "Older" -- based on their `updatedAt` value.
- * Groups with zero items are omitted from the result.
- *
- * @param notes - The full list of notes to categorise.
- * @returns An array of label/notes pairs, sorted from newest to oldest.
- */
-function groupNotes(notes: Note[]): { label: string; items: Note[] }[] {
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterday = new Date(today.getTime() - MS_PER_DAY);
-  const weekAgo = new Date(today.getTime() - 7 * MS_PER_DAY);
-
-  const todayItems: Note[] = [];
-  const yesterdayItems: Note[] = [];
-  const weekItems: Note[] = [];
-  const olderItems: Note[] = [];
-
-  for (const note of notes) {
-    const date = new Date(note.updatedAt);
-    if (date >= today) {
-      todayItems.push(note);
-    } else if (date >= yesterday) {
-      yesterdayItems.push(note);
-    } else if (date >= weekAgo) {
-      weekItems.push(note);
-    } else {
-      olderItems.push(note);
-    }
-  }
-
-  const groups: { label: string; items: Note[] }[] = [
-    { label: "Today", items: todayItems },
-    { label: "Yesterday", items: yesterdayItems },
-    { label: "Previous 7 Days", items: weekItems },
-    { label: "Older", items: olderItems },
-  ];
-
-  return groups.filter((g) => g.items.length > 0);
-}
-
-/**
- * Props for the {@link NoteItem} component.
- */
-interface NoteItemProps {
-  note: Note;
-  selectedNoteId: string | null;
-  onSelectNote: (id: string) => void;
-  onTogglePin: (id: string, pinned: boolean) => void;
-  onDeleteNote: () => void;
-  onExportNote: (noteId: string) => void;
-  justPinnedId: string | null;
-}
-
-/**
- * A single note item in the sidebar, used in both pinned and date groups.
- */
-function NoteItem({
-  note,
-  selectedNoteId,
-  onSelectNote,
-  onTogglePin,
-  onDeleteNote,
-  onExportNote,
-  justPinnedId,
-}: NoteItemProps) {
-  return (
-    <SidebarMenuItem className="animate-in fade-in-0 slide-in-from-top-1 duration-200 fill-mode-both py-px">
-      <ContextMenu>
-        <ContextMenuTrigger>
-          <SidebarMenuButton
-            isActive={note.id === selectedNoteId}
-            onClick={() => onSelectNote(note.id)}
-            className={cn(note.isPinned && "hover:bg-primary/5")}
-          >
-            {note.isPinned ? (
-              <Pin
-                className={cn(
-                  "h-4 w-4 shrink-0 text-primary fill-primary/20",
-                  justPinnedId === note.id && "animate-pin-bounce",
-                )}
-              />
-            ) : (
-              <FileText className="h-4 w-4 shrink-0" />
-            )}
-            <div className="flex flex-col overflow-hidden">
-              <span className="truncate text-sm">{note.title}</span>
-              <span className="text-xs text-muted-foreground">
-                {formatDate(note.updatedAt)}
-              </span>
-            </div>
-          </SidebarMenuButton>
-        </ContextMenuTrigger>
-        <ContextMenuContent>
-          <ContextMenuItem onClick={() => onTogglePin(note.id, !note.isPinned)}>
-            {note.isPinned ? (
-              <>
-                <PinOff className="h-4 w-4" />
-                Unpin
-              </>
-            ) : (
-              <>
-                <Pin className="h-4 w-4" />
-                Pin to top
-              </>
-            )}
-          </ContextMenuItem>
-          <ContextMenuItem onClick={() => onExportNote(note.id)}>
-            <Download className="h-4 w-4" />
-            Export as Markdown
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem variant="destructive" onClick={onDeleteNote}>
-            <Trash2 />
-            Delete
-          </ContextMenuItem>
-        </ContextMenuContent>
-      </ContextMenu>
-    </SidebarMenuItem>
-  );
-}
+import { useSidebarNotes } from "../hooks/useSidebarNotes";
+import { SidebarSearch } from "./SidebarSearch";
+import { NoteItem } from "./NoteItem";
+import { PinnedSection } from "./PinnedSection";
+import { DateGroup } from "./DateGroup";
+import { GroupSection } from "./GroupSection";
+import { UncategorizedSection } from "./UncategorizedSection";
+import { GroupManageDialog } from "./GroupManageDialog";
+import { DeleteNoteDialog } from "./DeleteNoteDialog";
+import { toast } from "sonner";
 
 /**
  * Props for the {@link NoteSidebar} component.
- *
- * @property selectedNoteId - The UUID of the currently active note, or `null` if none is selected.
- * @property onSelectNote - Callback invoked with the chosen note UUID when the user clicks a sidebar item.
- * @property onNewNote - Callback invoked when the user clicks the "new note" button in the sidebar header.
- * @property onDeleteNote - Callback invoked with the note UUID when the user confirms deletion via the context menu.
- * @property onTogglePin - Callback invoked with the note UUID and new pinned state when the user toggles pin.
- * @property refreshKey - A numeric counter that triggers a re-fetch of the note list whenever it changes.
  */
 interface NoteSidebarProps {
   selectedNoteId: string | null;
@@ -211,19 +51,15 @@ interface NoteSidebarProps {
   onExportNote: (noteId: string) => void;
   onImportNote: () => void;
   refreshKey: number;
+  onRefresh: () => void;
 }
 
 /**
- * Sidebar component displaying notes with pinned section and date grouping.
+ * Sidebar component displaying notes organised by groups and date.
  *
- * Fetches the full note list on mount and whenever `refreshKey` changes,
- * then separates pinned notes (displayed at the top) from unpinned notes
- * (grouped by relative date via {@link groupNotes}).
- *
- * A search input in the header allows filtering notes by title in
- * real-time with a 300 ms debounce.
- *
- * @param props - {@link NoteSidebarProps}
+ * Renders pinned notes at the top, followed by collapsible group
+ * sections each containing date sub-groups. Notes without a group
+ * appear in an "Uncategorized" section.
  */
 export function NoteSidebar({
   selectedNoteId,
@@ -234,191 +70,298 @@ export function NoteSidebar({
   onExportNote,
   onImportNote,
   refreshKey,
+  onRefresh,
 }: NoteSidebarProps) {
-  const [notes, setNotes] = useState<Note[]>([]);
+  const { groups, create, rename, remove, reorder, moveNote } = useGroups(
+    refreshKey,
+    onRefresh,
+  );
+  const { isCollapsed, toggle } = useGroupCollapse();
+  const {
+    searchQuery,
+    setSearchQuery,
+    isSearching,
+    pinnedNotes,
+    grouped,
+    uncategorized,
+    isEmpty,
+    noResults,
+    debouncedQuery,
+  } = useSidebarNotes(refreshKey, groups);
+
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
   const [justPinnedId, setJustPinnedId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [groupManageOpen, setGroupManageOpen] = useState(false);
+  const [activeDragNoteId, setActiveDragNoteId] = useState<string | null>(null);
 
-  const debouncedQuery = useDebounce(searchQuery);
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+  );
 
-  useEffect(() => {
-    listNotes().then(setNotes).catch(console.error);
-  }, [refreshKey]);
-
-  const filteredNotes = useMemo(() => {
-    if (!debouncedQuery.trim()) return notes;
-    const q = debouncedQuery.toLowerCase();
-    return notes.filter((note) => note.title.toLowerCase().includes(q));
-  }, [notes, debouncedQuery]);
-
-  const isSearching = debouncedQuery.trim().length > 0;
-
-  const handleTogglePin = (noteId: string, pinned: boolean) => {
-    onTogglePin(noteId, pinned);
-    if (pinned) {
-      setJustPinnedId(noteId);
-      setTimeout(() => setJustPinnedId(null), 400);
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const data = event.active.data.current;
+    if (data?.type === "note") {
+      setActiveDragNoteId(data.noteId as string);
     }
-  };
+  }, []);
 
-  /**
-   * Renders the main content area of the sidebar.
-   *
-   * Handles four display states:
-   *
-   * 1. **No search results** -- Shows a centered empty-state message
-   *    with the search query.
-   * 2. **Pinned + date groups** -- Pinned notes appear first in a
-   *    dedicated section (hidden during search), followed by unpinned
-   *    notes grouped by relative date via {@link groupNotes}.
-   * 3. **Search results only** -- During search, pinned section is
-   *    hidden and all matching notes are shown in date groups.
-   * 4. **No notes at all** -- Shows a simple "No notes yet" message.
-   *
-   * @returns The rendered sidebar body as a `React.ReactNode`.
-   */
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      setActiveDragNoteId(null);
+      const { active, over } = event;
+      if (!over) return;
+
+      const activeData = active.data.current;
+      const overData = over.data.current;
+
+      // Note dropped on a group or uncategorized
+      if (activeData?.type === "note") {
+        const noteId = activeData.noteId as string;
+        if (overData?.type === "group") {
+          const groupId = overData.groupId as string;
+          try {
+            await moveNote(noteId, groupId);
+          } catch {
+            toast.error("Failed to move note");
+          }
+        } else if (overData?.type === "uncategorized") {
+          try {
+            await moveNote(noteId, null);
+          } catch {
+            toast.error("Failed to move note");
+          }
+        }
+        return;
+      }
+
+      // Group reordering
+      if (activeData?.type === "group" && overData?.type === "group") {
+        const oldIndex = groups.findIndex((g) => g.id === active.id);
+        const newIndex = groups.findIndex((g) => g.id === over.id);
+        if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+          const newOrder = arrayMove(groups, oldIndex, newIndex);
+          try {
+            await reorder(newOrder.map((g) => g.id));
+          } catch {
+            toast.error("Failed to reorder groups");
+          }
+        }
+      }
+    },
+    [groups, moveNote, reorder],
+  );
+
+  const handleTogglePin = useCallback(
+    (noteId: string, pinned: boolean) => {
+      onTogglePin(noteId, pinned);
+      if (pinned) {
+        setJustPinnedId(noteId);
+        setTimeout(() => setJustPinnedId(null), 400);
+      }
+    },
+    [onTogglePin],
+  );
+
+  const handleMoveToGroup = useCallback(
+    async (noteId: string, groupId: string | null) => {
+      try {
+        await moveNote(noteId, groupId);
+      } catch {
+        toast.error("Failed to move note");
+      }
+    },
+    [moveNote],
+  );
+
+  const renderNoteItem = useCallback(
+    (note: Note) => (
+      <NoteItem
+        key={note.id}
+        note={note}
+        selectedNoteId={selectedNoteId}
+        onSelectNote={onSelectNote}
+        onTogglePin={handleTogglePin}
+        onDeleteNote={() => setDeleteTarget(note.id)}
+        onExportNote={onExportNote}
+        onMoveToGroup={handleMoveToGroup}
+        groups={groups}
+        justPinnedId={justPinnedId}
+      />
+    ),
+    [
+      selectedNoteId,
+      onSelectNote,
+      handleTogglePin,
+      onExportNote,
+      handleMoveToGroup,
+      groups,
+      justPinnedId,
+    ],
+  );
+
   function renderSidebarBody(): React.ReactNode {
-    if (isSearching && filteredNotes.length === 0) {
+    if (noResults) {
       return (
         <div className="flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground">
           <Search className="h-8 w-8" />
-          <p className="text-xs">No notes match &quot;{debouncedQuery}&quot;</p>
+          <p className="text-xs">
+            No notes match &quot;{debouncedQuery}&quot;
+          </p>
         </div>
       );
     }
 
-    const pinnedNotes = isSearching ? [] : filteredNotes.filter((n) => n.isPinned);
-    const groups = groupNotes(isSearching ? filteredNotes : filteredNotes.filter((n) => !n.isPinned));
+    // During search: bypass groups, show flat date-grouped results
+    if (isSearching) {
+      const searchBuckets = bucketByDate(
+        grouped.flatMap((g) =>
+          g.dateBuckets.flatMap((b) => b.items),
+        ).concat(uncategorized.flatMap((b) => b.items)),
+      );
+      if (searchBuckets.length === 0) {
+        return (
+          <p className="p-4 text-sm text-muted-foreground">No notes yet</p>
+        );
+      }
+      return searchBuckets.map((bucket) => (
+        <DateGroup
+          key={bucket.label}
+          bucket={bucket}
+          renderNoteItem={renderNoteItem}
+        />
+      ));
+    }
 
-    if (pinnedNotes.length === 0 && groups.length === 0) {
+    if (isEmpty) {
       return <p className="p-4 text-sm text-muted-foreground">No notes yet</p>;
     }
 
-    function renderNoteItem(note: Note) {
-      return (
-        <NoteItem
-          key={note.id}
-          note={note}
-          selectedNoteId={selectedNoteId}
-          onSelectNote={onSelectNote}
-          onTogglePin={handleTogglePin}
-          onDeleteNote={() => setDeleteTarget(note.id)}
-          onExportNote={onExportNote}
-          justPinnedId={justPinnedId}
-        />
-      );
-    }
+    const hasGroups = groups.length > 0;
 
     return (
       <>
-        {/* Pinned section */}
-        {pinnedNotes.length > 0 && (
-          <SidebarGroup className="animate-in fade-in-0 slide-in-from-top-2 duration-300">
-            <SidebarGroupLabel className="flex items-center gap-1 text-[10px] [&>svg]:!size-2.5">
-              <Pin className="fill-primary text-primary" />
-              Pinned
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>{pinnedNotes.map(renderNoteItem)}</SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-        {pinnedNotes.length > 0 && (
-          <SidebarSeparator className="mx-3 animate-in fade-in-0 duration-500 delay-150" />
-        )}
+        <PinnedSection notes={pinnedNotes} renderNoteItem={renderNoteItem} />
 
-        {/* Date groups */}
-        {groups.map((group) => (
-          <SidebarGroup key={group.label}>
-            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>{group.items.map(renderNoteItem)}</SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
+        {hasGroups ? (
+          <>
+            <SortableContext
+              items={groups.map((g) => g.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {grouped.map((g) => (
+                <GroupSection
+                  key={g.group.id}
+                  groupWithNotes={g}
+                  isCollapsed={isCollapsed(g.group.id)}
+                  onToggleCollapse={() => toggle(g.group.id)}
+                  onRename={rename}
+                  onDelete={remove}
+                  renderNoteItem={renderNoteItem}
+                />
+              ))}
+            </SortableContext>
+
+            {grouped.length > 0 && uncategorized.length > 0 && (
+              <SidebarSeparator className="mx-3" />
+            )}
+
+            <UncategorizedSection
+              dateBuckets={uncategorized}
+              isCollapsed={isCollapsed("__uncategorized__")}
+              onToggleCollapse={() => toggle("__uncategorized__")}
+              renderNoteItem={renderNoteItem}
+            />
+          </>
+        ) : (
+          // No groups defined: show flat date-grouped notes (original behavior)
+          uncategorized.map((bucket) => (
+            <DateGroup
+              key={bucket.label}
+              bucket={bucket}
+              renderNoteItem={renderNoteItem}
+            />
+          ))
+        )}
       </>
     );
   }
 
+  // Find dragged note for DragOverlay
+  const allNotes = grouped
+    .flatMap((g) => g.dateBuckets.flatMap((b) => b.items))
+    .concat(uncategorized.flatMap((b) => b.items))
+    .concat(pinnedNotes);
+  const draggedNote = activeDragNoteId
+    ? allNotes.find((n) => n.id === activeDragNoteId) ?? null
+    : null;
+
   return (
-    <Sidebar>
-      <SidebarHeader className="flex flex-row items-center gap-2 border-b px-3 py-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search notes..."
-            className="h-8 pl-8 pr-8 text-sm bg-muted/50 border-transparent focus:border-border focus:bg-background"
-          />
-          {searchQuery && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute right-1 top-1/2 h-5 w-5 -translate-y-1/2"
-              onClick={() => setSearchQuery("")}
-            >
-              <X className="h-3.5 w-3.5" />
-            </Button>
-          )}
-        </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 shrink-0"
-          onClick={onNewNote}
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
-      </SidebarHeader>
-      <SidebarContent>{renderSidebarBody()}</SidebarContent>
-      <SidebarFooter>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-start gap-2 text-muted-foreground"
-          onClick={onImportNote}
-        >
-          <Upload className="h-4 w-4" />
-          Import Markdown
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-start gap-2 text-muted-foreground"
-          onClick={() => setSettingsOpen(true)}
-        >
-          <Settings className="h-4 w-4" />
-          Settings
-        </Button>
-      </SidebarFooter>
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
-      <AlertDialog
-        open={deleteTarget !== null}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete note?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (deleteTarget) onDeleteNote(deleteTarget);
-                setDeleteTarget(null);
-              }}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </Sidebar>
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
+      <Sidebar>
+        <SidebarSearch
+          query={searchQuery}
+          onQueryChange={setSearchQuery}
+          onNewNote={onNewNote}
+        />
+        <SidebarContent className="overflow-x-hidden">{renderSidebarBody()}</SidebarContent>
+        <SidebarFooter>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start gap-2 text-muted-foreground"
+            onClick={() => setGroupManageOpen(true)}
+          >
+            <FolderCog className="h-4 w-4" />
+            Manage Groups
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start gap-2 text-muted-foreground"
+            onClick={onImportNote}
+          >
+            <Upload className="h-4 w-4" />
+            Import Markdown
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start gap-2 text-muted-foreground"
+            onClick={() => setSettingsOpen(true)}
+          >
+            <Settings className="h-4 w-4" />
+            Settings
+          </Button>
+        </SidebarFooter>
+        <GroupManageDialog
+          open={groupManageOpen}
+          onOpenChange={setGroupManageOpen}
+          groups={groups}
+          onCreate={create}
+          onRename={rename}
+          onDelete={remove}
+        />
+        <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+        <DeleteNoteDialog
+          noteId={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={onDeleteNote}
+        />
+      </Sidebar>
+      <DragOverlay dropAnimation={null}>
+        {draggedNote && (
+          <div className="rounded-md bg-sidebar border border-border shadow-lg px-3 py-2 text-sm opacity-80 max-w-[200px] truncate">
+            {draggedNote.title}
+          </div>
+        )}
+      </DragOverlay>
+    </DndContext>
   );
 }
