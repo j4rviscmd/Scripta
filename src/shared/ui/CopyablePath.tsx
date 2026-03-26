@@ -43,7 +43,7 @@ function CopyablePath({ path }: CopyablePathProps) {
 
   return (
     <div className="flex items-center gap-1.5">
-      <button onClick={handleCopy} className="shrink-0">
+      <button type="button" onClick={handleCopy} className="shrink-0">
         {copied ? (
           <Check className="size-3.5" />
         ) : (
