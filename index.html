@@ -10,20 +10,43 @@
   <body>
     <div id="root"></div>
     <!--
-      Suppresses the "linkifyjs: already initialized" warning from TipTap/BlockNote.
-      See: https://github.com/ueberdosis/tiptap/issues/5450
-      This IIFE must execute before Vite pre-bundled chunks capture console.warn.
+      Console log suppression.
+      This IIFE intercepts specific console methods and filters out noisy
+      messages by prefix before the Vite pre-bundled chunks run.
+
+      Suppressed messages:
+        - "linkifyjs: already initialized" (console.warn)
+          See: https://github.com/ueberdosis/tiptap/issues/5450
+        - "[vite]" (console.debug)
+          Vite client-side debug logs that are not useful in production builds.
+
+      NOTE: This script must appear BEFORE the main application module
+      (<script type="module">) so that the console overrides are in place
+      before any library code captures a reference to the original methods.
     -->
     <script>
-      // Workaround for https://github.com/ueberdosis/tiptap/issues/5450
-      // Must run before Vite pre-bundled chunks capture console.warn
       (() => {
-        const _warn = console.warn;
-        console.warn = (...args) => {
-          const msg = typeof args[0] === "string" ? args[0] : "";
-          if (msg.startsWith("linkifyjs: already initialized")) return;
-          _warn.apply(console, args);
+        /**
+         * Replaces a console method with a filtered version that silently
+         * drops messages whose first argument starts with the given prefix.
+         *
+         * @param {keyof Pick<Console, 'warn'|'debug'|'log'|'info'>} method
+         *   - The name of the console method to override.
+         * @param {string} prefix
+         *   - The message prefix to match. Any call whose first argument is a
+         *     string beginning with this value will be suppressed.
+         */
+        const suppress = (method, prefix) => {
+          const original = console[method];
+          console[method] = (...args) => {
+            const msg = typeof args[0] === "string" ? args[0] : "";
+            if (msg.startsWith(prefix)) return;
+            original.apply(console, args);
+          };
         };
+
+        suppress("warn", "linkifyjs: already initialized");
+        suppress("debug", "[vite]");
       })();
     </script>
     <script type="module" src="/src/main.tsx"></script>
