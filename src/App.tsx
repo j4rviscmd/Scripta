@@ -9,6 +9,7 @@ import {
 } from '@/app/providers/font-size-provider'
 import { configDefaults, useAppStore } from '@/app/providers/store-provider'
 import { ThemeProvider } from '@/app/providers/theme-provider'
+import { ToolbarConfigProvider } from '@/app/providers/toolbar-config-provider'
 import {
   SidebarInset,
   SidebarProvider,
@@ -380,8 +381,9 @@ function AppContent() {
  * Root component of the application.
  *
  * Wraps {@link AppContent} with the {@link ThemeProvider},
- * {@link FontSizeProvider}, and {@link EditorFontProvider} so their
- * context hooks are available throughout the component tree.
+ * {@link FontSizeProvider}, {@link EditorFontProvider}, and
+ * {@link ToolbarConfigProvider} so their context hooks are available
+ * throughout the component tree.
  *
  * @returns The rendered application tree.
  */
@@ -390,7 +392,9 @@ function App() {
     <ThemeProvider defaultTheme={configDefaults.theme}>
       <FontSizeProvider>
         <EditorFontProvider>
-          <AppContent />
+          <ToolbarConfigProvider>
+            <AppContent />
+          </ToolbarConfigProvider>
         </EditorFontProvider>
       </FontSizeProvider>
     </ThemeProvider>

@@ -6,6 +6,12 @@ import {
 import { createContext, type ReactNode, use, useContext } from 'react'
 import type { Theme } from '@/app/providers/theme-provider'
 import {
+  DEFAULT_TOOLBAR_CONFIG,
+  TOOLBAR_CONFIG_STORE_KEY,
+  type ToolbarItemConfig,
+  validateToolbarConfig,
+} from '@/features/settings/lib/toolbarConfig'
+import {
   DEFAULT_WINDOW_STATE_RESTORE,
   WINDOW_STATE_STORE_KEY,
 } from '@/features/settings/lib/windowStateConfig'
@@ -35,6 +41,8 @@ export const configDefaults = {
   windowStateRestoreEnabled: DEFAULT_WINDOW_STATE_RESTORE,
   /** User-selected theme. Falls back to `"system"` if not persisted. */
   theme: 'system' as Theme,
+  /** Toolbar item order and visibility. Falls back to all-visible canonical order. */
+  toolbarConfig: DEFAULT_TOOLBAR_CONFIG as ToolbarItemConfig[],
 }
 
 /**
@@ -48,11 +56,12 @@ export const storeInitPromise = Promise.all([
   configStore.init(),
   editorStateStore.init(),
 ]).then(async () => {
-  const [storedSidebarOpen, storedWindowRestore, storedTheme] =
+  const [storedSidebarOpen, storedWindowRestore, storedTheme, storedToolbar] =
     await Promise.all([
       configStore.get<boolean>('sidebarOpen'),
       configStore.get<boolean>(WINDOW_STATE_STORE_KEY),
       configStore.get<string>('theme'),
+      configStore.get<ToolbarItemConfig[]>(TOOLBAR_CONFIG_STORE_KEY),
     ])
   if (storedSidebarOpen != null) {
     configDefaults.sidebarOpen = storedSidebarOpen
@@ -60,6 +69,9 @@ export const storeInitPromise = Promise.all([
   const validThemes = new Set<Theme>(['dark', 'light', 'system'])
   if (storedTheme && validThemes.has(storedTheme as Theme)) {
     configDefaults.theme = storedTheme as Theme
+  }
+  if (storedToolbar && Array.isArray(storedToolbar)) {
+    configDefaults.toolbarConfig = validateToolbarConfig(storedToolbar)
   }
   const restoreEnabled = storedWindowRestore ?? DEFAULT_WINDOW_STATE_RESTORE
   configDefaults.windowStateRestoreEnabled = restoreEnabled

@@ -13,6 +13,7 @@ import { CursorCenteringOption } from './CursorCenteringOption'
 import { EditorFontOption } from './EditorFontOption'
 import { FontSizeOption } from './FontSizeOption'
 import { ThemeOption } from './ThemeOption'
+import { ToolbarOption } from './ToolbarOption'
 import { WindowStateOption } from './WindowStateOption'
 
 /**
@@ -44,6 +45,7 @@ const themeOptions: Array<{ value: Theme; label: string; icon: LucideIcon }> = [
  * - **Command palette scroll** — Scroll-to-top on open.
  * - **Font size** — Editor font size adjustment.
  * - **Editor font** — Editor font family selection (Google Fonts).
+ * - **Toolbar** — Formatting toolbar item order and visibility via {@link ToolbarOption}.
  * - **Window state** — Restore window position and size on launch.
  *
  * The dialog is controlled externally through the `open` and
@@ -80,6 +82,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         <FontSizeOption />
         <Separator />
         <EditorFontOption />
+        <Separator />
+        <ToolbarOption />
         <Separator />
         <WindowStateOption />
       </DialogContent>
