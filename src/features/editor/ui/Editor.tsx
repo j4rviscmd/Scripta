@@ -17,8 +17,10 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
 } from 'react'
+import { useToolbarConfig } from '@/app/providers/toolbar-config-provider'
 import { CustomLinkToolbar } from './CustomLinkToolbar'
 import { SearchReplacePanel } from './SearchReplacePanel'
 import '@blocknote/shadcn/style.css'
@@ -94,23 +96,20 @@ export interface EditorHandle {
 }
 
 /**
- * Builds the formatting toolbar item list with a custom highlight button
- * injected after the color-style button.
- *
- * @returns The augmented array of formatting toolbar React elements.
+ * Set of toolbar item keys that are context-dependent (always rendered,
+ * self-hide when irrelevant). These are NOT user-configurable.
  */
-function buildFormattingToolbarItems() {
-  const items = getFormattingToolbarItems()
-  const colorIndex = items.findIndex((item) => item.key === 'colorStyleButton')
-  if (colorIndex === -1) return items
-  return [
-    ...items.slice(0, colorIndex + 1),
-    <HighlightButton key="highlightButton" />,
-    ...items.slice(colorIndex + 1),
-  ]
-}
-
-const formattingToolbarItems = buildFormattingToolbarItems()
+const PASS_THROUGH_KEYS = new Set([
+  'blockTypeSelect',
+  'tableCellMergeButton',
+  'fileCaptionButton',
+  'replaceFileButton',
+  'fileRenameButton',
+  'fileDeleteButton',
+  'fileDownloadButton',
+  'filePreviewButton',
+  'addTiptapCommentButton',
+])
 
 /**
  * BlockNote-based rich-text editor with auto-save, link handling,
@@ -135,8 +134,43 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   const { resolvedTheme } = useTheme()
   const { fontSize } = useEditorFontSize()
   const { fontFamily } = useEditorFont()
+  const { items: toolbarItemConfigs } = useToolbarConfig()
 
   useCursorCentering()
+
+  /**
+   * Builds the formatting toolbar items respecting user-configured
+   * order and visibility from the ToolbarConfigProvider.
+   *
+   * Context-dependent items (blockTypeSelect, table, file operations)
+   * are always prepended in their original order. Customizable items
+   * follow in the user-defined order, filtered by visibility.
+   */
+  const formattingToolbarItems = useMemo(() => {
+    const allItems = getFormattingToolbarItems()
+    const itemMap = new Map<string, React.ReactElement>()
+    const passThroughItems: React.ReactElement[] = []
+
+    for (const item of allItems) {
+      const key = item.key as string
+      if (PASS_THROUGH_KEYS.has(key)) {
+        passThroughItems.push(item)
+      } else {
+        itemMap.set(key, item)
+      }
+    }
+    // Add custom HighlightButton to the lookup
+    itemMap.set('highlightButton', <HighlightButton key="highlightButton" />)
+
+    const configuredItems: React.ReactElement[] = []
+    for (const cfg of toolbarItemConfigs) {
+      if (!cfg.visible) continue
+      const el = itemMap.get(cfg.key)
+      if (el) configuredItems.push(el)
+    }
+
+    return [...passThroughItems, ...configuredItems]
+  }, [toolbarItemConfigs])
 
   const { scheduleSave, saveStatus } = useAutoSave(
     500,
