@@ -1,4 +1,5 @@
-import { Monitor, Moon, Sun } from 'lucide-react'
+import { type LucideIcon, Monitor, Moon, Sun } from 'lucide-react'
+import type { Theme } from '@/app/providers/theme-provider'
 import {
   Dialog,
   DialogContent,
@@ -18,13 +19,19 @@ import { WindowStateOption } from './WindowStateOption'
  * Props for the {@link SettingsDialog} component.
  *
  * @property open - Whether the dialog is currently visible.
- * @property onOpenChange - Callback invoked when the dialog open state changes,
- *   receiving the new `open` boolean value.
+ * @property onOpenChange - Callback invoked when the dialog open state changes.
  */
 interface SettingsDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
 }
+
+/** Available theme choices displayed as selectable rows inside the dialog. */
+const themeOptions: Array<{ value: Theme; label: string; icon: LucideIcon }> = [
+  { value: 'light', label: 'Light', icon: Sun },
+  { value: 'dark', label: 'Dark', icon: Moon },
+  { value: 'system', label: 'System', icon: Monitor },
+]
 
 /**
  * A modal dialog for managing application preferences.
@@ -47,7 +54,7 @@ interface SettingsDialogProps {
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>Manage your preferences.</DialogDescription>
@@ -56,21 +63,14 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           <p className="px-3 font-medium text-muted-foreground text-xs">
             Theme
           </p>
-          <ThemeOption
-            value="light"
-            label="Light"
-            icon={<Sun className="h-5 w-5" />}
-          />
-          <ThemeOption
-            value="dark"
-            label="Dark"
-            icon={<Moon className="h-5 w-5" />}
-          />
-          <ThemeOption
-            value="system"
-            label="System"
-            icon={<Monitor className="h-5 w-5" />}
-          />
+          {themeOptions.map(({ value, label, icon: Icon }) => (
+            <ThemeOption
+              key={value}
+              value={value}
+              label={label}
+              icon={<Icon className="h-5 w-5" />}
+            />
+          ))}
         </div>
         <Separator />
         <CursorCenteringOption />
