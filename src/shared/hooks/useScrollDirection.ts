@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useAppStore } from "@/app/providers/store-provider";
-import { CENTERING_EVENT } from "@/shared/lib/events";
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useAppStore } from '@/app/providers/store-provider'
+import { CENTERING_EVENT } from '@/shared/lib/events'
 
 /**
  * Configuration options for {@link useScrollDirection}.
  */
 interface ScrollDirectionOptions {
   /** Minimum accumulated scroll delta (px) before toggling header visibility. Defaults to `10`. */
-  threshold?: number;
+  threshold?: number
 }
 
 /**
@@ -28,43 +28,53 @@ interface ScrollDirectionOptions {
  */
 export function useScrollDirection(
   containerRef: React.RefObject<HTMLElement | null>,
-  options: ScrollDirectionOptions = {},
+  options: ScrollDirectionOptions = {}
 ) {
-  const { threshold = 10 } = options;
-  const { editorState: editorStore } = useAppStore();
-  const [isHidden, setIsHidden] = useState(false);
+  const { threshold = 10 } = options
+  const { editorState: editorStore } = useAppStore()
+  const [isHidden, setIsHidden] = useState(false)
 
   // Load persisted header hidden state from the store on first mount.
   useEffect(() => {
-    editorStore.get<boolean>("headerHidden").then((val) => {
-      if (val !== undefined) setIsHidden(val);
-    }).catch((err) => {
-      console.error("Failed to load headerHidden:", err);
-    });
-  }, [editorStore]);
+    editorStore
+      .get<boolean>('headerHidden')
+      .then((val) => {
+        if (val !== undefined) setIsHidden(val)
+      })
+      .catch((err) => {
+        console.error('Failed to load headerHidden:', err)
+      })
+  }, [editorStore])
 
   /** Updates the hidden state and persists it to the store. */
-  const setHidden = useCallback((value: boolean) => {
-    setIsHidden(value);
-    editorStore.set("headerHidden", value).catch((err) => {
-      console.error("Failed to persist headerHidden:", err);
-    });
-  }, [editorStore]);
-  const accumulatedDelta = useRef(0);
-  const ticking = useRef(false);
-  const clickLock = useRef(false);
-  const clickTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const rafId = useRef<number>(0);
+  const setHidden = useCallback(
+    (value: boolean) => {
+      setIsHidden(value)
+      editorStore.set('headerHidden', value).catch((err) => {
+        console.error('Failed to persist headerHidden:', err)
+      })
+    },
+    [editorStore]
+  )
+  const accumulatedDelta = useRef(0)
+  const ticking = useRef(false)
+  const clickLock = useRef(false)
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined
+  )
+  const rafId = useRef<number>(0)
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+    const container = containerRef.current
+    if (!container) return
 
     /** Locks wheel-based scroll detection for 200 ms after a mouse click to prevent accidental toggles. */
     const handleMouseDown = () => {
-      clickLock.current = true;
-      clickTimer.current = setTimeout(() => { clickLock.current = false; }, 200);
-    };
+      clickLock.current = true
+      clickTimer.current = setTimeout(() => {
+        clickLock.current = false
+      }, 200)
+    }
 
     /**
      * Accumulates vertical wheel delta and, once it exceeds the threshold within a
@@ -73,58 +83,60 @@ export function useScrollDirection(
      * or when the delta is purely horizontal.
      */
     const handleWheel = (e: WheelEvent) => {
-      if (clickLock.current) return;
-      if (e.deltaY === 0) return;
+      if (clickLock.current) return
+      if (e.deltaY === 0) return
       if (
-        container.scrollTop <= 0 && e.deltaY < 0 ||
-        container.scrollTop + container.clientHeight >= container.scrollHeight - 1 && e.deltaY > 0
+        (container.scrollTop <= 0 && e.deltaY < 0) ||
+        (container.scrollTop + container.clientHeight >=
+          container.scrollHeight - 1 &&
+          e.deltaY > 0)
       ) {
-        return;
+        return
       }
 
-      accumulatedDelta.current += e.deltaY;
+      accumulatedDelta.current += e.deltaY
 
-      if (ticking.current) return;
-      ticking.current = true;
+      if (ticking.current) return
+      ticking.current = true
 
       rafId.current = requestAnimationFrame(() => {
         if (Math.abs(accumulatedDelta.current) >= threshold) {
-          setHidden(accumulatedDelta.current > 0);
-          accumulatedDelta.current = 0;
+          setHidden(accumulatedDelta.current > 0)
+          accumulatedDelta.current = 0
         }
 
-        ticking.current = false;
-      });
-    };
+        ticking.current = false
+      })
+    }
 
     /** Forces the header to become visible when the container is scrolled back to the very top. */
     const handleScroll = () => {
       if (container.scrollTop <= 0) {
-        setHidden(false);
-        accumulatedDelta.current = 0;
+        setHidden(false)
+        accumulatedDelta.current = 0
       }
-    };
+    }
 
     /** Hides the header when the cursor-centering plugin triggers a centering scroll. */
     const handleCentering = () => {
       if (container.scrollTop > 0) {
-        setHidden(true);
+        setHidden(true)
       }
-    };
+    }
 
-    container.addEventListener("mousedown", handleMouseDown, { passive: true });
-    container.addEventListener("wheel", handleWheel, { passive: true });
-    container.addEventListener("scroll", handleScroll, { passive: true });
-    document.addEventListener(CENTERING_EVENT, handleCentering);
+    container.addEventListener('mousedown', handleMouseDown, { passive: true })
+    container.addEventListener('wheel', handleWheel, { passive: true })
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    document.addEventListener(CENTERING_EVENT, handleCentering)
     return () => {
-      container.removeEventListener("mousedown", handleMouseDown);
-      container.removeEventListener("wheel", handleWheel);
-      container.removeEventListener("scroll", handleScroll);
-      document.removeEventListener(CENTERING_EVENT, handleCentering);
-      cancelAnimationFrame(rafId.current);
-      clearTimeout(clickTimer.current);
-    };
-  }, [containerRef, threshold, setHidden]);
+      container.removeEventListener('mousedown', handleMouseDown)
+      container.removeEventListener('wheel', handleWheel)
+      container.removeEventListener('scroll', handleScroll)
+      document.removeEventListener(CENTERING_EVENT, handleCentering)
+      cancelAnimationFrame(rafId.current)
+      clearTimeout(clickTimer.current)
+    }
+  }, [containerRef, threshold, setHidden])
 
-  return isHidden;
+  return isHidden
 }

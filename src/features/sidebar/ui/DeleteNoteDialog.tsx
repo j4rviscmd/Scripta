@@ -7,12 +7,12 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from '@/components/ui/alert-dialog'
 
 interface DeleteNoteDialogProps {
-  noteId: string | null;
-  onClose: () => void;
-  onConfirm: (noteId: string) => void;
+  noteId: string | null
+  onClose: () => void
+  onConfirm: (noteId: string) => void
 }
 
 /**
@@ -39,8 +39,8 @@ export function DeleteNoteDialog({
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={() => {
-              if (noteId) onConfirm(noteId);
-              onClose();
+              if (noteId) onConfirm(noteId)
+              onClose()
             }}
           >
             Delete
@@ -48,5 +48,5 @@ export function DeleteNoteDialog({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  );
+  )
 }

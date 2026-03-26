@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from 'react'
 
 interface ScrollPositionOptions {
   /** Minimum scrollTop (px) before `isScrolledDown` becomes `true`. Default: 300 */
-  threshold?: number;
+  threshold?: number
 }
 
 /**
@@ -18,31 +18,31 @@ interface ScrollPositionOptions {
  */
 export function useScrollPosition(
   containerRef: React.RefObject<HTMLElement | null>,
-  options: ScrollPositionOptions = {},
+  options: ScrollPositionOptions = {}
 ): boolean {
-  const { threshold = 300 } = options;
-  const [isScrolledDown, setIsScrolledDown] = useState(false);
-  const rafId = useRef<number>(0);
+  const { threshold = 300 } = options
+  const [isScrolledDown, setIsScrolledDown] = useState(false)
+  const rafId = useRef<number>(0)
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+    const container = containerRef.current
+    if (!container) return
 
     const handleScroll = () => {
-      if (rafId.current) return;
+      if (rafId.current) return
 
       rafId.current = requestAnimationFrame(() => {
-        setIsScrolledDown(container.scrollTop > threshold);
-        rafId.current = 0;
-      });
-    };
+        setIsScrolledDown(container.scrollTop > threshold)
+        rafId.current = 0
+      })
+    }
 
-    container.addEventListener("scroll", handleScroll, { passive: true });
+    container.addEventListener('scroll', handleScroll, { passive: true })
     return () => {
-      container.removeEventListener("scroll", handleScroll);
-      cancelAnimationFrame(rafId.current);
-    };
-  }, [containerRef, threshold]);
+      container.removeEventListener('scroll', handleScroll)
+      cancelAnimationFrame(rafId.current)
+    }
+  }, [containerRef, threshold])
 
-  return isScrolledDown;
+  return isScrolledDown
 }

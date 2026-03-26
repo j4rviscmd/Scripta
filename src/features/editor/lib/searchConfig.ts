@@ -1,4 +1,4 @@
-import type { SearchMatch } from "./searchMatch";
+import type { SearchMatch } from './searchMatch'
 
 /**
  * Mutable configuration for the search & replace extension.
@@ -12,10 +12,10 @@ import type { SearchMatch } from "./searchMatch";
  */
 export const searchConfig = {
   isOpen: false,
-  query: "",
-  replaceText: "",
+  query: '',
+  replaceText: '',
   caseSensitive: false,
   useRegex: false,
   results: [] as SearchMatch[],
   currentIndex: -1,
-};
+}

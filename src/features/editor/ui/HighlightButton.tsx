@@ -1,15 +1,15 @@
-import { useCallback } from "react";
-import { Highlighter } from "lucide-react";
 import {
   useBlockNoteEditor,
   useComponentsContext,
   useEditorState,
-} from "@blocknote/react";
+} from '@blocknote/react'
+import { Highlighter } from 'lucide-react'
+import { useCallback } from 'react'
 
 /**
  * Yellow highlight color value used for the highlight style.
  */
-const HIGHLIGHT_COLOR = "yellow";
+const HIGHLIGHT_COLOR = 'yellow'
 
 /**
  * Toggle button that applies or removes a yellow highlight on the
@@ -20,48 +20,47 @@ const HIGHLIGHT_COLOR = "yellow";
  * selection already has the yellow highlight applied.
  */
 export const HighlightButton = () => {
-  const Components = useComponentsContext()!;
-  const editor = useBlockNoteEditor();
+  const Components = useComponentsContext()!
+  const editor = useBlockNoteEditor()
 
   const state = useEditorState({
     editor,
     selector: ({ editor }) => {
       if (!editor.isEditable) {
-        return undefined;
+        return undefined
       }
 
-      const selectedBlocks =
-        editor.getSelection()?.blocks || [
-          editor.getTextCursorPosition().block,
-        ];
+      const selectedBlocks = editor.getSelection()?.blocks || [
+        editor.getTextCursorPosition().block,
+      ]
       const hasContent = selectedBlocks.some(
-        (block) => block.content !== undefined,
-      );
+        (block) => block.content !== undefined
+      )
       if (!hasContent) {
-        return undefined;
+        return undefined
       }
 
-      const activeBg = editor.getActiveStyles().backgroundColor;
-      return { active: activeBg === HIGHLIGHT_COLOR };
+      const activeBg = editor.getActiveStyles().backgroundColor
+      return { active: activeBg === HIGHLIGHT_COLOR }
     },
-  });
+  })
 
   const toggleHighlight = useCallback(() => {
-    editor.focus();
+    editor.focus()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const style = { backgroundColor: HIGHLIGHT_COLOR } as any;
+    const style = { backgroundColor: HIGHLIGHT_COLOR } as any
     const isHighlighted =
-      editor.getActiveStyles().backgroundColor === HIGHLIGHT_COLOR;
+      editor.getActiveStyles().backgroundColor === HIGHLIGHT_COLOR
 
     if (isHighlighted) {
-      editor.removeStyles(style);
+      editor.removeStyles(style)
     } else {
-      editor.addStyles(style);
+      editor.addStyles(style)
     }
-  }, [editor]);
+  }, [editor])
 
   if (state === undefined) {
-    return null;
+    return null
   }
 
   return (
@@ -74,5 +73,5 @@ export const HighlightButton = () => {
       mainTooltip="Highlight"
       icon={<Highlighter size={18} />}
     />
-  );
-};
+  )
+}

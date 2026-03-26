@@ -7,4 +7,4 @@
  * remains visible until stores finish loading and a minimum display
  * time has elapsed, then fades out and unmounts.
  */
-export { SplashScreen } from "./ui/SplashScreen";
+export { SplashScreen } from './ui/SplashScreen'

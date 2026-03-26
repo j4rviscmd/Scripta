@@ -1,12 +1,12 @@
-import { invoke } from "@tauri-apps/api/core";
-import type { Note } from "@/features/editor";
-import type { Group } from "../lib/types";
+import { invoke } from '@tauri-apps/api/core'
+import type { Note } from '@/features/editor'
+import type { Group } from '../lib/types'
 
 /**
  * Returns all groups sorted by their display order.
  */
 export async function listGroups(): Promise<Group[]> {
-  return invoke<Group[]>("list_groups");
+  return invoke<Group[]>('list_groups')
 }
 
 /**
@@ -16,7 +16,7 @@ export async function listGroups(): Promise<Group[]> {
  * @returns The newly created group.
  */
 export async function createGroup(name: string): Promise<Group> {
-  return invoke<Group>("create_group", { name });
+  return invoke<Group>('create_group', { name })
 }
 
 /**
@@ -27,7 +27,7 @@ export async function createGroup(name: string): Promise<Group> {
  * @returns The updated group.
  */
 export async function renameGroup(id: string, name: string): Promise<Group> {
-  return invoke<Group>("rename_group", { id, name });
+  return invoke<Group>('rename_group', { id, name })
 }
 
 /**
@@ -39,7 +39,7 @@ export async function renameGroup(id: string, name: string): Promise<Group> {
  * @param id - The UUID of the group to delete.
  */
 export async function deleteGroup(id: string): Promise<void> {
-  return invoke<void>("delete_group", { id });
+  return invoke<void>('delete_group', { id })
 }
 
 /**
@@ -48,7 +48,7 @@ export async function deleteGroup(id: string): Promise<void> {
  * @param ids - Ordered list of group UUIDs representing the desired order.
  */
 export async function reorderGroups(ids: string[]): Promise<void> {
-  return invoke<void>("reorder_groups", { ids });
+  return invoke<void>('reorder_groups', { ids })
 }
 
 /**
@@ -60,7 +60,7 @@ export async function reorderGroups(ids: string[]): Promise<void> {
  */
 export async function setNoteGroup(
   noteId: string,
-  groupId: string | null,
+  groupId: string | null
 ): Promise<Note> {
-  return invoke<Note>("set_note_group", { noteId, groupId });
+  return invoke<Note>('set_note_group', { noteId, groupId })
 }

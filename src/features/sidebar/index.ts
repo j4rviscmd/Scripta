@@ -8,5 +8,5 @@
  * - {@link useDebounce} -- generic hook that delays value updates by a configurable timeout.
  */
 
-export { NoteSidebar } from "./ui/NoteSidebar";
-export { useDebounce } from "./hooks/useDebounce";
+export { useDebounce } from './hooks/useDebounce'
+export { NoteSidebar } from './ui/NoteSidebar'

@@ -1,42 +1,39 @@
+import { useDraggable } from '@dnd-kit/core'
 import {
+  Check,
+  Download,
   FileText,
+  FolderInput,
   Pin,
   PinOff,
-  Download,
   Trash2,
-  FolderInput,
-  Check,
-} from "lucide-react";
-import { useDraggable } from "@dnd-kit/core";
-import {
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar";
+} from 'lucide-react'
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
-  ContextMenuTrigger,
   ContextMenuSub,
-  ContextMenuSubTrigger,
   ContextMenuSubContent,
-} from "@/components/ui/context-menu";
-import { cn } from "@/lib/utils";
-import type { Note } from "@/features/editor";
-import type { Group } from "@/features/groups";
-import { formatRelativeDate } from "@/features/groups";
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
+import { SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
+import type { Note } from '@/features/editor'
+import type { Group } from '@/features/groups'
+import { formatRelativeDate } from '@/features/groups'
+import { cn } from '@/lib/utils'
 
 interface NoteItemProps {
-  note: Note;
-  selectedNoteId: string | null;
-  onSelectNote: (id: string) => void;
-  onTogglePin: (id: string, pinned: boolean) => void;
-  onDeleteNote: () => void;
-  onExportNote: (noteId: string) => void;
-  onMoveToGroup: (noteId: string, groupId: string | null) => void;
-  groups: Group[];
-  justPinnedId: string | null;
+  note: Note
+  selectedNoteId: string | null
+  onSelectNote: (id: string) => void
+  onTogglePin: (id: string, pinned: boolean) => void
+  onDeleteNote: () => void
+  onExportNote: (noteId: string) => void
+  onMoveToGroup: (noteId: string, groupId: string | null) => void
+  groups: Group[]
+  justPinnedId: string | null
 }
 
 /**
@@ -58,12 +55,12 @@ export function NoteItem({
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
       id: `note-${note.id}`,
-      data: { type: "note", noteId: note.id },
-    });
+      data: { type: 'note', noteId: note.id },
+    })
 
   const style = transform
     ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
-    : undefined;
+    : undefined
 
   return (
     <SidebarMenuItem
@@ -72,8 +69,8 @@ export function NoteItem({
       {...attributes}
       {...listeners}
       className={cn(
-        "animate-in fade-in-0 slide-in-from-top-1 duration-200 fill-mode-both py-px",
-        isDragging && "opacity-50 z-50",
+        'fade-in-0 slide-in-from-top-1 animate-in fill-mode-both py-px duration-200',
+        isDragging && 'z-50 opacity-50'
       )}
     >
       <ContextMenu>
@@ -81,13 +78,13 @@ export function NoteItem({
           <SidebarMenuButton
             isActive={note.id === selectedNoteId}
             onClick={() => onSelectNote(note.id)}
-            className={cn(note.isPinned && "hover:bg-primary/5")}
+            className={cn(note.isPinned && 'hover:bg-primary/5')}
           >
             {note.isPinned ? (
               <Pin
                 className={cn(
-                  "h-4 w-4 shrink-0 text-primary fill-primary/20",
-                  justPinnedId === note.id && "animate-pin-bounce",
+                  'h-4 w-4 shrink-0 fill-primary/20 text-primary',
+                  justPinnedId === note.id && 'animate-pin-bounce'
                 )}
               />
             ) : (
@@ -95,16 +92,14 @@ export function NoteItem({
             )}
             <div className="flex flex-col overflow-hidden">
               <span className="truncate text-sm">{note.title}</span>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-muted-foreground text-xs">
                 {formatRelativeDate(note.updatedAt)}
               </span>
             </div>
           </SidebarMenuButton>
         </ContextMenuTrigger>
         <ContextMenuContent>
-          <ContextMenuItem
-            onClick={() => onTogglePin(note.id, !note.isPinned)}
-          >
+          <ContextMenuItem onClick={() => onTogglePin(note.id, !note.isPinned)}>
             {note.isPinned ? (
               <>
                 <PinOff className="h-4 w-4" />
@@ -130,18 +125,14 @@ export function NoteItem({
                 >
                   <span className="flex-1">{g.name}</span>
                   {note.groupId === g.id && (
-                    <Check className="h-4 w-4 ml-auto" />
+                    <Check className="ml-auto h-4 w-4" />
                   )}
                 </ContextMenuItem>
               ))}
               {groups.length > 0 && <ContextMenuSeparator />}
-              <ContextMenuItem
-                onClick={() => onMoveToGroup(note.id, null)}
-              >
+              <ContextMenuItem onClick={() => onMoveToGroup(note.id, null)}>
                 <span className="flex-1">Uncategorized</span>
-                {note.groupId === null && (
-                  <Check className="h-4 w-4 ml-auto" />
-                )}
+                {note.groupId === null && <Check className="ml-auto h-4 w-4" />}
               </ContextMenuItem>
             </ContextMenuSubContent>
           </ContextMenuSub>
@@ -157,5 +148,5 @@ export function NoteItem({
         </ContextMenuContent>
       </ContextMenu>
     </SidebarMenuItem>
-  );
+  )
 }
