@@ -13,6 +13,7 @@ export interface Note {
   createdAt: string;
   updatedAt: string;
   isPinned: boolean;
+  groupId: string | null;
 }
 
 /**
