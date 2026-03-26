@@ -12,6 +12,7 @@ import { NoteSidebar } from "@/features/sidebar";
 import { ThemeProvider } from "@/app/providers/theme-provider";
 import { FontSizeProvider } from "@/app/providers/font-size-provider";
 import { useFontSize } from "@/app/providers/font-size-provider";
+import { EditorFontProvider } from "@/app/providers/editor-font-provider";
 import { useAppStore, configDefaults } from "@/app/providers/store-provider";
 import { ModeToggle } from "@/shared/ui/ModeToggle";
 import { SaveStatusIndicator } from "@/shared/ui/SaveStatusIndicator";
@@ -331,9 +332,9 @@ function AppContent() {
 /**
  * Root component of the application.
  *
- * Wraps {@link AppContent} with the {@link ThemeProvider} and
- * {@link FontSizeProvider} so their context hooks are available
- * throughout the component tree.
+ * Wraps {@link AppContent} with the {@link ThemeProvider},
+ * {@link FontSizeProvider}, and {@link EditorFontProvider} so their
+ * context hooks are available throughout the component tree.
  *
  * @returns The rendered application tree.
  */
@@ -341,7 +342,9 @@ function App() {
   return (
     <ThemeProvider defaultTheme="system">
       <FontSizeProvider>
-        <AppContent />
+        <EditorFontProvider>
+          <AppContent />
+        </EditorFontProvider>
       </FontSizeProvider>
     </ThemeProvider>
   );

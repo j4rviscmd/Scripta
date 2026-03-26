@@ -1,5 +1,7 @@
 import { createContext, useContext, use, type ReactNode } from "react";
 import { LazyStore } from "@tauri-apps/plugin-store";
+import { restoreStateCurrent, StateFlags } from "@tauri-apps/plugin-window-state";
+import { DEFAULT_WINDOW_STATE_RESTORE, WINDOW_STATE_STORE_KEY } from "@/features/settings/lib/windowStateConfig";
 
 /**
  * Module-scoped singleton store instances.
@@ -22,20 +24,34 @@ const editorStateStore = new LazyStore("editor-state.json");
 export const configDefaults = {
   /** Whether the sidebar is open. Falls back to `true` if not persisted. */
   sidebarOpen: true,
+  /** Whether to restore window position & size on launch. Falls back to `true` if not persisted. */
+  windowStateRestoreEnabled: DEFAULT_WINDOW_STATE_RESTORE,
 };
 
 /**
  * Promise that resolves when all stores have been loaded from disk and
  * config defaults have been pre-fetched.
  *
- * Consumed by {@link StoreProvider} via `React.use()` to suspend rendering
- * until the stores are ready.
+ * Consumed internally by {@link StoreProvider} via `React.use()` and
+ * externally by the splash screen to coordinate its dismissal timing.
  */
-const initPromise = Promise.all([configStore.init(), editorStateStore.init()])
+export const storeInitPromise = Promise.all([configStore.init(), editorStateStore.init()])
   .then(async () => {
-    const stored = await configStore.get<boolean>("sidebarOpen");
-    if (stored != null) {
-      configDefaults.sidebarOpen = stored;
+    const [storedSidebarOpen, storedWindowRestore] = await Promise.all([
+      configStore.get<boolean>("sidebarOpen"),
+      configStore.get<boolean>(WINDOW_STATE_STORE_KEY),
+    ]);
+    if (storedSidebarOpen != null) {
+      configDefaults.sidebarOpen = storedSidebarOpen;
+    }
+    const restoreEnabled = storedWindowRestore ?? DEFAULT_WINDOW_STATE_RESTORE;
+    configDefaults.windowStateRestoreEnabled = restoreEnabled;
+    if (restoreEnabled) {
+      try {
+        await restoreStateCurrent(StateFlags.POSITION | StateFlags.SIZE);
+      } catch (err) {
+        console.error("Failed to restore window state:", err);
+      }
     }
   });
 
@@ -69,7 +85,7 @@ const StoreContext = createContext<{
  * ```
  */
 export function StoreProvider({ children }: { children: ReactNode }) {
-  use(initPromise);
+  use(storeInitPromise);
 
   return (
     <StoreContext.Provider value={{ config: configStore, editorState: editorStateStore }}>

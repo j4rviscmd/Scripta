@@ -9,6 +9,7 @@
     "core:window:allow-set-title",
     "store:default",
     "dialog:default",
+    "window-state:default",
     "fs:default",
     {
       "identifier": "fs:allow-write-file",

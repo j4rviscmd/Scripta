@@ -4,11 +4,27 @@ mod groups;
 mod link_preview;
 
 use tauri::Manager;
+use tauri_plugin_window_state::StateFlags;
 
 /// Initializes and runs the Tauri application.
 ///
-/// Initializes the SQLite database, registers the `tauri-plugin-opener`
-/// plugin, registers all note CRUD commands, and starts the event loop.
+/// Sets up the following plugins before starting the event loop:
+///
+/// - **opener** — OS-native file/URL opening.
+/// - **store** — Persistent key-value config storage.
+/// - **dialog** — Native file/message dialogs.
+/// - **fs** — Scoped filesystem access.
+/// - **window-state** — Saves and optionally restores window position and
+///   size across launches (initial restore is skipped for the `"main"`
+///   window so the frontend can decide via a user setting).
+///
+/// During setup the SQLite database is initialized and a
+/// [`LinkPreviewCache`](link_preview::LinkPreviewCache) is registered as
+/// managed state. All note CRUD and utility commands are then registered
+/// via the invoke handler.
+///
+/// # Panics
+///
 /// Panics if the application context cannot be generated or the runtime
 /// fails to start.
 ///
@@ -21,6 +37,12 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(
+            tauri_plugin_window_state::Builder::new()
+                .with_state_flags(StateFlags::POSITION | StateFlags::SIZE)
+                .skip_initial_state("main")
+                .build(),
+        )
         .setup(|app| {
             db::init_db(&app.handle())?;
             app.manage(link_preview::LinkPreviewCache(std::sync::Mutex::new(

@@ -8,9 +8,11 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { CursorCenteringOption } from "./CursorCenteringOption";
+import { EditorFontOption } from "./EditorFontOption";
 import { FontSizeOption } from "./FontSizeOption";
 import { ThemeOption } from "./ThemeOption";
 import { CommandPaletteScrollOption } from "./CommandPaletteScrollOption";
+import { WindowStateOption } from "./WindowStateOption";
 
 /**
  * Props for the {@link SettingsDialog} component.
@@ -27,9 +29,17 @@ interface SettingsDialogProps {
 /**
  * A modal dialog for managing application preferences.
  *
- * Renders a theme picker that allows the user to switch between
- * light, dark, and system color schemes via {@link ThemeOption} radio
- * buttons. The dialog is controlled externally through the `open` and
+ * Renders the following settings sections, each separated by a
+ * visual divider:
+ *
+ * - **Theme** — Light / Dark / System color scheme via {@link ThemeOption}.
+ * - **Cursor centering** — Typewriter-style scroll behavior.
+ * - **Command palette scroll** — Scroll-to-top on open.
+ * - **Font size** — Editor font size adjustment.
+ * - **Editor font** — Editor font family selection (Google Fonts).
+ * - **Window state** — Restore window position and size on launch.
+ *
+ * The dialog is controlled externally through the `open` and
  * `onOpenChange` props.
  *
  * @param props - {@link SettingsDialogProps}
@@ -57,6 +67,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         <Separator />
         <FontSizeOption />
         <Separator />
+        <EditorFontOption />
+        <Separator />
+        <WindowStateOption />
       </DialogContent>
     </Dialog>
   );

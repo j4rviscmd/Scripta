@@ -23,6 +23,7 @@ import type { SaveStatus } from "..";
 import { DEFAULT_BLOCKS } from "../lib/constants";
 import { cursorCenteringExtension, searchExtension, useCursorCentering } from "..";
 import { useEditorFontSize } from "../hooks/useEditorFontSize";
+import { useEditorFont } from "@/app/providers/editor-font-provider";
 import { useTheme } from "@/app/providers/theme-provider";
 import { HighlightButton } from "./HighlightButton";
 import { uploadImage, resolveImageUrl } from "..";
@@ -95,6 +96,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   const loadingRef = useRef(true);
   const { resolvedTheme } = useTheme();
   const { fontSize } = useEditorFontSize();
+  const { fontFamily } = useEditorFont();
 
   useCursorCentering();
 
@@ -325,7 +327,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       <div
         className="w-full px-8 pb-[60vh]"
         data-editor-root
-        style={{ "--editor-font-size": `${fontSize}px` } as React.CSSProperties}
+        style={{ "--editor-font-size": `${fontSize}px`, "--editor-font-family": fontFamily } as React.CSSProperties}
       >
         <BlockNoteView
           editor={editor}
