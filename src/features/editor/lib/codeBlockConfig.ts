@@ -17,9 +17,9 @@
  * companion CSS rule (in `index.css`) activates when `.dark` is present on
  * the document root.
  */
-import type { CodeBlockOptions } from "@blocknote/core";
-import { createParser } from "prosemirror-highlight/shiki";
-import { createHighlighter } from "./shiki.bundle";
+import type { CodeBlockOptions } from '@blocknote/core'
+import { createParser } from 'prosemirror-highlight/shiki'
+import { createHighlighter } from './shiki.bundle'
 
 /**
  * Languages available in the code block language selector.
@@ -28,36 +28,38 @@ import { createHighlighter } from "./shiki.bundle";
  * bundle (`shiki.bundle.ts`). The `name` is the display label shown in the
  * UI, and `aliases` are alternative identifiers that map to the same grammar.
  */
-export const supportedLanguages: NonNullable<CodeBlockOptions["supportedLanguages"]> = {
-  text: { name: "Plain Text" },
-  javascript: { name: "JavaScript", aliases: ["js"] },
-  typescript: { name: "TypeScript", aliases: ["ts"] },
-  jsx: { name: "JSX" },
-  tsx: { name: "TSX" },
-  html: { name: "HTML" },
-  css: { name: "CSS" },
-  json: { name: "JSON" },
-  python: { name: "Python", aliases: ["py"] },
-  rust: { name: "Rust", aliases: ["rs"] },
-  bash: { name: "Bash", aliases: ["sh", "shell", "zsh"] },
-  sql: { name: "SQL" },
-  yaml: { name: "YAML", aliases: ["yml"] },
-  markdown: { name: "Markdown", aliases: ["md"] },
-  go: { name: "Go" },
-  java: { name: "Java" },
-  c: { name: "C" },
-  cpp: { name: "C++", aliases: ["c++"] },
-  ruby: { name: "Ruby", aliases: ["rb"] },
-  php: { name: "PHP" },
-  swift: { name: "Swift" },
-  kotlin: { name: "Kotlin", aliases: ["kt"] },
-  lua: { name: "Lua" },
-  diff: { name: "Diff" },
-  toml: { name: "TOML" },
-  xml: { name: "XML" },
-  dockerfile: { name: "Dockerfile", aliases: ["docker"] },
-  graphql: { name: "GraphQL", aliases: ["gql"] },
-};
+export const supportedLanguages: NonNullable<
+  CodeBlockOptions['supportedLanguages']
+> = {
+  text: { name: 'Plain Text' },
+  javascript: { name: 'JavaScript', aliases: ['js'] },
+  typescript: { name: 'TypeScript', aliases: ['ts'] },
+  jsx: { name: 'JSX' },
+  tsx: { name: 'TSX' },
+  html: { name: 'HTML' },
+  css: { name: 'CSS' },
+  json: { name: 'JSON' },
+  python: { name: 'Python', aliases: ['py'] },
+  rust: { name: 'Rust', aliases: ['rs'] },
+  bash: { name: 'Bash', aliases: ['sh', 'shell', 'zsh'] },
+  sql: { name: 'SQL' },
+  yaml: { name: 'YAML', aliases: ['yml'] },
+  markdown: { name: 'Markdown', aliases: ['md'] },
+  go: { name: 'Go' },
+  java: { name: 'Java' },
+  c: { name: 'C' },
+  cpp: { name: 'C++', aliases: ['c++'] },
+  ruby: { name: 'Ruby', aliases: ['rb'] },
+  php: { name: 'PHP' },
+  swift: { name: 'Swift' },
+  kotlin: { name: 'Kotlin', aliases: ['kt'] },
+  lua: { name: 'Lua' },
+  diff: { name: 'Diff' },
+  toml: { name: 'TOML' },
+  xml: { name: 'XML' },
+  dockerfile: { name: 'Dockerfile', aliases: ['docker'] },
+  graphql: { name: 'GraphQL', aliases: ['gql'] },
+}
 
 /**
  * Well-known symbol BlockNote uses to cache the Shiki parser on `globalThis`.
@@ -65,7 +67,7 @@ export const supportedLanguages: NonNullable<CodeBlockOptions["supportedLanguage
  * By pre-populating this slot we ensure BlockNote picks up our dual-theme
  * parser instead of creating its own single-theme one.
  */
-const SHIKI_PARSER_KEY = Symbol.for("blocknote.shikiParser");
+const SHIKI_PARSER_KEY = Symbol.for('blocknote.shikiParser')
 
 /**
  * Installs a dual-theme Shiki parser into the BlockNote global cache.
@@ -76,9 +78,9 @@ const SHIKI_PARSER_KEY = Symbol.for("blocknote.shikiParser");
  */
 async function createDualThemeHighlighter() {
   const highlighter = await createHighlighter({
-    themes: ["light-plus", "dark-plus"],
+    themes: ['light-plus', 'dark-plus'],
     langs: [],
-  });
+  })
 
   // Install our dual-theme parser into the global cache.
   // BlockNote checks `globalThis[Symbol.for("blocknote.shikiParser")]` before
@@ -86,15 +88,15 @@ async function createDualThemeHighlighter() {
   // this ensures all code blocks use light+dark CSS variable output.
   const dualParser = createParser(highlighter, {
     themes: {
-      light: "light-plus",
-      dark: "dark-plus",
+      light: 'light-plus',
+      dark: 'dark-plus',
     },
-    defaultColor: "light",
-    cssVariablePrefix: "--shiki-",
-  });
-  (globalThis as Record<symbol, unknown>)[SHIKI_PARSER_KEY] = dualParser;
+    defaultColor: 'light',
+    cssVariablePrefix: '--shiki-',
+  })
+  ;(globalThis as Record<symbol, unknown>)[SHIKI_PARSER_KEY] = dualParser
 
-  return highlighter;
+  return highlighter
 }
 
 /**
@@ -102,7 +104,7 @@ async function createDualThemeHighlighter() {
  */
 export const codeBlockOptions: CodeBlockOptions = {
   indentLineWithTab: true,
-  defaultLanguage: "text",
+  defaultLanguage: 'text',
   supportedLanguages,
   createHighlighter: createDualThemeHighlighter,
-};
+}

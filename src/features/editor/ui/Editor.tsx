@@ -41,9 +41,9 @@ import { useEditorFontSize } from '../hooks/useEditorFontSize'
 import { useLinkClickHandler } from '../hooks/useLinkClickHandler'
 import { useLinkPreview } from '../hooks/useLinkPreview'
 import { useSearchReplace } from '../hooks/useSearchReplace'
+import { codeBlockOptions } from '../lib/codeBlockConfig'
 import { DEFAULT_BLOCKS } from '../lib/constants'
 import { rangeCheckToggleExtension } from '../lib/rangeCheckToggle'
-import { codeBlockOptions } from '../lib/codeBlockConfig'
 import { HighlightButton } from './HighlightButton'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -61,7 +61,7 @@ const schema = BlockNoteSchema.create({
     ...defaultBlockSpecs,
     codeBlock: createCodeBlockSpec(codeBlockOptions),
   },
-});
+})
 
 /**
  * Props for the {@link Editor} component.

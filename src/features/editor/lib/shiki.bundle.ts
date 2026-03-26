@@ -1,14 +1,15 @@
 /* Generate by @shikijs/codegen */
-import type {
-  DynamicImportLanguageRegistration,
-  DynamicImportThemeRegistration,
-  HighlighterGeneric,
-} from '@shikijs/types'
+
 import {
   createBundledHighlighter,
   createSingletonShorthands,
 } from '@shikijs/core'
 import { createJavaScriptRegexEngine } from '@shikijs/engine-javascript'
+import type {
+  DynamicImportLanguageRegistration,
+  DynamicImportThemeRegistration,
+  HighlighterGeneric,
+} from '@shikijs/types'
 
 type BundledLanguage =
   | 'javascript'
@@ -134,9 +135,10 @@ const {
   getSingletonHighlighter,
   getLastGrammarState,
 } = /* @__PURE__ */ createSingletonShorthands<BundledLanguage, BundledTheme>(
-  createHighlighter,
+  createHighlighter
 )
 
+export type { BundledLanguage, BundledTheme, Highlighter }
 export {
   bundledLanguages,
   bundledThemes,
@@ -149,4 +151,3 @@ export {
   getLastGrammarState,
   getSingletonHighlighter,
 }
-export type { BundledLanguage, BundledTheme, Highlighter }
