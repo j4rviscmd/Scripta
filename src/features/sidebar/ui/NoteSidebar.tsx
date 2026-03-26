@@ -302,8 +302,10 @@ export function NoteSidebar({
           onQueryChange={setSearchQuery}
           onNewNote={onNewNote}
         />
-        <SidebarContent className="overflow-x-hidden">
-          {renderSidebarBody()}
+        <SidebarContent>
+          <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+            {renderSidebarBody()}
+          </div>
         </SidebarContent>
         <SidebarFooter>
           <Button
