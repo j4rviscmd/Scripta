@@ -1,6 +1,6 @@
-import { useEffect } from "react";
-import { toast } from "sonner";
-import type { BlockNoteEditor } from "@blocknote/core";
+import type { BlockNoteEditor } from '@blocknote/core'
+import { useEffect } from 'react'
+import { toast } from 'sonner'
 
 /**
  * Shows a success toast whenever the user copies content in the
@@ -13,22 +13,22 @@ import type { BlockNoteEditor } from "@blocknote/core";
 export function useCopyToast(editor: BlockNoteEditor): void {
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tiptap = (editor as any)._tiptapEditor;
-    if (!tiptap) return;
+    const tiptap = (editor as any)._tiptapEditor
+    if (!tiptap) return
 
-    const editorDom = tiptap.view.dom as HTMLElement;
+    const editorDom = tiptap.view.dom as HTMLElement
 
     const handleCopy = () => {
-      const selection = window.getSelection();
-      if (!selection || selection.isCollapsed) return;
+      const selection = window.getSelection()
+      if (!selection || selection.isCollapsed) return
 
-      toast.success("Copied to clipboard");
-    };
+      toast.success('Copied to clipboard')
+    }
 
-    editorDom.addEventListener("copy", handleCopy);
+    editorDom.addEventListener('copy', handleCopy)
 
     return () => {
-      editorDom.removeEventListener("copy", handleCopy);
-    };
-  }, [editor]);
+      editorDom.removeEventListener('copy', handleCopy)
+    }
+  }, [editor])
 }

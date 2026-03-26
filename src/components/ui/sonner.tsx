@@ -10,9 +10,15 @@
  * @packageDocumentation
  */
 
-import { useTheme } from "@/app/providers/theme-provider"
-import { Toaster as Sonner, type ToasterProps } from "sonner"
-import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
+import {
+  CircleCheckIcon,
+  InfoIcon,
+  Loader2Icon,
+  OctagonXIcon,
+  TriangleAlertIcon,
+} from 'lucide-react'
+import { Toaster as Sonner, type ToasterProps } from 'sonner'
+import { useTheme } from '@/app/providers/theme-provider'
 
 /**
  * Themed toast notification component built on top of Sonner.
@@ -41,11 +47,11 @@ import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon
  * ```
  */
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
+  const { theme = 'system' } = useTheme()
 
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
+      theme={theme as ToasterProps['theme']}
       className="toaster group"
       richColors
       icons={{
@@ -58,27 +64,27 @@ const Toaster = ({ ...props }: ToasterProps) => {
       style={
         {
           zIndex: 9999,
-          "--border-radius": "var(--radius)",
-          "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
-          "--normal-border": "var(--border)",
-          "--success-bg": "var(--success-muted)",
-          "--success-text": "var(--success)",
-          "--success-border": "var(--success)",
-          "--error-bg": "var(--error-muted)",
-          "--error-text": "var(--destructive)",
-          "--error-border": "var(--destructive)",
-          "--warning-bg": "var(--warning-muted)",
-          "--warning-text": "var(--warning)",
-          "--warning-border": "var(--warning)",
-          "--info-bg": "var(--info-muted)",
-          "--info-text": "var(--info)",
-          "--info-border": "var(--info)",
+          '--border-radius': 'var(--radius)',
+          '--normal-bg': 'var(--popover)',
+          '--normal-text': 'var(--popover-foreground)',
+          '--normal-border': 'var(--border)',
+          '--success-bg': 'var(--success-muted)',
+          '--success-text': 'var(--success)',
+          '--success-border': 'var(--success)',
+          '--error-bg': 'var(--error-muted)',
+          '--error-text': 'var(--destructive)',
+          '--error-border': 'var(--destructive)',
+          '--warning-bg': 'var(--warning-muted)',
+          '--warning-text': 'var(--warning)',
+          '--warning-border': 'var(--warning)',
+          '--info-bg': 'var(--info-muted)',
+          '--info-text': 'var(--info)',
+          '--info-border': 'var(--info)',
         } as React.CSSProperties
       }
       toastOptions={{
         classNames: {
-          toast: "cn-toast",
+          toast: 'cn-toast',
         },
       }}
       {...props}

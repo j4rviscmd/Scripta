@@ -6,7 +6,7 @@
  * @property variants - Available weight/style variants (e.g. ["400", "700", "400i"]).
  */
 export type GoogleFontEntry = {
-  family: string;
-  category: string;
-  variants: string[];
-};
+  family: string
+  category: string
+  variants: string[]
+}

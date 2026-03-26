@@ -1,7 +1,7 @@
-import { openUrl } from "@tauri-apps/plugin-opener";
-import { useComponentsContext } from "@blocknote/react";
-import { ExternalLink } from "lucide-react";
-import type { LinkToolbarProps } from "@blocknote/react";
+import type { LinkToolbarProps } from '@blocknote/react'
+import { useComponentsContext } from '@blocknote/react'
+import { openUrl } from '@tauri-apps/plugin-opener'
+import { ExternalLink } from 'lucide-react'
 
 /**
  * Custom link toolbar button that opens the link in the system browser
@@ -10,10 +10,10 @@ import type { LinkToolbarProps } from "@blocknote/react";
  * @param url - The HTTP/HTTPS URL to open. Passed through to the system
  *   default browser via `tauri-plugin-opener`.
  */
-export function OpenInBrowserButton({ url }: Pick<LinkToolbarProps, "url">) {
-  const components = useComponentsContext();
+export function OpenInBrowserButton({ url }: Pick<LinkToolbarProps, 'url'>) {
+  const components = useComponentsContext()
 
-  if (!components) return null;
+  if (!components) return null
 
   return (
     <components.LinkToolbar.Button
@@ -22,9 +22,9 @@ export function OpenInBrowserButton({ url }: Pick<LinkToolbarProps, "url">) {
       icon={<ExternalLink size={16} />}
       onClick={() => {
         openUrl(url).catch((err) => {
-          console.error("Failed to open URL:", err);
-        });
+          console.error('Failed to open URL:', err)
+        })
       }}
     />
-  );
+  )
 }

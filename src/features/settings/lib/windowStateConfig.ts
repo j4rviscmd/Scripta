@@ -1,5 +1,5 @@
 /** Default value used when no persisted setting exists. */
-export const DEFAULT_WINDOW_STATE_RESTORE = true;
+export const DEFAULT_WINDOW_STATE_RESTORE = true
 
 /**
  * Store key name for persistence via `configStore`.
@@ -13,4 +13,4 @@ export const DEFAULT_WINDOW_STATE_RESTORE = true;
  * of this setting. This key only controls whether restore is performed
  * at startup.
  */
-export const WINDOW_STATE_STORE_KEY = "windowStateRestoreEnabled" as const;
+export const WINDOW_STATE_STORE_KEY = 'windowStateRestoreEnabled' as const

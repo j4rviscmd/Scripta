@@ -70,9 +70,11 @@ pub fn create_group(state: tauri::State<DbState>, name: String) -> Result<Group,
     let now = chrono::Utc::now().to_rfc3339();
 
     let max_order: i32 = conn
-        .query_row("SELECT COALESCE(MAX(sort_order), -1) FROM groups", [], |row| {
-            row.get(0)
-        })
+        .query_row(
+            "SELECT COALESCE(MAX(sort_order), -1) FROM groups",
+            [],
+            |row| row.get(0),
+        )
         .map_err(|e| e.to_string())?;
 
     let sort_order = max_order + 1;

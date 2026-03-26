@@ -1,10 +1,6 @@
-import {
-  LinkToolbar,
-  EditLinkButton,
-  DeleteLinkButton,
-} from "@blocknote/react";
-import type { LinkToolbarProps } from "@blocknote/react";
-import { OpenInBrowserButton } from "./OpenInBrowserButton";
+import type { LinkToolbarProps } from '@blocknote/react'
+import { DeleteLinkButton, EditLinkButton, LinkToolbar } from '@blocknote/react'
+import { OpenInBrowserButton } from './OpenInBrowserButton'
 
 /**
  * Custom link toolbar that replaces the default "Open in new tab" button
@@ -29,5 +25,5 @@ export function CustomLinkToolbar(props: LinkToolbarProps) {
         setToolbarOpen={props.setToolbarOpen}
       />
     </LinkToolbar>
-  );
+  )
 }

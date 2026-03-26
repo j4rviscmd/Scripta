@@ -1,4 +1,4 @@
-import { useFontSize } from "@/app/providers/font-size-provider";
+import { useFontSize } from '@/app/providers/font-size-provider'
 
 /**
  * Manages the editor font size with immediate persistence.
@@ -14,5 +14,5 @@ import { useFontSize } from "@/app/providers/font-size-provider";
  *   - `reset` — Resets font size to the default value.
  */
 export function useEditorFontSize() {
-  return useFontSize();
+  return useFontSize()
 }

@@ -1,9 +1,9 @@
-import React, { Suspense } from "react";
-import ReactDOM from "react-dom/client";
-import App from "./App";
-import { StoreProvider } from "./app/providers/store-provider";
-import { SplashScreen } from "./features/splash";
-import "./index.css";
+import React, { Suspense } from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App'
+import { StoreProvider } from './app/providers/store-provider'
+import { SplashScreen } from './features/splash'
+import './index.css'
 
 /**
  * Application entry point.
@@ -19,7 +19,7 @@ import "./index.css";
  *    them to the rest of the component tree.
  * 5. `App` — the root application component.
  */
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <SplashScreen />
     <Suspense fallback={null}>
@@ -27,5 +27,5 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         <App />
       </StoreProvider>
     </Suspense>
-  </React.StrictMode>,
-);
+  </React.StrictMode>
+)

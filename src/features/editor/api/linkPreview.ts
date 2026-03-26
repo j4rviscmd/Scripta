@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from '@tauri-apps/api/core'
 
 /**
  * Fetches the page title for a URL via the Rust backend.
@@ -8,8 +8,6 @@ import { invoke } from "@tauri-apps/api/core";
  * @param url - The HTTP/HTTPS URL to scrape.
  * @returns The page title, or `null` if unavailable.
  */
-export async function fetchLinkTitle(
-  url: string,
-): Promise<string | null> {
-  return invoke<string | null>("fetch_link_title", { url });
+export async function fetchLinkTitle(url: string): Promise<string | null> {
+  return invoke<string | null>('fetch_link_title', { url })
 }

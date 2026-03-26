@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
-import { Check } from "lucide-react";
-import { useTheme } from "@/app/providers/theme-provider";
-import { cn } from "@/lib/utils";
+import { Check } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { useTheme } from '@/app/providers/theme-provider'
+import { cn } from '@/lib/utils'
 
 /**
  * Supported theme identifiers.
@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
  * - `"dark"` -- Forces the dark color scheme.
  * - `"system"` -- Automatically follows the OS preference.
  */
-type Theme = "dark" | "light" | "system";
+type Theme = 'dark' | 'light' | 'system'
 
 /**
  * Props for the {@link ThemeOption} component.
@@ -21,9 +21,9 @@ type Theme = "dark" | "light" | "system";
  * @property icon - A React node rendered as the theme's visual indicator (e.g. a sun or moon icon).
  */
 interface ThemeOptionProps {
-  value: Theme;
-  label: string;
-  icon: ReactNode;
+  value: Theme
+  label: string
+  icon: ReactNode
 }
 
 /**
@@ -36,8 +36,8 @@ interface ThemeOptionProps {
  * @param props - {@link ThemeOptionProps}
  */
 export function ThemeOption({ value, label, icon }: ThemeOptionProps) {
-  const { theme, setTheme } = useTheme();
-  const isActive = theme === value;
+  const { theme, setTheme } = useTheme()
+  const isActive = theme === value
 
   return (
     <button
@@ -46,15 +46,15 @@ export function ThemeOption({ value, label, icon }: ThemeOptionProps) {
       aria-checked={isActive}
       onClick={() => setTheme(value)}
       className={cn(
-        "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+        'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
         isActive
-          ? "bg-accent text-accent-foreground"
-          : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+          ? 'bg-accent text-accent-foreground'
+          : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
       )}
     >
       <span className="h-5 w-5 shrink-0">{icon}</span>
       <span className="flex-1 text-left">{label}</span>
       {isActive && <Check className="h-4 w-4 shrink-0" />}
     </button>
-  );
+  )
 }

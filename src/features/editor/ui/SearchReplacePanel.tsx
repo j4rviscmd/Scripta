@@ -1,13 +1,7 @@
-import { type RefObject } from "react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import {
-  Search,
-  ArrowUp,
-  ArrowDown,
-  Replace,
-  X,
-} from "lucide-react";
+import { ArrowDown, ArrowUp, Replace, Search, X } from 'lucide-react'
+import type { RefObject } from 'react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 /**
  * Props for the {@link SearchReplacePanel} component.
@@ -15,24 +9,24 @@ import {
  * All state and callbacks are provided by the {@link useSearchReplace} hook.
  */
 interface SearchReplacePanelProps {
-  isOpen: boolean;
-  query: string;
-  replaceText: string;
-  caseSensitive: boolean;
-  useRegex: boolean;
-  matchCount: number;
-  currentMatchIndex: number;
-  searchInputRef: RefObject<HTMLInputElement | null>;
-  open: () => void;
-  close: () => void;
-  setQuery: (q: string) => void;
-  setReplaceText: (t: string) => void;
-  toggleCaseSensitive: () => void;
-  toggleUseRegex: () => void;
-  goNext: () => void;
-  goPrev: () => void;
-  replaceOne: () => void;
-  replaceAll: () => void;
+  isOpen: boolean
+  query: string
+  replaceText: string
+  caseSensitive: boolean
+  useRegex: boolean
+  matchCount: number
+  currentMatchIndex: number
+  searchInputRef: RefObject<HTMLInputElement | null>
+  open: () => void
+  close: () => void
+  setQuery: (q: string) => void
+  setReplaceText: (t: string) => void
+  toggleCaseSensitive: () => void
+  toggleUseRegex: () => void
+  goNext: () => void
+  goPrev: () => void
+  replaceOne: () => void
+  replaceAll: () => void
 }
 
 /**
@@ -64,67 +58,65 @@ export function SearchReplacePanel({
   replaceAll,
   close,
 }: SearchReplacePanelProps) {
-  if (!isOpen) return null;
+  if (!isOpen) return null
 
   function stopAndClose(e: React.KeyboardEvent) {
-    e.stopPropagation();
-    e.nativeEvent.stopImmediatePropagation();
-    close();
+    e.stopPropagation()
+    e.nativeEvent.stopImmediatePropagation()
+    close()
   }
 
   function stopPropagate(e: React.KeyboardEvent) {
-    e.stopPropagation();
+    e.stopPropagation()
   }
 
   const matchLabel =
-    matchCount === 0
-      ? "No results"
-      : `${currentMatchIndex + 1}/${matchCount}`;
+    matchCount === 0 ? 'No results' : `${currentMatchIndex + 1}/${matchCount}`
 
   return (
-    <div className="search-panel sticky bottom-0 z-20 flex items-center gap-1 border-t border-border bg-background px-4 py-1.5">
+    <div className="search-panel sticky bottom-0 z-20 flex items-center gap-1 border-border border-t bg-background px-4 py-1.5">
       <div className="relative w-48">
-        <Search className="absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Search className="absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
         <Input
           ref={searchInputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Find..."
-          className="h-7 pl-7 pr-1 text-sm"
+          className="h-7 pr-1 pl-7 text-sm"
           onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              stopAndClose(e);
-              return;
+            if (e.key === 'Escape') {
+              stopAndClose(e)
+              return
             }
-            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              e.nativeEvent.stopImmediatePropagation();
-              e.shiftKey ? goPrev() : goNext();
-              return;
+            if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+              e.preventDefault()
+              e.nativeEvent.stopImmediatePropagation()
+              e.shiftKey ? goPrev() : goNext()
+              return
             }
-            stopPropagate(e);
+            stopPropagate(e)
           }}
         />
       </div>
       <Button
-        variant={caseSensitive ? "secondary" : "ghost"}
+        variant={caseSensitive ? 'secondary' : 'ghost'}
         size="icon-xs"
         onClick={toggleCaseSensitive}
         title="Match case"
         aria-label="Match case"
       >
-        <span className="text-xs font-bold">Aa</span>
+        <span className="font-bold text-xs">Aa</span>
       </Button>
       <Button
-        variant={useRegex ? "secondary" : "ghost"}
+        variant={useRegex ? 'secondary' : 'ghost'}
         size="icon-xs"
         onClick={toggleUseRegex}
         title="Use regex"
         aria-label="Use regular expression"
       >
-        <span className="text-xs font-bold">.*</span>
+        <span className="font-bold text-xs">.*</span>
       </Button>
-      <span className="min-w-[3rem] text-center text-xs text-muted-foreground">
+      <span className="min-w-[3rem] text-center text-muted-foreground text-xs">
         {matchLabel}
       </span>
       <Button
@@ -150,18 +142,18 @@ export function SearchReplacePanel({
 
       <div className="mx-1 h-4 w-px bg-border" />
       <div className="relative w-48">
-        <Replace className="absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Replace className="absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
         <Input
           value={replaceText}
           onChange={(e) => setReplaceText(e.target.value)}
           placeholder="Replace..."
-          className="h-7 pl-7 pr-1 text-sm"
+          className="h-7 pr-1 pl-7 text-sm"
           onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              stopAndClose(e);
-              return;
+            if (e.key === 'Escape') {
+              stopAndClose(e)
+              return
             }
-            stopPropagate(e);
+            stopPropagate(e)
           }}
         />
       </div>
@@ -196,5 +188,5 @@ export function SearchReplacePanel({
         <X className="size-3.5" />
       </Button>
     </div>
-  );
+  )
 }

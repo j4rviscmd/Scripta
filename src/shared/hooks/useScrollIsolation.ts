@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect } from 'react'
 
 /**
  * Options for the {@link useScrollIsolation} hook.
@@ -12,10 +12,10 @@ import { useEffect } from "react";
  *     the portal is present.
  */
 interface ScrollIsolationOptions {
-  selectors: string[];
+  selectors: string[]
 }
 
-const marker = "scrollIsolated";
+const marker = 'scrollIsolated'
 
 /**
  * Applies scroll isolation to an inline element inside the scroll container.
@@ -31,10 +31,10 @@ const marker = "scrollIsolated";
  * @param el - The element to isolate.
  */
 function isolateInline(el: HTMLElement) {
-  if (el.dataset[marker]) return;
-  el.dataset[marker] = "1";
-  el.style.overscrollBehavior = "contain";
-  el.addEventListener("wheel", (e) => e.stopPropagation(), { passive: true });
+  if (el.dataset[marker]) return
+  el.dataset[marker] = '1'
+  el.style.overscrollBehavior = 'contain'
+  el.addEventListener('wheel', (e) => e.stopPropagation(), { passive: true })
 }
 
 /**
@@ -48,25 +48,26 @@ function isolateInline(el: HTMLElement) {
  * @param selector - CSS selector for elements that should be isolated.
  * @returns The `MutationObserver` instance (call `disconnect()` to clean up).
  */
-function observeInlineElements(
-  container: HTMLElement,
-  selector: string,
-) {
-  container.querySelectorAll(selector).forEach((el) => isolateInline(el as HTMLElement));
+function observeInlineElements(container: HTMLElement, selector: string) {
+  container
+    .querySelectorAll(selector)
+    .forEach((el) => isolateInline(el as HTMLElement))
 
   const observer = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
         if (node instanceof HTMLElement) {
-          if (node.matches(selector)) isolateInline(node);
-          node.querySelectorAll(selector).forEach((el) => isolateInline(el as HTMLElement));
+          if (node.matches(selector)) isolateInline(node)
+          node
+            .querySelectorAll(selector)
+            .forEach((el) => isolateInline(el as HTMLElement))
         }
       }
     }
-  });
+  })
 
-  observer.observe(container, { childList: true, subtree: true });
-  return observer;
+  observer.observe(container, { childList: true, subtree: true })
+  return observer
 }
 
 /**
@@ -88,21 +89,21 @@ function observeInlineElements(
  */
 function createPortalScrollLock(
   container: HTMLElement,
-  portalSelector: string,
+  portalSelector: string
 ) {
-  let locked = false;
-  let rafId = 0;
+  let locked = false
+  let rafId = 0
 
   const lock = () => {
-    if (locked) return;
-    locked = true;
-    container.style.overflowY = "hidden";
-  };
+    if (locked) return
+    locked = true
+    container.style.overflowY = 'hidden'
+  }
   const unlock = () => {
-    if (!locked) return;
-    locked = false;
-    container.style.overflowY = "";
-  };
+    if (!locked) return
+    locked = false
+    container.style.overflowY = ''
+  }
 
   /**
    * Returns true if there is a matching portal element that is NOT a descendant
@@ -110,20 +111,20 @@ function createPortalScrollLock(
    * outside the container).
    */
   const hasExternalPortal = () => {
-    const els = document.querySelectorAll(portalSelector);
+    const els = document.querySelectorAll(portalSelector)
     for (const el of els) {
-      if (!container.contains(el)) return true;
+      if (!container.contains(el)) return true
     }
-    return false;
-  };
+    return false
+  }
 
   const check = () => {
     if (hasExternalPortal()) {
-      lock();
+      lock()
     } else {
-      unlock();
+      unlock()
     }
-  };
+  }
 
   /**
    * While locked, poll every animation frame so that a Portal element
@@ -131,26 +132,26 @@ function createPortalScrollLock(
    * detection) is caught promptly and the container is unlocked.
    */
   const startPoll = () => {
-    cancelAnimationFrame(rafId);
+    cancelAnimationFrame(rafId)
     rafId = requestAnimationFrame(() => {
-      if (!locked) return;
-      check();
-      startPoll();
-    });
-  };
+      if (!locked) return
+      check()
+      startPoll()
+    })
+  }
 
   const observer = new MutationObserver(() => {
-    check();
-    if (locked) startPoll();
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
-  check();
+    check()
+    if (locked) startPoll()
+  })
+  observer.observe(document.body, { childList: true, subtree: true })
+  check()
 
   return () => {
-    observer.disconnect();
-    cancelAnimationFrame(rafId);
-    unlock();
-  };
+    observer.disconnect()
+    cancelAnimationFrame(rafId)
+    unlock()
+  }
 }
 
 /**
@@ -168,21 +169,21 @@ function createPortalScrollLock(
  */
 export function useScrollIsolation(
   containerRef: React.RefObject<HTMLElement | null>,
-  options: ScrollIsolationOptions,
+  options: ScrollIsolationOptions
 ): void {
-  const { selectors } = options;
-  const selectorString = selectors.join(",");
+  const { selectors } = options
+  const selectorString = selectors.join(',')
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container || selectorString.length === 0) return;
+    const container = containerRef.current
+    if (!container || selectorString.length === 0) return
 
-    const inlineObserver = observeInlineElements(container, selectorString);
-    const removePortalLock = createPortalScrollLock(container, selectorString);
+    const inlineObserver = observeInlineElements(container, selectorString)
+    const removePortalLock = createPortalScrollLock(container, selectorString)
 
     return () => {
-      inlineObserver.disconnect();
-      removePortalLock();
-    };
-  }, [containerRef, selectorString]);
+      inlineObserver.disconnect()
+      removePortalLock()
+    }
+  }, [containerRef, selectorString])
 }

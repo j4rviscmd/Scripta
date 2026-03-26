@@ -1,11 +1,6 @@
-import { useCallback, useRef, useState } from "react";
-import { Pencil, Plus, Trash2, Check, X } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Check, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { useCallback, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,20 +10,25 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
-import type { Group } from "@/features/groups";
-import { toast } from "sonner";
+} from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Separator } from '@/components/ui/separator'
+import type { Group } from '@/features/groups'
 
 interface GroupManageDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  groups: Group[];
-  onCreate: (name: string) => Promise<Group>;
-  onRename: (id: string, name: string) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  groups: Group[]
+  onCreate: (name: string) => Promise<Group>
+  onRename: (id: string, name: string) => Promise<void>
+  onDelete: (id: string) => Promise<void>
 }
 
 /**
@@ -42,60 +42,60 @@ export function GroupManageDialog({
   onRename,
   onDelete,
 }: GroupManageDialogProps) {
-  const [newGroupName, setNewGroupName] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingName, setEditingName] = useState("");
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-  const composingRef = useRef(false);
+  const [newGroupName, setNewGroupName] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const composingRef = useRef(false)
 
   const handleCompositionStart = useCallback(() => {
-    composingRef.current = true;
-  }, []);
+    composingRef.current = true
+  }, [])
 
   const handleCompositionEnd = useCallback(() => {
     // Delay reset: in Chromium compositionend fires *before* the keydown
     // for the Enter that confirms the composition, so the ref must stay
     // true long enough for the subsequent keydown handler to see it.
     setTimeout(() => {
-      composingRef.current = false;
-    }, 50);
-  }, []);
+      composingRef.current = false
+    }, 50)
+  }, [])
 
   const handleCreate = async () => {
-    const name = newGroupName.trim();
-    if (!name) return;
+    const name = newGroupName.trim()
+    if (!name) return
     try {
-      await onCreate(name);
-      setNewGroupName("");
+      await onCreate(name)
+      setNewGroupName('')
     } catch {
-      toast.error("Failed to create group");
+      toast.error('Failed to create group')
     }
-  };
+  }
 
   const handleRename = async (id: string) => {
-    const name = editingName.trim();
-    if (!name) return;
+    const name = editingName.trim()
+    if (!name) return
     try {
-      await onRename(id, name);
-      setEditingId(null);
+      await onRename(id, name)
+      setEditingId(null)
     } catch {
-      toast.error("Failed to rename group");
+      toast.error('Failed to rename group')
     }
-  };
+  }
 
   const handleDelete = async (id: string) => {
     try {
-      await onDelete(id);
-      setDeleteTarget(null);
+      await onDelete(id)
+      setDeleteTarget(null)
     } catch {
-      toast.error("Failed to delete group");
+      toast.error('Failed to delete group')
     }
-  };
+  }
 
   const startEditing = (group: Group) => {
-    setEditingId(group.id);
-    setEditingName(group.name);
-  };
+    setEditingId(group.id)
+    setEditingName(group.name)
+  }
 
   return (
     <>
@@ -113,7 +113,7 @@ export function GroupManageDialog({
                 onCompositionStart={handleCompositionStart}
                 onCompositionEnd={handleCompositionEnd}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !composingRef.current) handleCreate();
+                  if (e.key === 'Enter' && !composingRef.current) handleCreate()
                 }}
                 placeholder="New group name..."
                 className="flex-1"
@@ -131,7 +131,7 @@ export function GroupManageDialog({
             {groups.length > 0 && <Separator />}
 
             {/* Group list */}
-            <div className="space-y-1 max-h-64 overflow-y-auto">
+            <div className="max-h-64 space-y-1 overflow-y-auto">
               {groups.map((group) => (
                 <div
                   key={group.id}
@@ -145,8 +145,9 @@ export function GroupManageDialog({
                         onCompositionStart={handleCompositionStart}
                         onCompositionEnd={handleCompositionEnd}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter" && !composingRef.current) handleRename(group.id);
-                          if (e.key === "Escape") setEditingId(null);
+                          if (e.key === 'Enter' && !composingRef.current)
+                            handleRename(group.id)
+                          if (e.key === 'Escape') setEditingId(null)
                         }}
                         className="h-7 flex-1 text-sm"
                         autoFocus
@@ -213,7 +214,7 @@ export function GroupManageDialog({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                if (deleteTarget) handleDelete(deleteTarget);
+                if (deleteTarget) handleDelete(deleteTarget)
               }}
             >
               Delete
@@ -222,5 +223,5 @@ export function GroupManageDialog({
         </AlertDialogContent>
       </AlertDialog>
     </>
-  );
+  )
 }

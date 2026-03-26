@@ -3,13 +3,13 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
-} from "@/components/ui/sidebar";
-import type { Note } from "@/features/editor";
-import type { DateBucket } from "@/features/groups";
+} from '@/components/ui/sidebar'
+import type { Note } from '@/features/editor'
+import type { DateBucket } from '@/features/groups'
 
 interface DateGroupProps {
-  bucket: DateBucket;
-  renderNoteItem: (note: Note) => React.ReactNode;
+  bucket: DateBucket
+  renderNoteItem: (note: Note) => React.ReactNode
 }
 
 /**
@@ -23,5 +23,5 @@ export function DateGroup({ bucket, renderNoteItem }: DateGroupProps) {
         <SidebarMenu>{bucket.items.map(renderNoteItem)}</SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>
-  );
+  )
 }

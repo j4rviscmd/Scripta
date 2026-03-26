@@ -1,34 +1,44 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { toast } from "sonner";
-import { useAppStore } from "@/app/providers/store-provider";
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
+import { toast } from 'sonner'
+import { useAppStore } from '@/app/providers/store-provider'
+import type { GoogleFontEntry } from '@/data/googleFonts'
 import {
   DEFAULT_EDITOR_FONT,
   DEFAULT_EDITOR_FONT_LABEL,
   EDITOR_FONT_STORE_KEY,
   GOOGLE_FONTS_CSS_BASE,
-} from "@/features/settings/lib/editorFontConfig";
-import type { GoogleFontEntry } from "@/data/googleFonts";
+} from '@/features/settings/lib/editorFontConfig'
 
 type EditorFontContextState = {
-  fontFamily: string;
-  fontLabel: string;
-  setEditorFont: (font: GoogleFontEntry | null) => void;
-  reset: () => void;
-  isLoadingFont: boolean;
-};
+  fontFamily: string
+  fontLabel: string
+  setEditorFont: (font: GoogleFontEntry | null) => void
+  reset: () => void
+  isLoadingFont: boolean
+}
 
-const EditorFontContext = createContext<EditorFontContextState | undefined>(undefined);
+const EditorFontContext = createContext<EditorFontContextState | undefined>(
+  undefined
+)
 
 /**
  * Injects a `<link>` element for the given Google Fonts CSS URL into
  * `<head>`. If a link for the same URL already exists, does nothing.
  */
 function injectFontLink(cssUrl: string) {
-  if (document.querySelector(`link[href="${CSS.escape(cssUrl)}"]`)) return;
-  const link = document.createElement("link");
-  link.rel = "stylesheet";
-  link.href = cssUrl;
-  document.head.appendChild(link);
+  if (document.querySelector(`link[href="${CSS.escape(cssUrl)}"]`)) return
+  const link = document.createElement('link')
+  link.rel = 'stylesheet'
+  link.href = cssUrl
+  document.head.appendChild(link)
 }
 
 /**
@@ -38,8 +48,8 @@ function injectFontLink(cssUrl: string) {
  * Variable fonts are automatically handled by the API.
  */
 function buildFontCssUrl(family: string): string {
-  const encoded = family.replace(/ /g, "+");
-  return `${GOOGLE_FONTS_CSS_BASE}?family=${encoded}:wght@400;700&display=swap`;
+  const encoded = family.replace(/ /g, '+')
+  return `${GOOGLE_FONTS_CSS_BASE}?family=${encoded}:wght@400;700&display=swap`
 }
 
 /**
@@ -53,89 +63,94 @@ function buildFontCssUrl(family: string): string {
  * @param props.children - The component subtree that needs font context.
  */
 export function EditorFontProvider({ children }: { children: ReactNode }) {
-  const { config: configStore } = useAppStore();
-  const [fontFamily, setFontFamily] = useState(DEFAULT_EDITOR_FONT);
-  const [fontLabel, setFontLabel] = useState(DEFAULT_EDITOR_FONT_LABEL);
-  const [isLoadingFont, setIsLoadingFont] = useState(false);
-  const prevFontRef = useRef({ family: DEFAULT_EDITOR_FONT, label: DEFAULT_EDITOR_FONT_LABEL });
+  const { config: configStore } = useAppStore()
+  const [fontFamily, setFontFamily] = useState(DEFAULT_EDITOR_FONT)
+  const [fontLabel, setFontLabel] = useState(DEFAULT_EDITOR_FONT_LABEL)
+  const [isLoadingFont, setIsLoadingFont] = useState(false)
+  const prevFontRef = useRef({
+    family: DEFAULT_EDITOR_FONT,
+    label: DEFAULT_EDITOR_FONT_LABEL,
+  })
 
   const updateFont = useCallback((family: string, label: string) => {
-    setFontFamily(family);
-    setFontLabel(label);
-    prevFontRef.current = { family, label };
-  }, []);
+    setFontFamily(family)
+    setFontLabel(label)
+    prevFontRef.current = { family, label }
+  }, [])
 
   const persistFont = useCallback(
     async (family: string) => {
       try {
-        await configStore.set(EDITOR_FONT_STORE_KEY, family);
+        await configStore.set(EDITOR_FONT_STORE_KEY, family)
       } catch (err) {
-        console.error("Failed to persist editorFontFamily:", err);
+        console.error('Failed to persist editorFontFamily:', err)
       }
     },
-    [configStore],
-  );
+    [configStore]
+  )
 
   const deleteFontStore = useCallback(async () => {
     try {
-      await configStore.delete(EDITOR_FONT_STORE_KEY);
+      await configStore.delete(EDITOR_FONT_STORE_KEY)
     } catch (err) {
-      console.error("Failed to delete editorFontFamily:", err);
+      console.error('Failed to delete editorFontFamily:', err)
     }
-  }, [configStore]);
+  }, [configStore])
 
   useEffect(() => {
-    (async () => {
+    ;(async () => {
       try {
-        const stored = await configStore.get<string>(EDITOR_FONT_STORE_KEY);
+        const stored = await configStore.get<string>(EDITOR_FONT_STORE_KEY)
         if (stored) {
-          injectFontLink(buildFontCssUrl(stored));
-          updateFont(`'${stored}', sans-serif`, stored);
+          injectFontLink(buildFontCssUrl(stored))
+          updateFont(`'${stored}', sans-serif`, stored)
         }
       } catch (err) {
-        console.error("Failed to load editorFontFamily:", err);
+        console.error('Failed to load editorFontFamily:', err)
       }
-    })();
-  }, [configStore, updateFont]);
+    })()
+  }, [configStore, updateFont])
 
   const setEditorFont = useCallback(
     (font: GoogleFontEntry | null) => {
       if (!font) {
-        updateFont(DEFAULT_EDITOR_FONT, DEFAULT_EDITOR_FONT_LABEL);
-        deleteFontStore();
-        return;
+        updateFont(DEFAULT_EDITOR_FONT, DEFAULT_EDITOR_FONT_LABEL)
+        deleteFontStore()
+        return
       }
 
-      const cssUrl = buildFontCssUrl(font.family);
-      const prev = prevFontRef.current;
-      setIsLoadingFont(true);
+      const cssUrl = buildFontCssUrl(font.family)
+      const prev = prevFontRef.current
+      setIsLoadingFont(true)
 
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = cssUrl;
-      link.onload = () => setIsLoadingFont(false);
+      const link = document.createElement('link')
+      link.rel = 'stylesheet'
+      link.href = cssUrl
+      link.onload = () => setIsLoadingFont(false)
       link.onerror = () => {
-        setIsLoadingFont(false);
-        updateFont(prev.family, prev.label);
-        toast.error(`Failed to load font "${font.family}"`);
-      };
-      document.head.appendChild(link);
+        setIsLoadingFont(false)
+        updateFont(prev.family, prev.label)
+        toast.error(`Failed to load font "${font.family}"`)
+      }
+      document.head.appendChild(link)
 
-      updateFont(`'${font.family}', sans-serif`, font.family);
-      persistFont(font.family);
+      updateFont(`'${font.family}', sans-serif`, font.family)
+      persistFont(font.family)
     },
-    [deleteFontStore, persistFont, updateFont],
-  );
+    [deleteFontStore, persistFont, updateFont]
+  )
 
   const reset = useCallback(() => {
-    setEditorFont(null);
-  }, [setEditorFont]);
+    setEditorFont(null)
+  }, [setEditorFont])
 
   return (
-    <EditorFontContext.Provider value={{ fontFamily, fontLabel, setEditorFont, reset, isLoadingFont }}>
+    <EditorFontContext.Provider
+      value={{ fontFamily, fontLabel, setEditorFont, reset, isLoadingFont }}
+    >
       {children}
     </EditorFontContext.Provider>
-  );
+  )
 }
 
 /**
@@ -153,9 +168,9 @@ export function EditorFontProvider({ children }: { children: ReactNode }) {
  * @throws {Error} If used outside of an `<EditorFontProvider>`.
  */
 export function useEditorFont() {
-  const context = useContext(EditorFontContext);
+  const context = useContext(EditorFontContext)
   if (context === undefined) {
-    throw new Error("useEditorFont must be used within an EditorFontProvider");
+    throw new Error('useEditorFont must be used within an EditorFontProvider')
   }
-  return context;
+  return context
 }

@@ -1,5 +1,5 @@
-import { createExtension } from "@blocknote/core";
-import { createSearchPlugin } from "./searchPlugin";
+import { createExtension } from '@blocknote/core'
+import { createSearchPlugin } from './searchPlugin'
 
 /**
  * BlockNote extension for in-editor search & replace.
@@ -8,6 +8,6 @@ import { createSearchPlugin } from "./searchPlugin";
  * following the same pattern as {@link cursorCenteringExtension}.
  */
 export const searchExtension = createExtension({
-  key: "searchReplace",
+  key: 'searchReplace',
   prosemirrorPlugins: [createSearchPlugin()],
-});
+})

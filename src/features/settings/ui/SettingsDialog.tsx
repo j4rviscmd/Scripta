@@ -1,18 +1,18 @@
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Monitor, Moon, Sun } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Separator } from "@/components/ui/separator";
-import { CursorCenteringOption } from "./CursorCenteringOption";
-import { EditorFontOption } from "./EditorFontOption";
-import { FontSizeOption } from "./FontSizeOption";
-import { ThemeOption } from "./ThemeOption";
-import { CommandPaletteScrollOption } from "./CommandPaletteScrollOption";
-import { WindowStateOption } from "./WindowStateOption";
+} from '@/components/ui/dialog'
+import { Separator } from '@/components/ui/separator'
+import { CommandPaletteScrollOption } from './CommandPaletteScrollOption'
+import { CursorCenteringOption } from './CursorCenteringOption'
+import { EditorFontOption } from './EditorFontOption'
+import { FontSizeOption } from './FontSizeOption'
+import { ThemeOption } from './ThemeOption'
+import { WindowStateOption } from './WindowStateOption'
 
 /**
  * Props for the {@link SettingsDialog} component.
@@ -22,8 +22,8 @@ import { WindowStateOption } from "./WindowStateOption";
  *   receiving the new `open` boolean value.
  */
 interface SettingsDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  open: boolean
+  onOpenChange: (open: boolean) => void
 }
 
 /**
@@ -53,12 +53,24 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           <DialogDescription>Manage your preferences.</DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-1">
-          <p className="px-3 text-xs font-medium text-muted-foreground">
+          <p className="px-3 font-medium text-muted-foreground text-xs">
             Theme
           </p>
-          <ThemeOption value="light" label="Light" icon={<Sun className="h-5 w-5" />} />
-          <ThemeOption value="dark" label="Dark" icon={<Moon className="h-5 w-5" />} />
-          <ThemeOption value="system" label="System" icon={<Monitor className="h-5 w-5" />} />
+          <ThemeOption
+            value="light"
+            label="Light"
+            icon={<Sun className="h-5 w-5" />}
+          />
+          <ThemeOption
+            value="dark"
+            label="Dark"
+            icon={<Moon className="h-5 w-5" />}
+          />
+          <ThemeOption
+            value="system"
+            label="System"
+            icon={<Monitor className="h-5 w-5" />}
+          />
         </div>
         <Separator />
         <CursorCenteringOption />
@@ -72,5 +84,5 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         <WindowStateOption />
       </DialogContent>
     </Dialog>
-  );
+  )
 }

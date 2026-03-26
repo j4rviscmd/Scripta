@@ -1,40 +1,46 @@
-import { useMemo, useState } from "react";
-import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Check, ChevronsUpDown, Loader2 } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { useEditorFont } from '@/app/providers/editor-font-provider'
 import {
   Command,
   CommandEmpty,
-  CommandList,
   CommandGroup,
   CommandItem,
-} from "@/components/ui/command";
-import { cn } from "@/lib/utils";
-import { useEditorFont } from "@/app/providers/editor-font-provider";
-import { DEFAULT_EDITOR_FONT_LABEL } from "@/features/settings/lib/editorFontConfig";
-import googleFonts from "@/data/googleFonts.json";
-import type { GoogleFontEntry } from "@/data/googleFonts";
+  CommandList,
+} from '@/components/ui/command'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import type { GoogleFontEntry } from '@/data/googleFonts'
+import googleFonts from '@/data/googleFonts.json'
+import { DEFAULT_EDITOR_FONT_LABEL } from '@/features/settings/lib/editorFontConfig'
+import { cn } from '@/lib/utils'
 
-const MAX_VISIBLE_ITEMS = 50;
+const MAX_VISIBLE_ITEMS = 50
 
 export function EditorFontOption() {
-  const { fontLabel, setEditorFont, reset, isLoadingFont } = useEditorFont();
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
+  const { fontLabel, setEditorFont, reset, isLoadingFont } = useEditorFont()
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
 
   const filteredFonts = useMemo(() => {
-    if (!search.trim()) return googleFonts.slice(0, MAX_VISIBLE_ITEMS);
-    const q = search.replace(/\s+/g, "").toLowerCase();
-    return googleFonts.filter((f) => f.family.replace(/\s+/g, "").toLowerCase().includes(q)).slice(0, MAX_VISIBLE_ITEMS);
-  }, [search]);
+    if (!search.trim()) return googleFonts.slice(0, MAX_VISIBLE_ITEMS)
+    const q = search.replace(/\s+/g, '').toLowerCase()
+    return googleFonts
+      .filter((f) => f.family.replace(/\s+/g, '').toLowerCase().includes(q))
+      .slice(0, MAX_VISIBLE_ITEMS)
+  }, [search])
 
-  const isDefault = fontLabel === DEFAULT_EDITOR_FONT_LABEL;
-  const fontFamilyStyle = isDefault ? undefined : `'${fontLabel}', sans-serif`;
+  const isDefault = fontLabel === DEFAULT_EDITOR_FONT_LABEL
+  const fontFamilyStyle = isDefault ? undefined : `'${fontLabel}', sans-serif`
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="px-3 text-xs font-medium text-muted-foreground">
+      <p className="px-3 font-medium text-muted-foreground text-xs">
         Editor Font
       </p>
       <div className="flex flex-col gap-2 px-3">
@@ -42,7 +48,7 @@ export function EditorFontOption() {
         <div className="flex items-center gap-2">
           <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger
-              className="inline-flex w-full items-center justify-between rounded-lg border border-input bg-background px-3 py-2 text-sm font-normal hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground"
+              className="inline-flex w-full items-center justify-between rounded-lg border border-input bg-background px-3 py-2 font-normal text-sm hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground"
               aria-expanded={open}
             >
               <span
@@ -77,9 +83,9 @@ export function EditorFontOption() {
                         font={font}
                         isSelected={font.family === fontLabel}
                         onSelect={() => {
-                          setEditorFont(font);
-                          setOpen(false);
-                          setSearch("");
+                          setEditorFont(font)
+                          setOpen(false)
+                          setSearch('')
                         }}
                       />
                     ))}
@@ -92,7 +98,7 @@ export function EditorFontOption() {
         {!isDefault && (
           <button
             type="button"
-            className="h-5 w-fit px-2 text-xs text-muted-foreground hover:text-foreground"
+            className="h-5 w-fit px-2 text-muted-foreground text-xs hover:text-foreground"
             onClick={reset}
           >
             Reset
@@ -100,7 +106,7 @@ export function EditorFontOption() {
         )}
       </div>
     </div>
-  );
+  )
 }
 
 function FontItem({
@@ -108,9 +114,9 @@ function FontItem({
   isSelected,
   onSelect,
 }: {
-  font: GoogleFontEntry;
-  isSelected: boolean;
-  onSelect: () => void;
+  font: GoogleFontEntry
+  isSelected: boolean
+  onSelect: () => void
 }) {
   return (
     <CommandItem
@@ -120,14 +126,16 @@ function FontItem({
     >
       <Check
         className={cn(
-          "mr-2 h-4 w-4 shrink-0",
-          isSelected ? "opacity-100" : "opacity-0",
+          'mr-2 h-4 w-4 shrink-0',
+          isSelected ? 'opacity-100' : 'opacity-0'
         )}
       />
       <span style={{ fontFamily: `'${font.family}', sans-serif` }}>
         {font.family}
       </span>
-      <span className="ml-1.5 text-xs text-muted-foreground">{font.category}</span>
+      <span className="ml-1.5 text-muted-foreground text-xs">
+        {font.category}
+      </span>
     </CommandItem>
-  );
+  )
 }

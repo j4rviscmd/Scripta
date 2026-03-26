@@ -1,7 +1,13 @@
-import { createContext, useContext, use, type ReactNode } from "react";
-import { LazyStore } from "@tauri-apps/plugin-store";
-import { restoreStateCurrent, StateFlags } from "@tauri-apps/plugin-window-state";
-import { DEFAULT_WINDOW_STATE_RESTORE, WINDOW_STATE_STORE_KEY } from "@/features/settings/lib/windowStateConfig";
+import { LazyStore } from '@tauri-apps/plugin-store'
+import {
+  restoreStateCurrent,
+  StateFlags,
+} from '@tauri-apps/plugin-window-state'
+import { createContext, type ReactNode, use, useContext } from 'react'
+import {
+  DEFAULT_WINDOW_STATE_RESTORE,
+  WINDOW_STATE_STORE_KEY,
+} from '@/features/settings/lib/windowStateConfig'
 
 /**
  * Module-scoped singleton store instances.
@@ -9,8 +15,8 @@ import { DEFAULT_WINDOW_STATE_RESTORE, WINDOW_STATE_STORE_KEY } from "@/features
  * - `configStore` — persistent application settings (e.g. theme, UI preferences).
  * - `editorStateStore` — transient editor state such as scroll positions and header visibility.
  */
-const configStore = new LazyStore("config.json");
-const editorStateStore = new LazyStore("editor-state.json");
+const configStore = new LazyStore('config.json')
+const editorStateStore = new LazyStore('editor-state.json')
 
 /**
  * Pre-fetched config defaults, populated during store initialization.
@@ -26,7 +32,7 @@ export const configDefaults = {
   sidebarOpen: true,
   /** Whether to restore window position & size on launch. Falls back to `true` if not persisted. */
   windowStateRestoreEnabled: DEFAULT_WINDOW_STATE_RESTORE,
-};
+}
 
 /**
  * Promise that resolves when all stores have been loaded from disk and
@@ -35,25 +41,27 @@ export const configDefaults = {
  * Consumed internally by {@link StoreProvider} via `React.use()` and
  * externally by the splash screen to coordinate its dismissal timing.
  */
-export const storeInitPromise = Promise.all([configStore.init(), editorStateStore.init()])
-  .then(async () => {
-    const [storedSidebarOpen, storedWindowRestore] = await Promise.all([
-      configStore.get<boolean>("sidebarOpen"),
-      configStore.get<boolean>(WINDOW_STATE_STORE_KEY),
-    ]);
-    if (storedSidebarOpen != null) {
-      configDefaults.sidebarOpen = storedSidebarOpen;
+export const storeInitPromise = Promise.all([
+  configStore.init(),
+  editorStateStore.init(),
+]).then(async () => {
+  const [storedSidebarOpen, storedWindowRestore] = await Promise.all([
+    configStore.get<boolean>('sidebarOpen'),
+    configStore.get<boolean>(WINDOW_STATE_STORE_KEY),
+  ])
+  if (storedSidebarOpen != null) {
+    configDefaults.sidebarOpen = storedSidebarOpen
+  }
+  const restoreEnabled = storedWindowRestore ?? DEFAULT_WINDOW_STATE_RESTORE
+  configDefaults.windowStateRestoreEnabled = restoreEnabled
+  if (restoreEnabled) {
+    try {
+      await restoreStateCurrent(StateFlags.POSITION | StateFlags.SIZE)
+    } catch (err) {
+      console.error('Failed to restore window state:', err)
     }
-    const restoreEnabled = storedWindowRestore ?? DEFAULT_WINDOW_STATE_RESTORE;
-    configDefaults.windowStateRestoreEnabled = restoreEnabled;
-    if (restoreEnabled) {
-      try {
-        await restoreStateCurrent(StateFlags.POSITION | StateFlags.SIZE);
-      } catch (err) {
-        console.error("Failed to restore window state:", err);
-      }
-    }
-  });
+  }
+})
 
 /**
  * React context holding initialized store instances.
@@ -61,9 +69,9 @@ export const storeInitPromise = Promise.all([configStore.init(), editorStateStor
  * @internal Use {@link useAppStore} to consume this context.
  */
 const StoreContext = createContext<{
-  config: LazyStore;
-  editorState: LazyStore;
-} | null>(null);
+  config: LazyStore
+  editorState: LazyStore
+} | null>(null)
 
 /**
  * Provides initialized store instances to the component tree.
@@ -85,13 +93,15 @@ const StoreContext = createContext<{
  * ```
  */
 export function StoreProvider({ children }: { children: ReactNode }) {
-  use(storeInitPromise);
+  use(storeInitPromise)
 
   return (
-    <StoreContext.Provider value={{ config: configStore, editorState: editorStateStore }}>
+    <StoreContext.Provider
+      value={{ config: configStore, editorState: editorStateStore }}
+    >
       {children}
     </StoreContext.Provider>
-  );
+  )
 }
 
 /**
@@ -110,9 +120,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
  * ```
  */
 export function useAppStore() {
-  const stores = useContext(StoreContext);
+  const stores = useContext(StoreContext)
   if (!stores) {
-    throw new Error("useAppStore must be used within a StoreProvider");
+    throw new Error('useAppStore must be used within a StoreProvider')
   }
-  return stores;
+  return stores
 }

@@ -1,6 +1,6 @@
-import { useWindowState } from "../hooks/useWindowState";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import { useWindowState } from '../hooks/useWindowState'
 
 /**
  * Settings section for configuring window position/size restoration.
@@ -18,13 +18,11 @@ import { Switch } from "@/components/ui/switch";
  * ```
  */
 export function WindowStateOption() {
-  const { enabled, setEnabled } = useWindowState();
+  const { enabled, setEnabled } = useWindowState()
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="px-3 text-xs font-medium text-muted-foreground">
-        Window
-      </p>
+      <p className="px-3 font-medium text-muted-foreground text-xs">Window</p>
       <div className="flex items-center justify-between px-3">
         <Label htmlFor="window-state-toggle" className="text-sm">
           Restore position &amp; size
@@ -36,5 +34,5 @@ export function WindowStateOption() {
         />
       </div>
     </div>
-  );
+  )
 }

@@ -1,8 +1,8 @@
-import { useState, useCallback, useRef, useEffect } from "react";
-import type { BlockNoteEditor } from "@blocknote/core";
-import { TextSelection } from "prosemirror-state";
-import { searchConfig } from "../lib/searchConfig";
-import { searchPluginKey } from "../lib/searchPlugin";
+import type { BlockNoteEditor } from '@blocknote/core'
+import { TextSelection } from 'prosemirror-state'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { searchConfig } from '../lib/searchConfig'
+import { searchPluginKey } from '../lib/searchPlugin'
 
 /**
  * Return value of {@link useSearchReplace}.
@@ -11,24 +11,24 @@ import { searchPluginKey } from "../lib/searchPlugin";
  * needed by the {@link SearchReplacePanel} UI component.
  */
 export interface UseSearchReplaceReturn {
-  isOpen: boolean;
-  query: string;
-  replaceText: string;
-  caseSensitive: boolean;
-  useRegex: boolean;
-  matchCount: number;
-  currentMatchIndex: number;
-  searchInputRef: React.RefObject<HTMLInputElement | null>;
-  open: () => void;
-  close: () => void;
-  setQuery: (q: string) => void;
-  setReplaceText: (t: string) => void;
-  toggleCaseSensitive: () => void;
-  toggleUseRegex: () => void;
-  goNext: () => void;
-  goPrev: () => void;
-  replaceOne: () => void;
-  replaceAll: () => void;
+  isOpen: boolean
+  query: string
+  replaceText: string
+  caseSensitive: boolean
+  useRegex: boolean
+  matchCount: number
+  currentMatchIndex: number
+  searchInputRef: React.RefObject<HTMLInputElement | null>
+  open: () => void
+  close: () => void
+  setQuery: (q: string) => void
+  setReplaceText: (t: string) => void
+  toggleCaseSensitive: () => void
+  toggleUseRegex: () => void
+  goNext: () => void
+  goPrev: () => void
+  replaceOne: () => void
+  replaceAll: () => void
 }
 
 /**
@@ -39,253 +39,260 @@ export interface UseSearchReplaceReturn {
  * with the ProseMirror plugin without dispatching extra transactions.
  */
 export function useSearchReplace(
-  editor: BlockNoteEditor,
+  editor: BlockNoteEditor
 ): UseSearchReplaceReturn {
-  const [isOpen, setIsOpen] = useState(false);
-  const [query, setQueryState] = useState("");
-  const [replaceText, setReplaceTextState] = useState("");
-  const [caseSensitive, setCaseSensitive] = useState(false);
-  const [useRegex, setUseRegex] = useState(false);
-  const [matchCount, setMatchCount] = useState(0);
-  const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const isComposingRef = useRef(false);
+  const [isOpen, setIsOpen] = useState(false)
+  const [query, setQueryState] = useState('')
+  const [replaceText, setReplaceTextState] = useState('')
+  const [caseSensitive, setCaseSensitive] = useState(false)
+  const [useRegex, setUseRegex] = useState(false)
+  const [matchCount, setMatchCount] = useState(0)
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(-1)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const isComposingRef = useRef(false)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const getView = useCallback(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tiptap = (editor as any)._tiptapEditor;
-    return tiptap?.view ?? null;
-  }, [editor]);
+    const tiptap = (editor as any)._tiptapEditor
+    return tiptap?.view ?? null
+  }, [editor])
 
   const triggerRedecorate = useCallback(() => {
-    const view = getView();
-    if (!view) return;
-    const tr = view.state.tr.setMeta(searchPluginKey, true);
-    view.dispatch(tr);
+    const view = getView()
+    if (!view) return
+    const tr = view.state.tr.setMeta(searchPluginKey, true)
+    view.dispatch(tr)
 
     // Read back results from config (written by plugin.apply)
-    setMatchCount(searchConfig.results.length);
-    setCurrentMatchIndex(searchConfig.currentIndex);
-  }, [getView]);
+    setMatchCount(searchConfig.results.length)
+    setCurrentMatchIndex(searchConfig.currentIndex)
+  }, [getView])
 
   const open = useCallback(() => {
-    setIsOpen(true);
-    searchConfig.isOpen = true;
+    setIsOpen(true)
+    searchConfig.isOpen = true
 
     // Pre-fill with selected text if available
-    const view = getView();
+    const view = getView()
     if (view) {
-      const { from, to } = view.state.selection;
+      const { from, to } = view.state.selection
       if (from !== to) {
-        const selectedText = view.state.doc.textBetween(from, to);
-        searchConfig.query = selectedText;
-        setQueryState(selectedText);
-        triggerRedecorate();
+        const selectedText = view.state.doc.textBetween(from, to)
+        searchConfig.query = selectedText
+        setQueryState(selectedText)
+        triggerRedecorate()
       }
     }
 
     // Focus search input after render
     queueMicrotask(() => {
-      searchInputRef.current?.focus();
-      searchInputRef.current?.select();
-    });
-  }, [getView, triggerRedecorate]);
+      searchInputRef.current?.focus()
+      searchInputRef.current?.select()
+    })
+  }, [getView, triggerRedecorate])
 
   const resetConfig = useCallback(() => {
-    searchConfig.query = "";
-    searchConfig.replaceText = "";
-    searchConfig.results = [];
-    searchConfig.currentIndex = -1;
-  }, []);
+    searchConfig.query = ''
+    searchConfig.replaceText = ''
+    searchConfig.results = []
+    searchConfig.currentIndex = -1
+  }, [])
 
   const close = useCallback(() => {
-    setIsOpen(false);
-    searchConfig.isOpen = false;
-    resetConfig();
-    setQueryState("");
-    setReplaceTextState("");
-    setMatchCount(0);
-    setCurrentMatchIndex(-1);
-    triggerRedecorate();
-  }, [resetConfig, triggerRedecorate]);
+    setIsOpen(false)
+    searchConfig.isOpen = false
+    resetConfig()
+    setQueryState('')
+    setReplaceTextState('')
+    setMatchCount(0)
+    setCurrentMatchIndex(-1)
+    triggerRedecorate()
+  }, [resetConfig, triggerRedecorate])
 
   const setQuery = useCallback(
     (q: string) => {
-      setQueryState(q);
-      searchConfig.query = q;
-      searchConfig.currentIndex = 0;
-      triggerRedecorate();
+      setQueryState(q)
+      searchConfig.query = q
+      searchConfig.currentIndex = 0
+      triggerRedecorate()
     },
-    [triggerRedecorate],
-  );
+    [triggerRedecorate]
+  )
 
   const setReplaceText = useCallback((t: string) => {
-    setReplaceTextState(t);
-    searchConfig.replaceText = t;
-  }, []);
+    setReplaceTextState(t)
+    searchConfig.replaceText = t
+  }, [])
 
   const toggleCaseSensitive = useCallback(() => {
     setCaseSensitive((prev) => {
-      const next = !prev;
-      searchConfig.caseSensitive = next;
-      searchConfig.currentIndex = 0;
-      triggerRedecorate();
-      return next;
-    });
-  }, [triggerRedecorate]);
+      const next = !prev
+      searchConfig.caseSensitive = next
+      searchConfig.currentIndex = 0
+      triggerRedecorate()
+      return next
+    })
+  }, [triggerRedecorate])
 
   const toggleUseRegex = useCallback(() => {
     setUseRegex((prev) => {
-      const next = !prev;
-      searchConfig.useRegex = next;
-      searchConfig.currentIndex = 0;
-      triggerRedecorate();
-      return next;
-    });
-  }, [triggerRedecorate]);
+      const next = !prev
+      searchConfig.useRegex = next
+      searchConfig.currentIndex = 0
+      triggerRedecorate()
+      return next
+    })
+  }, [triggerRedecorate])
 
   const scrollToMatch = useCallback(
     (index: number) => {
-      const view = getView();
-      if (!view || searchConfig.results.length === 0) return;
-      const match = searchConfig.results[index];
-      if (!match) return;
+      const view = getView()
+      if (!view || searchConfig.results.length === 0) return
+      const match = searchConfig.results[index]
+      if (!match) return
 
       const tr = view.state.tr.setSelection(
-        TextSelection.near(
-          view.state.doc.resolve(match.from),
-        ),
-      );
-      view.dispatch(tr);
+        TextSelection.near(view.state.doc.resolve(match.from))
+      )
+      view.dispatch(tr)
 
       // After ProseMirror updates the DOM, use native scrollIntoView
       // on the resolved DOM node to scroll the match into view.
       requestAnimationFrame(() => {
-        const dom = view.domAtPos(match.from);
+        const dom = view.domAtPos(match.from)
         const target =
           dom.node.nodeType === Node.TEXT_NODE
             ? dom.node.parentElement
-            : dom.node;
-        if (target && typeof target.scrollIntoView === "function") {
-          target.scrollIntoView({ block: "center", behavior: "smooth" });
+            : dom.node
+        if (target && typeof target.scrollIntoView === 'function') {
+          target.scrollIntoView({ block: 'center', behavior: 'smooth' })
         }
-      });
+      })
     },
-    [getView],
-  );
+    [getView]
+  )
 
   const goNext = useCallback(() => {
-    if (searchConfig.results.length === 0) return;
+    if (searchConfig.results.length === 0) return
     searchConfig.currentIndex =
-      (searchConfig.currentIndex + 1) % searchConfig.results.length;
-    triggerRedecorate();
-    scrollToMatch(searchConfig.currentIndex);
-  }, [triggerRedecorate, scrollToMatch]);
+      (searchConfig.currentIndex + 1) % searchConfig.results.length
+    triggerRedecorate()
+    scrollToMatch(searchConfig.currentIndex)
+  }, [triggerRedecorate, scrollToMatch])
 
   const goPrev = useCallback(() => {
-    if (searchConfig.results.length === 0) return;
+    if (searchConfig.results.length === 0) return
     searchConfig.currentIndex =
       (searchConfig.currentIndex - 1 + searchConfig.results.length) %
-      searchConfig.results.length;
-    triggerRedecorate();
-    scrollToMatch(searchConfig.currentIndex);
-  }, [triggerRedecorate, scrollToMatch]);
+      searchConfig.results.length
+    triggerRedecorate()
+    scrollToMatch(searchConfig.currentIndex)
+  }, [triggerRedecorate, scrollToMatch])
 
   const syncMatchState = useCallback(() => {
-    setMatchCount(searchConfig.results.length);
-    setCurrentMatchIndex(searchConfig.currentIndex);
-  }, []);
+    setMatchCount(searchConfig.results.length)
+    setCurrentMatchIndex(searchConfig.currentIndex)
+  }, [])
 
   const replaceOne = useCallback(() => {
-    const view = getView();
-    if (!view) return;
-    const { results, currentIndex: idx } = searchConfig;
-    if (results.length === 0 || idx < 0 || idx >= results.length) return;
+    const view = getView()
+    if (!view) return
+    const { results, currentIndex: idx } = searchConfig
+    if (results.length === 0 || idx < 0 || idx >= results.length) return
 
-    const match = results[idx];
-    const { schema } = view.state;
+    const match = results[idx]
+    const { schema } = view.state
     const content = searchConfig.replaceText
       ? schema.text(searchConfig.replaceText)
-      : undefined;
+      : undefined
     const tr = view.state.tr
       .replaceWith(match.from, match.to, content)
-      .setMeta(searchPluginKey, true);
-    view.dispatch(tr);
+      .setMeta(searchPluginKey, true)
+    view.dispatch(tr)
 
-    syncMatchState();
-  }, [getView, syncMatchState]);
+    syncMatchState()
+  }, [getView, syncMatchState])
 
   const replaceAll = useCallback(() => {
-    const view = getView();
-    if (!view) return;
-    const { results } = searchConfig;
-    if (results.length === 0) return;
+    const view = getView()
+    if (!view) return
+    const { results } = searchConfig
+    if (results.length === 0) return
 
-    const { schema } = view.state;
+    const { schema } = view.state
     const content = searchConfig.replaceText
       ? schema.text(searchConfig.replaceText)
-      : undefined;
-    let tr = view.state.tr;
+      : undefined
+    let tr = view.state.tr
     for (let i = results.length - 1; i >= 0; i--) {
-      const mappedFrom = tr.mapping.map(results[i].from);
-      const mappedTo = tr.mapping.map(results[i].to);
-      tr = tr.replaceWith(mappedFrom, mappedTo, content);
+      const mappedFrom = tr.mapping.map(results[i].from)
+      const mappedTo = tr.mapping.map(results[i].to)
+      tr = tr.replaceWith(mappedFrom, mappedTo, content)
     }
 
-    tr.setMeta(searchPluginKey, true);
-    view.dispatch(tr);
+    tr.setMeta(searchPluginKey, true)
+    view.dispatch(tr)
 
-    syncMatchState();
-  }, [getView, syncMatchState]);
+    syncMatchState()
+  }, [getView, syncMatchState])
 
   // Keyboard shortcuts: Cmd/Ctrl+F to open, Escape to close
   useEffect(() => {
-    const input = searchInputRef.current;
-    const onCompositionStart = () => { isComposingRef.current = true; };
-    const onCompositionEnd = () => { isComposingRef.current = false; };
-    input?.addEventListener("compositionstart", onCompositionStart);
-    input?.addEventListener("compositionend", onCompositionEnd);
+    const input = searchInputRef.current
+    const onCompositionStart = () => {
+      isComposingRef.current = true
+    }
+    const onCompositionEnd = () => {
+      isComposingRef.current = false
+    }
+    input?.addEventListener('compositionstart', onCompositionStart)
+    input?.addEventListener('compositionend', onCompositionEnd)
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Cmd/Ctrl+F — open search (only when not already in search input)
-      if ((e.metaKey || e.ctrlKey) && e.key === "f") {
-        e.preventDefault();
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault()
         if (!isOpen) {
-          open();
+          open()
         } else {
-          searchInputRef.current?.focus();
-          searchInputRef.current?.select();
+          searchInputRef.current?.focus()
+          searchInputRef.current?.select()
         }
-        return;
+        return
       }
 
       // Escape — close search
-      if (e.key === "Escape" && isOpen) {
-        e.preventDefault();
-        close();
-        return;
+      if (e.key === 'Escape' && isOpen) {
+        e.preventDefault()
+        close()
+        return
       }
 
       // Enter — next match (when search input focused, not during IME composition)
-      if (e.key === "Enter" && isOpen && document.activeElement === searchInputRef.current && !isComposingRef.current) {
-        e.preventDefault();
+      if (
+        e.key === 'Enter' &&
+        isOpen &&
+        document.activeElement === searchInputRef.current &&
+        !isComposingRef.current
+      ) {
+        e.preventDefault()
         if (e.shiftKey) {
-          goPrev();
+          goPrev()
         } else {
-          goNext();
+          goNext()
         }
-        return;
+        return
       }
-    };
+    }
 
-    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown)
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      input?.removeEventListener("compositionstart", onCompositionStart);
-      input?.removeEventListener("compositionend", onCompositionEnd);
-    };
-  }, [isOpen, open, close, goNext, goPrev]);
+      window.removeEventListener('keydown', handleKeyDown)
+      input?.removeEventListener('compositionstart', onCompositionStart)
+      input?.removeEventListener('compositionend', onCompositionEnd)
+    }
+  }, [isOpen, open, close, goNext, goPrev])
 
   return {
     isOpen,
@@ -306,5 +313,5 @@ export function useSearchReplace(
     goPrev,
     replaceOne,
     replaceAll,
-  };
+  }
 }

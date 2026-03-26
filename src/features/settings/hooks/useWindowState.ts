@@ -1,6 +1,6 @@
-import { useCallback, useState } from "react";
-import { useAppStore, configDefaults } from "@/app/providers/store-provider";
-import { WINDOW_STATE_STORE_KEY } from "../lib/windowStateConfig";
+import { useCallback, useState } from 'react'
+import { configDefaults, useAppStore } from '@/app/providers/store-provider'
+import { WINDOW_STATE_STORE_KEY } from '../lib/windowStateConfig'
 
 /**
  * Manages the window-state restore toggle setting.
@@ -17,15 +17,20 @@ import { WINDOW_STATE_STORE_KEY } from "../lib/windowStateConfig";
  *   - `setEnabled` — Toggles the flag and persists the change.
  */
 export function useWindowState() {
-  const { config: configStore } = useAppStore();
-  const [enabled, setEnabledState] = useState(configDefaults.windowStateRestoreEnabled);
+  const { config: configStore } = useAppStore()
+  const [enabled, setEnabledState] = useState(
+    configDefaults.windowStateRestoreEnabled
+  )
 
-  const setEnabled = useCallback((value: boolean) => {
-    setEnabledState(value);
-    configStore.set(WINDOW_STATE_STORE_KEY, value).catch((err) => {
-      console.error("Failed to persist windowStateRestoreEnabled:", err);
-    });
-  }, [configStore]);
+  const setEnabled = useCallback(
+    (value: boolean) => {
+      setEnabledState(value)
+      configStore.set(WINDOW_STATE_STORE_KEY, value).catch((err) => {
+        console.error('Failed to persist windowStateRestoreEnabled:', err)
+      })
+    },
+    [configStore]
+  )
 
-  return { enabled, setEnabled };
+  return { enabled, setEnabled }
 }
