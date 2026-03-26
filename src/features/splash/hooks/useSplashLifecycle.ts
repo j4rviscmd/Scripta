@@ -16,7 +16,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { storeInitPromise } from '@/app/providers/store-provider'
 import { FADE_DURATION_MS, MIN_DISPLAY_MS } from '../lib/constants'
+import { notifySplashFading } from '../lib/splash-state'
 
+/** Phases of the splash screen lifecycle. */
 type SplashPhase = 'active' | 'fading' | 'done'
 
 interface SplashLifecycle {
@@ -45,6 +47,7 @@ export function useSplashLifecycle(): SplashLifecycle {
 
     Promise.all([storeInitPromise, minTimer]).then(() => {
       if (!disposedRef.current) {
+        notifySplashFading()
         setPhase('fading')
       }
     })

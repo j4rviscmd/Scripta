@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
@@ -9,6 +9,11 @@
 
   <body>
     <div id="root"></div>
+    <!--
+      Suppresses the "linkifyjs: already initialized" warning from TipTap/BlockNote.
+      See: https://github.com/ueberdosis/tiptap/issues/5450
+      This IIFE must execute before Vite pre-bundled chunks capture console.warn.
+    -->
     <script>
       // Workaround for https://github.com/ueberdosis/tiptap/issues/5450
       // Must run before Vite pre-bundled chunks capture console.warn

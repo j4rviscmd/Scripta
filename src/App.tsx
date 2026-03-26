@@ -387,7 +387,7 @@ function AppContent() {
  */
 function App() {
   return (
-    <ThemeProvider defaultTheme="system">
+    <ThemeProvider defaultTheme={configDefaults.theme}>
       <FontSizeProvider>
         <EditorFontProvider>
           <AppContent />

@@ -1,17 +1,8 @@
 import { Check } from 'lucide-react'
 import type { ReactNode } from 'react'
+import type { Theme } from '@/app/providers/theme-provider'
 import { useTheme } from '@/app/providers/theme-provider'
 import { cn } from '@/lib/utils'
-
-/**
- * Supported theme identifiers.
- *
- * @remarks
- * - `"light"` -- Forces the light color scheme.
- * - `"dark"` -- Forces the dark color scheme.
- * - `"system"` -- Automatically follows the OS preference.
- */
-type Theme = 'dark' | 'light' | 'system'
 
 /**
  * Props for the {@link ThemeOption} component.

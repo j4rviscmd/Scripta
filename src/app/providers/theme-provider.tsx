@@ -6,9 +6,10 @@ import {
   useState,
 } from 'react'
 import { useAppStore } from '@/app/providers/store-provider'
+import { splashFadingPromise } from '@/features/splash'
 
 /** Supported theme modes. `"system"` resolves to the OS preference at runtime. */
-type Theme = 'dark' | 'light' | 'system'
+export type Theme = 'dark' | 'light' | 'system'
 
 /** Props for the {@link ThemeProvider} component. */
 type ThemeProviderProps = {
@@ -64,6 +65,14 @@ export function ThemeProvider({
   const [systemDark, setSystemDark] = useState(
     () => window.matchMedia('(prefers-color-scheme: dark)').matches
   )
+  const [canApplyTheme, setCanApplyTheme] = useState(false)
+
+  // Wait for the splash screen to start fading before applying theme to DOM.
+  // <html class="dark"> is set in index.html, so the splash always renders
+  // with a dark background regardless of the user's theme preference.
+  useEffect(() => {
+    splashFadingPromise.finally(() => setCanApplyTheme(true))
+  }, [])
 
   // Load persisted theme from the store on first mount.
   useEffect(() => {
@@ -88,10 +97,11 @@ export function ThemeProvider({
     theme === 'system' ? (systemDark ? 'dark' : 'light') : theme
 
   useEffect(() => {
+    if (!canApplyTheme) return
     const root = window.document.documentElement
     root.classList.remove('light', 'dark')
     root.classList.add(resolvedTheme)
-  }, [resolvedTheme])
+  }, [resolvedTheme, canApplyTheme])
 
   const handleSetTheme = useCallback(
     (t: Theme) => {
