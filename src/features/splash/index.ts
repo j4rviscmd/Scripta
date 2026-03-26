@@ -7,4 +7,6 @@
  * remains visible until stores finish loading and a minimum display
  * time has elapsed, then fades out and unmounts.
  */
+
+export { splashFadingPromise } from './lib/splash-state'
 export { SplashScreen } from './ui/SplashScreen'

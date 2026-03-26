@@ -4,6 +4,7 @@ import {
   StateFlags,
 } from '@tauri-apps/plugin-window-state'
 import { createContext, type ReactNode, use, useContext } from 'react'
+import type { Theme } from '@/app/providers/theme-provider'
 import {
   DEFAULT_WINDOW_STATE_RESTORE,
   WINDOW_STATE_STORE_KEY,
@@ -32,6 +33,8 @@ export const configDefaults = {
   sidebarOpen: true,
   /** Whether to restore window position & size on launch. Falls back to `true` if not persisted. */
   windowStateRestoreEnabled: DEFAULT_WINDOW_STATE_RESTORE,
+  /** User-selected theme. Falls back to `"system"` if not persisted. */
+  theme: 'system' as Theme,
 }
 
 /**
@@ -45,12 +48,18 @@ export const storeInitPromise = Promise.all([
   configStore.init(),
   editorStateStore.init(),
 ]).then(async () => {
-  const [storedSidebarOpen, storedWindowRestore] = await Promise.all([
-    configStore.get<boolean>('sidebarOpen'),
-    configStore.get<boolean>(WINDOW_STATE_STORE_KEY),
-  ])
+  const [storedSidebarOpen, storedWindowRestore, storedTheme] =
+    await Promise.all([
+      configStore.get<boolean>('sidebarOpen'),
+      configStore.get<boolean>(WINDOW_STATE_STORE_KEY),
+      configStore.get<string>('theme'),
+    ])
   if (storedSidebarOpen != null) {
     configDefaults.sidebarOpen = storedSidebarOpen
+  }
+  const validThemes = new Set<Theme>(['dark', 'light', 'system'])
+  if (storedTheme && validThemes.has(storedTheme as Theme)) {
+    configDefaults.theme = storedTheme as Theme
   }
   const restoreEnabled = storedWindowRestore ?? DEFAULT_WINDOW_STATE_RESTORE
   configDefaults.windowStateRestoreEnabled = restoreEnabled
