@@ -39,6 +39,7 @@ import { useBlockScrollMemory } from '@/shared/hooks/useBlockScrollMemory'
 import { useScrollDirection } from '@/shared/hooks/useScrollDirection'
 import { useScrollIsolation } from '@/shared/hooks/useScrollIsolation'
 import { useScrollPosition } from '@/shared/hooks/useScrollPosition'
+import { CopyablePath } from '@/shared/ui/CopyablePath'
 import { ModeToggle } from '@/shared/ui/ModeToggle'
 import { SaveStatusIndicator } from '@/shared/ui/SaveStatusIndicator'
 import { ScrollToTopButton } from '@/shared/ui/ScrollToTopButton'
@@ -283,7 +284,9 @@ function AppContent() {
 
       const markdown = fixBlockNoteTableExport(exportToMarkdown(editor))
       await writeTextFile(filePath, markdown)
-      toast.success('Exported as Markdown')
+      toast.success('Exported as Markdown', {
+        description: <CopyablePath path={filePath} />,
+      })
     } catch {
       toast.error('Failed to export note')
     }
