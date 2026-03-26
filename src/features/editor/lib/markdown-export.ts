@@ -6,9 +6,46 @@ const TABLE_SEPARATOR_RE = /^\|[\s\-:|]+\|$/
 /** Matches a Markdown table row that contains only whitespace and pipes (no visible text). */
 const EMPTY_TABLE_ROW_RE = /^\|[\s|]*\|$/
 
+/** Block types that form continuous lists (no blank lines between siblings). */
+const LIST_BLOCK_TYPES = new Set([
+  'bulletListItem',
+  'numberedListItem',
+  'checkListItem',
+])
+
+/**
+ * Collapse loose-list blank lines into tight format.
+ * Removes blank lines that appear before a list marker (with optional indentation).
+ *
+ * @param md - Markdown string that may contain loose-list formatting
+ * @returns The same Markdown with inter-item blank lines removed
+ */
+function tightenList(md: string): string {
+  return md.replace(/\n\n(\s*(?:[*-]|\d+\.) )/g, '\n$1')
+}
+
+/** Checks whether a block is a list item (bullet, numbered, or checklist). */
+function isListBlock(block: PartialBlock): boolean {
+  return LIST_BLOCK_TYPES.has(block.type as string)
+}
+
+/** Checks whether a block is a toggle block (`toggleListItem` or a toggleable heading). */
+function isToggleBlock(block: PartialBlock): boolean {
+  if (block.type === 'toggleListItem') return true
+  if (
+    block.type === 'heading' &&
+    (block.props as { isToggleable?: boolean })?.isToggleable
+  )
+    return true
+  return false
+}
+
 /**
  * Converts BlockNote inline content (StyledText, Link, or plain string)
  * to a Markdown string with basic formatting preserved.
+ *
+ * @param content - Inline content array from a BlockNote block
+ * @returns Markdown-formatted string representation of the inline content
  */
 function inlineContentToMd(content: PartialBlock['content']): string {
   if (!content) return ''
@@ -42,14 +79,13 @@ function inlineContentToMd(content: PartialBlock['content']): string {
 /**
  * Recursively converts a BlockNote block to Markdown.
  * ToggleListItem and toggle Heading blocks are exported as `<details>` tags.
+ *
+ * @param block - A single BlockNote block to convert
+ * @param editor - The BlockNoteEditor instance used for fallback conversion
+ * @returns Markdown string for the given block
  */
 function blockToMd(block: PartialBlock, editor: BlockNoteEditor): string {
-  const isToggleListItem = block.type === 'toggleListItem'
-  const isToggleHeading =
-    block.type === 'heading' &&
-    (block.props as { isToggleable?: boolean })?.isToggleable
-
-  if (isToggleListItem || isToggleHeading) {
+  if (isToggleBlock(block)) {
     const title = inlineContentToMd(block.content)
     let body = ''
     if (block.children && block.children.length > 0) {
@@ -61,21 +97,69 @@ function blockToMd(block: PartialBlock, editor: BlockNoteEditor): string {
     return `<details>\n<summary>${title}</summary>${body}</details>`
   }
 
-  return editor.blocksToMarkdownLossy([block])
+  return editor.blocksToMarkdownLossy([block]).trimEnd()
 }
 
 /**
  * Exports the editor document to Markdown, converting toggle blocks
  * (ToggleListItem and toggle Heading) to `<details>` tags.
+ * Consecutive list items of the same type are grouped and exported
+ * as a tight list (no blank lines between items).
+ *
+ * @param editor - The BlockNoteEditor instance whose document will be exported
+ * @returns The full document as a Markdown string
  */
 export function exportToMarkdown(editor: BlockNoteEditor): string {
   const blocks = editor.document
-  return blocks.map((block) => blockToMd(block, editor)).join('\n\n')
+  const segments: string[] = []
+  let i = 0
+
+  while (i < blocks.length) {
+    const block = blocks[i]
+
+    if (isToggleBlock(block)) {
+      segments.push(blockToMd(block, editor))
+      i++
+      continue
+    }
+
+    // Group consecutive same-type list blocks for tight list output.
+    // Empty paragraphs break the group so intentional spacing is preserved.
+    if (isListBlock(block)) {
+      const group: PartialBlock[] = []
+      const listType = block.type
+      while (
+        i < blocks.length &&
+        blocks[i].type === listType &&
+        !isToggleBlock(blocks[i])
+      ) {
+        group.push(blocks[i])
+        i++
+      }
+      const md = editor.blocksToMarkdownLossy(group).trimEnd()
+      segments.push(tightenList(md))
+      continue
+    }
+
+    // Regular block
+    segments.push(editor.blocksToMarkdownLossy([block]).trimEnd())
+    i++
+  }
+
+  return segments.filter((s) => s.length > 0).join('\n\n')
 }
 
 /**
  * Fixes BlockNote's table export where an empty header row is inserted
  * above the actual header content.
+ *
+ * When BlockNote serialises a table, it may produce an empty first row
+ * followed by the separator and then the real header. This function
+ * detects that pattern and swaps the empty row with the real header row
+ * so standard Markdown parsers render the table correctly.
+ *
+ * @param markdown - Raw Markdown string potentially containing malformed tables
+ * @returns Corrected Markdown with properly ordered table header rows
  */
 export function fixBlockNoteTableExport(markdown: string): string {
   const lines = markdown.split('\n')
