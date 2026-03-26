@@ -1,4 +1,9 @@
-import type { BlockNoteEditor } from '@blocknote/core'
+import {
+  type BlockNoteEditor,
+  BlockNoteSchema,
+  createCodeBlockSpec,
+  defaultBlockSpecs,
+} from '@blocknote/core'
 import {
   FormattingToolbar,
   FormattingToolbarController,
@@ -36,12 +41,27 @@ import { useEditorFontSize } from '../hooks/useEditorFontSize'
 import { useLinkClickHandler } from '../hooks/useLinkClickHandler'
 import { useLinkPreview } from '../hooks/useLinkPreview'
 import { useSearchReplace } from '../hooks/useSearchReplace'
+import { codeBlockOptions } from '../lib/codeBlockConfig'
 import { DEFAULT_BLOCKS } from '../lib/constants'
 import { rangeCheckToggleExtension } from '../lib/rangeCheckToggle'
 import { HighlightButton } from './HighlightButton'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const BLOCKS = DEFAULT_BLOCKS as any
+
+/**
+ * Custom BlockNote schema with Shiki-powered syntax highlighting for code blocks.
+ *
+ * Replaces the default `codeBlock` spec with one configured via
+ * {@link codeBlockOptions}, which provides a Shiki highlighter and the full
+ * set of supported programming languages.
+ */
+const schema = BlockNoteSchema.create({
+  blockSpecs: {
+    ...defaultBlockSpecs,
+    codeBlock: createCodeBlockSpec(codeBlockOptions),
+  },
+})
 
 /**
  * Props for the {@link Editor} component.
@@ -130,6 +150,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   }, [saveStatus, onStatusChange])
 
   const editor = useCreateBlockNote({
+    schema,
     initialContent: DEFAULT_BLOCKS,
     pasteHandler,
     extensions: [
