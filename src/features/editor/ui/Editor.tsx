@@ -22,6 +22,7 @@ import { useSearchReplace } from "../hooks/useSearchReplace";
 import type { SaveStatus } from "..";
 import { DEFAULT_BLOCKS } from "../lib/constants";
 import { cursorCenteringExtension, searchExtension, useCursorCentering } from "..";
+import { rangeCheckToggleExtension } from "../lib/rangeCheckToggle";
 import { useEditorFontSize } from "../hooks/useEditorFontSize";
 import { useEditorFont } from "@/app/providers/editor-font-provider";
 import { useTheme } from "@/app/providers/theme-provider";
@@ -38,6 +39,8 @@ const BLOCKS = DEFAULT_BLOCKS as any;
  * @property onNoteSaved - Optional callback invoked after the note content is auto-saved.
  * @property onStatusChange - Optional callback invoked whenever the save status changes.
  * @property onContentLoaded - Optional callback invoked once the note content has finished loading.
+ * @property onSuggestionMenuOpen - Optional callback invoked with the cursor's `clientY`
+ *   coordinate when the suggestion menu (slash command palette) opens.
  */
 interface EditorProps {
   noteId: string | null;
@@ -48,6 +51,12 @@ interface EditorProps {
   onSuggestionMenuOpen?: (cursorClientY: number) => void;
 }
 
+/**
+ * Handle exposed by the {@link Editor} component via `React.forwardRef`.
+ *
+ * Provides imperative access to the underlying BlockNote editor instance,
+ * allowing parent components to read or manipulate editor state directly.
+ */
 export interface EditorHandle {
   /** The underlying BlockNote editor instance. */
   editor: BlockNoteEditor;
@@ -110,7 +119,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   const editor = useCreateBlockNote({
     initialContent: DEFAULT_BLOCKS,
     pasteHandler,
-    extensions: [cursorCenteringExtension, searchExtension],
+    extensions: [cursorCenteringExtension, searchExtension, rangeCheckToggleExtension()],
     uploadFile: uploadImage,
     resolveFileUrl: resolveImageUrl,
   });
