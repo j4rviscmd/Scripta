@@ -17,7 +17,6 @@
 
 import {
   BufferGeometry,
-  Clock,
   Float32BufferAttribute,
   Group,
   IcosahedronGeometry,
@@ -29,6 +28,7 @@ import {
   Points,
   PointsMaterial,
   Scene,
+  Timer,
   WebGLRenderer,
 } from 'three'
 
@@ -142,12 +142,13 @@ export function createSplashScene(
   scene.add(group)
 
   // ── Animation loop ────────────────────────────────────────
-  const clock = new Clock()
+  const timer = new Timer()
   let frameId = 0
 
   function animate() {
     frameId = requestAnimationFrame(animate)
-    const elapsed = clock.getElapsedTime()
+    timer.update()
+    const elapsed = timer.getElapsed()
     group.rotation.y = elapsed * ROTATION_SPEED_Y
     group.rotation.x = elapsed * ROTATION_SPEED_X
     ico.rotation.y = elapsed * 0.1
