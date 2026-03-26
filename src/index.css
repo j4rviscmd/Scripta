@@ -405,3 +405,33 @@ span[data-style-type="backgroundColor"][data-value="yellow"] {
   display: block;
   height: 20px;
 }
+
+/*
+ * Hide the drag-and-drop ghost image during block reordering.
+ *
+ * BlockNote clones the dragged block's DOM into a `.bn-drag-preview` element,
+ * appends it to `document.body`, and passes it to `setDragImage()` so the
+ * browser uses it as the drag ghost instead of its native snapshot.
+ *
+ * The library sets `opacity: .001` to make the preview nearly invisible.
+ * However, on WebKit engines (Tauri WKWebView / Safari) the browser captures
+ * the element's rendered bitmap for the ghost *before* applying opacity in
+ * some compositing paths, causing block text to show through as a faint
+ * semi-transparent image that follows the cursor.
+ *
+ * To fully suppress the ghost we:
+ *   1. Force `opacity: 0` (complete transparency).
+ *   2. Collapse the element to 1×1 px with hidden overflow so even if the
+ *      browser ignores opacity during ghost capture, there is no visible
+ *      content to render.
+ *   3. Set `color` and `background` to transparent as a belt-and-suspenders
+ *      guard against any remaining text or background bleed.
+ */
+.bn-drag-preview {
+  opacity: 0 !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  color: transparent !important;
+  background: transparent !important;
+}
