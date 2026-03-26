@@ -199,9 +199,20 @@ body {
   body {
     @apply bg-background text-foreground;
   }
-  .dark .bn-editor {
-    background-color: var(--background);
-  }
+}
+
+/*
+ * Dark-mode editor background override.
+ *
+ * BlockNote's `.bn-editor` sets `background-color` via the CSS variable
+ * `--bn-colors-editor-background` (defined in `@blocknote/shadcn/style.css`).
+ * Because its stylesheet lives outside any `@layer`, a rule declared inside
+ * Tailwind's `@layer base` loses the cascade battle.  Placing this rule
+ * **outside** `@layer base` ensures it wins over the library default, so the
+ * editor background matches the app's dark theme token.
+ */
+.dark .bn-editor {
+  background-color: var(--background);
 }
 
 /*
