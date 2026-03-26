@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
-import type { Group } from "../lib/types";
+import { useCallback, useEffect, useState } from 'react'
+import type { Note } from '@/features/editor'
 import {
-  listGroups,
   createGroup as apiCreateGroup,
-  renameGroup as apiRenameGroup,
   deleteGroup as apiDeleteGroup,
+  renameGroup as apiRenameGroup,
   reorderGroups as apiReorderGroups,
   setNoteGroup as apiSetNoteGroup,
-} from "../api/groups";
-import type { Note } from "@/features/editor";
+  listGroups,
+} from '../api/groups'
+import type { Group } from '../lib/types'
 
 /**
  * Manages group CRUD operations and state.
@@ -19,60 +19,57 @@ import type { Note } from "@/features/editor";
  * @param refreshKey - Bumped externally to trigger a re-fetch.
  * @param onRefresh - Called after any mutation so the parent can bump its own refresh counter.
  */
-export function useGroups(refreshKey: number, onRefresh: () => void) {
-  const [groups, setGroups] = useState<Group[]>([]);
+export function useGroups(_refreshKey: number, onRefresh: () => void) {
+  const [groups, setGroups] = useState<Group[]>([])
 
   useEffect(() => {
-    listGroups().then(setGroups).catch(console.error);
-  }, [refreshKey]);
+    listGroups().then(setGroups).catch(console.error)
+  }, [])
 
   const create = useCallback(
     async (name: string): Promise<Group> => {
-      const group = await apiCreateGroup(name);
-      onRefresh();
-      return group;
+      const group = await apiCreateGroup(name)
+      onRefresh()
+      return group
     },
-    [onRefresh],
-  );
+    [onRefresh]
+  )
 
   const rename = useCallback(
     async (id: string, name: string): Promise<void> => {
-      await apiRenameGroup(id, name);
-      onRefresh();
+      await apiRenameGroup(id, name)
+      onRefresh()
     },
-    [onRefresh],
-  );
+    [onRefresh]
+  )
 
   const remove = useCallback(
     async (id: string): Promise<void> => {
-      await apiDeleteGroup(id);
-      onRefresh();
+      await apiDeleteGroup(id)
+      onRefresh()
     },
-    [onRefresh],
-  );
+    [onRefresh]
+  )
 
-  const reorder = useCallback(
-    async (orderedIds: string[]): Promise<void> => {
-      // Optimistic update
-      setGroups((prev) => {
-        const map = new Map(prev.map((g) => [g.id, g]));
-        return orderedIds
-          .map((id) => map.get(id))
-          .filter((g): g is Group => g !== undefined);
-      });
-      await apiReorderGroups(orderedIds);
-    },
-    [],
-  );
+  const reorder = useCallback(async (orderedIds: string[]): Promise<void> => {
+    // Optimistic update
+    setGroups((prev) => {
+      const map = new Map(prev.map((g) => [g.id, g]))
+      return orderedIds
+        .map((id) => map.get(id))
+        .filter((g): g is Group => g !== undefined)
+    })
+    await apiReorderGroups(orderedIds)
+  }, [])
 
   const moveNote = useCallback(
     async (noteId: string, groupId: string | null): Promise<Note> => {
-      const note = await apiSetNoteGroup(noteId, groupId);
-      onRefresh();
-      return note;
+      const note = await apiSetNoteGroup(noteId, groupId)
+      onRefresh()
+      return note
     },
-    [onRefresh],
-  );
+    [onRefresh]
+  )
 
-  return { groups, create, rename, remove, reorder, moveNote };
+  return { groups, create, rename, remove, reorder, moveNote }
 }

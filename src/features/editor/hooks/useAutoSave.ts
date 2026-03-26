@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
-import { createNote, updateNote } from "../api/notes";
-import { extractTitle } from "../lib/constants";
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
+import { createNote, updateNote } from '../api/notes'
+import { extractTitle } from '../lib/constants'
 
 /** Possible auto-save statuses exposed for UI feedback. */
-export type SaveStatus = "idle" | "saving" | "saved" | "error";
+export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
 /**
  * Auto-save hook with configurable debounce delay.
@@ -37,15 +37,15 @@ export type SaveStatus = "idle" | "saving" | "saved" | "error";
 export function useAutoSave(
   delay = 500,
   initialNoteId?: string,
-  onNoteSaved?: (id: string) => void,
+  onNoteSaved?: (id: string) => void
 ) {
-  const contentRef = useRef<string>("");
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isFirstSave = useRef(!initialNoteId);
-  const noteIdRef = useRef<string | null>(initialNoteId ?? null);
-  const savingRef = useRef(false);
-  const dirtyRef = useRef(false);
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const contentRef = useRef<string>('')
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isFirstSave = useRef(!initialNoteId)
+  const noteIdRef = useRef<string | null>(initialNoteId ?? null)
+  const savingRef = useRef(false)
+  const dirtyRef = useRef(false)
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
 
   /**
    * Persists the current editor content to the backend.
@@ -60,47 +60,47 @@ export function useAutoSave(
    */
   const save = useCallback(
     async (silent = false) => {
-      if (savingRef.current) return;
-      savingRef.current = true;
+      if (savingRef.current) return
+      savingRef.current = true
 
-      if (!silent) setSaveStatus("saving");
+      if (!silent) setSaveStatus('saving')
 
       try {
-        const content = contentRef.current;
-        const title = extractTitle(content);
-        let savedId: string | null = null;
+        const content = contentRef.current
+        const title = extractTitle(content)
+        let savedId: string | null = null
 
         if (isFirstSave.current) {
-          const note = await createNote(title, content);
-          noteIdRef.current = note.id;
-          isFirstSave.current = false;
-          savedId = note.id;
+          const note = await createNote(title, content)
+          noteIdRef.current = note.id
+          isFirstSave.current = false
+          savedId = note.id
         } else if (noteIdRef.current) {
-          await updateNote(noteIdRef.current, title, content);
-          savedId = noteIdRef.current;
+          await updateNote(noteIdRef.current, title, content)
+          savedId = noteIdRef.current
         }
 
         if (savedId && !silent) {
-          dirtyRef.current = false;
-          onNoteSaved?.(savedId);
-          setSaveStatus("saved");
+          dirtyRef.current = false
+          onNoteSaved?.(savedId)
+          setSaveStatus('saved')
         }
       } catch (err) {
-        console.error("Auto-save failed:", err);
+        console.error('Auto-save failed:', err)
         if (!silent) {
-          setSaveStatus("error");
-          toast.error("Auto-save failed");
+          setSaveStatus('error')
+          toast.error('Auto-save failed')
         }
       } finally {
-        savingRef.current = false;
+        savingRef.current = false
       }
     },
-    [onNoteSaved],
-  );
+    [onNoteSaved]
+  )
 
   // Keep a stable ref to save so the cleanup effect doesn't need save in its deps.
-  const saveRef = useRef(save);
-  saveRef.current = save;
+  const saveRef = useRef(save)
+  saveRef.current = save
 
   /**
    * Schedules a debounced save of the given editor content.
@@ -112,14 +112,14 @@ export function useAutoSave(
    */
   const scheduleSave = useCallback(
     (content: string) => {
-      contentRef.current = content;
-      dirtyRef.current = true;
-      setSaveStatus("idle");
-      clearTimeout(timerRef.current!);
-      timerRef.current = setTimeout(save, delay);
+      contentRef.current = content
+      dirtyRef.current = true
+      setSaveStatus('idle')
+      clearTimeout(timerRef.current!)
+      timerRef.current = setTimeout(save, delay)
     },
-    [save, delay],
-  );
+    [save, delay]
+  )
 
   /**
    * Cleanup effect that flushes unsaved content on unmount.
@@ -130,12 +130,12 @@ export function useAutoSave(
    */
   useEffect(() => {
     return () => {
-      clearTimeout(timerRef.current!);
+      clearTimeout(timerRef.current!)
       if (dirtyRef.current) {
-        saveRef.current(true);
+        saveRef.current(true)
       }
-    };
-  }, []);
+    }
+  }, [])
 
-  return { noteIdRef, scheduleSave, saveStatus };
+  return { noteIdRef, scheduleSave, saveStatus }
 }

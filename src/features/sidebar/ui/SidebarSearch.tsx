@@ -1,12 +1,12 @@
-import { Search, Plus, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { SidebarHeader } from "@/components/ui/sidebar";
+import { Plus, Search, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { SidebarHeader } from '@/components/ui/sidebar'
 
 interface SidebarSearchProps {
-  query: string;
-  onQueryChange: (query: string) => void;
-  onNewNote: () => void;
+  query: string
+  onQueryChange: (query: string) => void
+  onNewNote: () => void
 }
 
 /**
@@ -20,19 +20,19 @@ export function SidebarSearch({
   return (
     <SidebarHeader className="flex flex-row items-center gap-2 border-b px-3 py-2">
       <div className="relative flex-1">
-        <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Search className="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
           placeholder="Search notes..."
-          className="h-8 pl-8 pr-8 text-sm bg-muted/50 border-transparent focus:border-border focus:bg-background"
+          className="h-8 border-transparent bg-muted/50 pr-8 pl-8 text-sm focus:border-border focus:bg-background"
         />
         {query && (
           <Button
             variant="ghost"
             size="icon"
-            className="absolute right-1 top-1/2 h-5 w-5 -translate-y-1/2"
-            onClick={() => onQueryChange("")}
+            className="absolute top-1/2 right-1 h-5 w-5 -translate-y-1/2"
+            onClick={() => onQueryChange('')}
           >
             <X className="h-3.5 w-3.5" />
           </Button>
@@ -47,5 +47,5 @@ export function SidebarSearch({
         <Plus className="h-4 w-4" />
       </Button>
     </SidebarHeader>
-  );
+  )
 }

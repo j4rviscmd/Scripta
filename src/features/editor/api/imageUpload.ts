@@ -1,11 +1,11 @@
-import { writeFile, mkdir } from "@tauri-apps/plugin-fs";
-import { convertFileSrc } from "@tauri-apps/api/core";
-import { appDataDir, join } from "@tauri-apps/api/path";
+import { convertFileSrc } from '@tauri-apps/api/core'
+import { appDataDir, join } from '@tauri-apps/api/path'
+import { mkdir, writeFile } from '@tauri-apps/plugin-fs'
 import {
-  MAX_IMAGE_SIZE_BYTES,
-  IMAGE_DIR,
   ALLOWED_IMAGE_TYPES,
-} from "../lib/imageUploadConfig";
+  IMAGE_DIR,
+  MAX_IMAGE_SIZE_BYTES,
+} from '../lib/imageUploadConfig'
 
 /**
  * Generates a unique filename by combining a UUID v4 with the original file extension.
@@ -22,8 +22,8 @@ import {
  * ```
  */
 function generateUniqueFileName(originalName: string): string {
-  const ext = originalName.split(".").pop() ?? "png";
-  return `${crypto.randomUUID()}.${ext}`;
+  const ext = originalName.split('.').pop() ?? 'png'
+  return `${crypto.randomUUID()}.${ext}`
 }
 
 /**
@@ -43,23 +43,27 @@ function generateUniqueFileName(originalName: string): string {
  * ```
  */
 function validateImage(file: File): void {
-  if (!ALLOWED_IMAGE_TYPES.includes(file.type as (typeof ALLOWED_IMAGE_TYPES)[number])) {
-    throw new Error(`Unsupported file type: ${file.type}`);
+  if (
+    !ALLOWED_IMAGE_TYPES.includes(
+      file.type as (typeof ALLOWED_IMAGE_TYPES)[number]
+    )
+  ) {
+    throw new Error(`Unsupported file type: ${file.type}`)
   }
   if (file.size > MAX_IMAGE_SIZE_BYTES) {
     throw new Error(
-      `File size (${(file.size / 1024 / 1024).toFixed(1)}MB) exceeds the ${MAX_IMAGE_SIZE_BYTES / 1024 / 1024}MB limit.`,
-    );
+      `File size (${(file.size / 1024 / 1024).toFixed(1)}MB) exceeds the ${MAX_IMAGE_SIZE_BYTES / 1024 / 1024}MB limit.`
+    )
   }
 }
 
 /** Return type of {@link uploadImage}, compatible with BlockNote's `uploadFile` interface. */
 export interface ImageUploadResult {
   props: {
-    url: string;
-    name: string;
-    caption: string;
-  };
+    url: string
+    name: string
+    caption: string
+  }
 }
 
 /**
@@ -89,20 +93,20 @@ export interface ImageUploadResult {
  * ```
  */
 export async function uploadImage(file: File): Promise<ImageUploadResult> {
-  validateImage(file);
+  validateImage(file)
 
-  const fileName = generateUniqueFileName(file.name);
+  const fileName = generateUniqueFileName(file.name)
 
-  const appDir = await appDataDir();
-  const dirPath = await join(appDir, IMAGE_DIR);
+  const appDir = await appDataDir()
+  const dirPath = await join(appDir, IMAGE_DIR)
 
-  await mkdir(dirPath, { recursive: true });
+  await mkdir(dirPath, { recursive: true })
 
-  const filePath = await join(dirPath, fileName);
-  await writeFile(filePath, new Uint8Array(await file.arrayBuffer()));
+  const filePath = await join(dirPath, fileName)
+  await writeFile(filePath, new Uint8Array(await file.arrayBuffer()))
 
-  const url = convertFileSrc(filePath);
-  const caption = file.name || "image";
+  const url = convertFileSrc(filePath)
+  const caption = file.name || 'image'
 
   return {
     props: {
@@ -110,7 +114,7 @@ export async function uploadImage(file: File): Promise<ImageUploadResult> {
       name: file.name,
       caption,
     },
-  };
+  }
 }
 
 /**
@@ -130,5 +134,5 @@ export async function uploadImage(file: File): Promise<ImageUploadResult> {
  * ```
  */
 export async function resolveImageUrl(url: string): Promise<string> {
-  return url;
+  return url
 }

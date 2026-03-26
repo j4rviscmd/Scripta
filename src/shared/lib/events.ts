@@ -7,4 +7,4 @@
  */
 
 /** Dispatched on `document` when cursor-centering triggers a scroll. */
-export const CENTERING_EVENT = "scripta:centering";
+export const CENTERING_EVENT = 'scripta:centering'

@@ -1,15 +1,15 @@
-import { createExtension } from "@blocknote/core";
-import { Plugin } from "prosemirror-state";
-import type { EditorView } from "prosemirror-view";
-import { cursorCenteringConfig } from "./cursorCenteringConfig";
-import { CENTERING_EVENT } from "@/shared/lib/events";
+import { createExtension } from '@blocknote/core'
+import { Plugin } from 'prosemirror-state'
+import type { EditorView } from 'prosemirror-view'
+import { CENTERING_EVENT } from '@/shared/lib/events'
+import { cursorCenteringConfig } from './cursorCenteringConfig'
 
 /**
  * Bottom scroll-margin (px) passed to ProseMirror so that
  * `handleScrollToSelection` fires before the cursor reaches the
  * viewport edge, giving us room to reposition it.
  */
-const SCROLL_MARGIN_BOTTOM = 250;
+const SCROLL_MARGIN_BOTTOM = 250
 
 /**
  * Walks up the DOM from `el` and returns the first ancestor whose
@@ -19,15 +19,15 @@ const SCROLL_MARGIN_BOTTOM = 250;
  * @returns The nearest scrollable ancestor, or `null` if none is found.
  */
 function findScrollContainer(el: HTMLElement): HTMLElement | null {
-  let current: HTMLElement | null = el;
+  let current: HTMLElement | null = el
   while (current) {
-    const style = getComputedStyle(current);
-    if (style.overflowY === "auto" || style.overflowY === "scroll") {
-      return current;
+    const style = getComputedStyle(current)
+    if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
+      return current
     }
-    current = current.parentElement;
+    current = current.parentElement
   }
-  return null;
+  return null
 }
 
 /**
@@ -41,33 +41,33 @@ function findScrollContainer(el: HTMLElement): HTMLElement | null {
  * @returns `true` if a scroll was scheduled, `false` otherwise.
  */
 function centerCursorIfBelowTarget(view: EditorView): boolean {
-  const container = findScrollContainer(view.dom);
-  if (!container) return false;
+  const container = findScrollContainer(view.dom)
+  if (!container) return false
 
-  const { from, to } = view.state.selection;
-  if (from !== to) return false; // text selection in progress
+  const { from, to } = view.state.selection
+  if (from !== to) return false // text selection in progress
 
-  const coords = view.coordsAtPos(from);
-  const rect = container.getBoundingClientRect();
+  const coords = view.coordsAtPos(from)
+  const rect = container.getBoundingClientRect()
 
-  const targetY = rect.top + rect.height * cursorCenteringConfig.targetRatio;
-  const scrollTop = container.scrollTop;
-  const desired = scrollTop + (coords.top - targetY);
+  const targetY = rect.top + rect.height * cursorCenteringConfig.targetRatio
+  const scrollTop = container.scrollTop
+  const desired = scrollTop + (coords.top - targetY)
 
   // Not enough content above the cursor to center — skip
-  if (desired <= 0) return false;
+  if (desired <= 0) return false
 
-  const maxScroll = container.scrollHeight - container.clientHeight;
-  const clamped = Math.max(0, Math.min(desired, maxScroll));
+  const maxScroll = container.scrollHeight - container.clientHeight
+  const clamped = Math.max(0, Math.min(desired, maxScroll))
 
   if (Math.abs(clamped - scrollTop) > 2) {
     requestAnimationFrame(() => {
-      container.scrollTo({ top: clamped, behavior: "smooth" });
-    });
-    return true;
+      container.scrollTo({ top: clamped, behavior: 'smooth' })
+    })
+    return true
   }
 
-  return false;
+  return false
 }
 
 /**
@@ -78,7 +78,7 @@ function centerCursorIfBelowTarget(view: EditorView): boolean {
  * `state.apply()` is guaranteed to run before
  * `handleScrollToSelection` in ProseMirror's `updateStateInner`.
  */
-let docChangedInLastTr = false;
+let docChangedInLastTr = false
 
 /**
  * BlockNote extension that keeps the text cursor at the configured
@@ -98,16 +98,16 @@ let docChangedInLastTr = false;
  *   documents keep the cursor near the top (no centre-jump).
  */
 export const cursorCenteringExtension = createExtension({
-  key: "cursorCentering",
+  key: 'cursorCentering',
   prosemirrorPlugins: [
     new Plugin({
       state: {
         init() {
-          return {};
+          return {}
         },
         apply(tr) {
-          docChangedInLastTr = tr.docChanged;
-          return {};
+          docChangedInLastTr = tr.docChanged
+          return {}
         },
       },
       props: {
@@ -118,13 +118,13 @@ export const cursorCenteringExtension = createExtension({
           left: 0,
         },
         handleScrollToSelection(view: EditorView): boolean {
-          if (!cursorCenteringConfig.enabled) return false;
-          if (!docChangedInLastTr) return false;
-          docChangedInLastTr = false;
-          document.dispatchEvent(new CustomEvent(CENTERING_EVENT));
-          return centerCursorIfBelowTarget(view);
+          if (!cursorCenteringConfig.enabled) return false
+          if (!docChangedInLastTr) return false
+          docChangedInLastTr = false
+          document.dispatchEvent(new CustomEvent(CENTERING_EVENT))
+          return centerCursorIfBelowTarget(view)
         },
       },
     }),
   ],
-});
+})

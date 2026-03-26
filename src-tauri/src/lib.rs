@@ -44,7 +44,7 @@ pub fn run() {
                 .build(),
         )
         .setup(|app| {
-            db::init_db(&app.handle())?;
+            db::init_db(app.handle())?;
             app.manage(link_preview::LinkPreviewCache(std::sync::Mutex::new(
                 std::collections::HashMap::new(),
             )));

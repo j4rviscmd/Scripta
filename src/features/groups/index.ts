@@ -1,23 +1,22 @@
 // Types
-export type { Group, DateBucket, GroupWithNotes } from "./lib/types";
 
 // API
 export {
-  listGroups,
   createGroup,
-  renameGroup,
   deleteGroup,
+  listGroups,
+  renameGroup,
   reorderGroups,
   setNoteGroup,
-} from "./api/groups";
+} from './api/groups'
+export { useGroupCollapse } from './hooks/useGroupCollapse'
 
 // Hooks
-export { useGroups } from "./hooks/useGroups";
-export { useGroupCollapse } from "./hooks/useGroupCollapse";
-
+export { useGroups } from './hooks/useGroups'
 // Pure logic
 export {
   bucketByDate,
-  partitionByGroup,
   formatRelativeDate,
-} from "./lib/grouping";
+  partitionByGroup,
+} from './lib/grouping'
+export type { DateBucket, Group, GroupWithNotes } from './lib/types'

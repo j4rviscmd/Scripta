@@ -1,20 +1,20 @@
-import { ChevronRight, Inbox } from "lucide-react";
-import { useDroppable } from "@dnd-kit/core";
+import { useDroppable } from '@dnd-kit/core'
+import { ChevronRight, Inbox } from 'lucide-react'
 import {
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarGroupContent,
-} from "@/components/ui/sidebar";
-import { cn } from "@/lib/utils";
-import type { Note } from "@/features/editor";
-import type { DateBucket } from "@/features/groups";
-import { DateGroup } from "./DateGroup";
+  SidebarGroupLabel,
+} from '@/components/ui/sidebar'
+import type { Note } from '@/features/editor'
+import type { DateBucket } from '@/features/groups'
+import { cn } from '@/lib/utils'
+import { DateGroup } from './DateGroup'
 
 interface UncategorizedSectionProps {
-  dateBuckets: DateBucket[];
-  isCollapsed: boolean;
-  onToggleCollapse: () => void;
-  renderNoteItem: (note: Note) => React.ReactNode;
+  dateBuckets: DateBucket[]
+  isCollapsed: boolean
+  onToggleCollapse: () => void
+  renderNoteItem: (note: Note) => React.ReactNode
 }
 
 /**
@@ -29,30 +29,30 @@ export function UncategorizedSection({
   onToggleCollapse,
   renderNoteItem,
 }: UncategorizedSectionProps) {
-  const noteCount = dateBuckets.reduce((sum, b) => sum + b.items.length, 0);
+  const noteCount = dateBuckets.reduce((sum, b) => sum + b.items.length, 0)
 
   const { setNodeRef, isOver } = useDroppable({
-    id: "drop-uncategorized",
-    data: { type: "uncategorized" },
-  });
+    id: 'drop-uncategorized',
+    data: { type: 'uncategorized' },
+  })
 
-  if (noteCount === 0) return null;
+  if (noteCount === 0) return null
 
   return (
     <SidebarGroup>
       <SidebarGroupLabel
         ref={setNodeRef}
         className={cn(
-          "cursor-pointer select-none hover:bg-sidebar-accent/50 rounded-md transition-colors",
-          isOver && "bg-primary/10 ring-1 ring-primary/30",
+          'cursor-pointer select-none rounded-md transition-colors hover:bg-sidebar-accent/50',
+          isOver && 'bg-primary/10 ring-1 ring-primary/30'
         )}
         onClick={onToggleCollapse}
       >
-        <div className="flex items-center gap-1 flex-1">
+        <div className="flex flex-1 items-center gap-1">
           <ChevronRight
             className={cn(
-              "h-3 w-3 shrink-0 transition-transform duration-200",
-              !isCollapsed && "rotate-90",
+              'h-3 w-3 shrink-0 transition-transform duration-200',
+              !isCollapsed && 'rotate-90'
             )}
           />
           <Inbox className="h-3 w-3 shrink-0" />
@@ -76,5 +76,5 @@ export function UncategorizedSection({
         </SidebarGroupContent>
       )}
     </SidebarGroup>
-  );
+  )
 }

@@ -1,42 +1,53 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react";
+import {
+  type BlockNoteEditor,
+  BlockNoteSchema,
+  createCodeBlockSpec,
+  defaultBlockSpecs,
+} from '@blocknote/core'
 import {
   FormattingToolbar,
   FormattingToolbarController,
   getFormattingToolbarItems,
-  useCreateBlockNote,
   LinkToolbarController,
-} from "@blocknote/react";
+  useCreateBlockNote,
+} from '@blocknote/react'
+import { BlockNoteView } from '@blocknote/shadcn'
 import {
-  BlockNoteSchema,
-  defaultBlockSpecs,
-  createCodeBlockSpec,
-} from "@blocknote/core";
-import type { BlockNoteEditor } from "@blocknote/core";
-import { BlockNoteView } from "@blocknote/shadcn";
-import { CustomLinkToolbar } from "./CustomLinkToolbar";
-import { SearchReplacePanel } from "./SearchReplacePanel";
-import "@blocknote/shadcn/style.css";
-import "@blocknote/core/fonts/inter.css";
-import { toast } from "sonner";
-import { getNote } from "../api/notes";
-import { useAutoSave } from "../hooks/useAutoSave";
-import { useLinkPreview } from "../hooks/useLinkPreview";
-import { useLinkClickHandler } from "../hooks/useLinkClickHandler";
-import { useCopyToast } from "../hooks/useCopyToast";
-import { useSearchReplace } from "../hooks/useSearchReplace";
-import type { SaveStatus } from "..";
-import { DEFAULT_BLOCKS } from "../lib/constants";
-import { cursorCenteringExtension, searchExtension, useCursorCentering } from "..";
-import { rangeCheckToggleExtension } from "../lib/rangeCheckToggle";
-import { useEditorFontSize } from "../hooks/useEditorFontSize";
-import { useEditorFont } from "@/app/providers/editor-font-provider";
-import { useTheme } from "@/app/providers/theme-provider";
-import { HighlightButton } from "./HighlightButton";
-import { uploadImage, resolveImageUrl } from "..";
-import { codeBlockOptions } from "../lib/codeBlockConfig";
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+} from 'react'
+import { CustomLinkToolbar } from './CustomLinkToolbar'
+import { SearchReplacePanel } from './SearchReplacePanel'
+import '@blocknote/shadcn/style.css'
+import '@blocknote/core/fonts/inter.css'
+import { toast } from 'sonner'
+import { useEditorFont } from '@/app/providers/editor-font-provider'
+import { useTheme } from '@/app/providers/theme-provider'
+import type { SaveStatus } from '..'
+import {
+  cursorCenteringExtension,
+  resolveImageUrl,
+  searchExtension,
+  uploadImage,
+  useCursorCentering,
+} from '..'
+import { getNote } from '../api/notes'
+import { useAutoSave } from '../hooks/useAutoSave'
+import { useCopyToast } from '../hooks/useCopyToast'
+import { useEditorFontSize } from '../hooks/useEditorFontSize'
+import { useLinkClickHandler } from '../hooks/useLinkClickHandler'
+import { useLinkPreview } from '../hooks/useLinkPreview'
+import { useSearchReplace } from '../hooks/useSearchReplace'
+import { DEFAULT_BLOCKS } from '../lib/constants'
+import { rangeCheckToggleExtension } from '../lib/rangeCheckToggle'
+import { codeBlockOptions } from '../lib/codeBlockConfig'
+import { HighlightButton } from './HighlightButton'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const BLOCKS = DEFAULT_BLOCKS as any;
+const BLOCKS = DEFAULT_BLOCKS as any
 
 /**
  * Custom BlockNote schema with Shiki-powered syntax highlighting for code blocks.
@@ -63,12 +74,12 @@ const schema = BlockNoteSchema.create({
  *   coordinate when the suggestion menu (slash command palette) opens.
  */
 interface EditorProps {
-  noteId: string | null;
-  onNoteSaved?: (id: string) => void;
-  onStatusChange?: (status: SaveStatus) => void;
-  onContentLoaded?: () => void;
+  noteId: string | null
+  onNoteSaved?: (id: string) => void
+  onStatusChange?: (status: SaveStatus) => void
+  onContentLoaded?: () => void
   /** Called with the cursor's clientY coordinate when the suggestion menu (slash command palette) opens. */
-  onSuggestionMenuOpen?: (cursorClientY: number) => void;
+  onSuggestionMenuOpen?: (cursorClientY: number) => void
 }
 
 /**
@@ -79,7 +90,7 @@ interface EditorProps {
  */
 export interface EditorHandle {
   /** The underlying BlockNote editor instance. */
-  editor: BlockNoteEditor;
+  editor: BlockNoteEditor
 }
 
 /**
@@ -89,19 +100,17 @@ export interface EditorHandle {
  * @returns The augmented array of formatting toolbar React elements.
  */
 function buildFormattingToolbarItems() {
-  const items = getFormattingToolbarItems();
-  const colorIndex = items.findIndex(
-    (item) => item.key === "colorStyleButton",
-  );
-  if (colorIndex === -1) return items;
+  const items = getFormattingToolbarItems()
+  const colorIndex = items.findIndex((item) => item.key === 'colorStyleButton')
+  if (colorIndex === -1) return items
   return [
     ...items.slice(0, colorIndex + 1),
     <HighlightButton key="highlightButton" />,
     ...items.slice(colorIndex + 1),
-  ];
+  ]
 }
 
-const formattingToolbarItems = buildFormattingToolbarItems();
+const formattingToolbarItems = buildFormattingToolbarItems()
 
 /**
  * BlockNote-based rich-text editor with auto-save, link handling,
@@ -120,35 +129,43 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     onContentLoaded,
     onSuggestionMenuOpen,
   },
-  ref,
+  ref
 ) {
-  const loadingRef = useRef(true);
-  const { resolvedTheme } = useTheme();
-  const { fontSize } = useEditorFontSize();
-  const { fontFamily } = useEditorFont();
+  const loadingRef = useRef(true)
+  const { resolvedTheme } = useTheme()
+  const { fontSize } = useEditorFontSize()
+  const { fontFamily } = useEditorFont()
 
-  useCursorCentering();
+  useCursorCentering()
 
-  const { scheduleSave, saveStatus } = useAutoSave(500, noteId ?? undefined, onNoteSaved);
-  const pasteHandler = useLinkPreview();
+  const { scheduleSave, saveStatus } = useAutoSave(
+    500,
+    noteId ?? undefined,
+    onNoteSaved
+  )
+  const pasteHandler = useLinkPreview()
 
   useEffect(() => {
-    onStatusChange?.(saveStatus);
-  }, [saveStatus, onStatusChange]);
+    onStatusChange?.(saveStatus)
+  }, [saveStatus, onStatusChange])
 
   const editor = useCreateBlockNote({
     schema,
     initialContent: DEFAULT_BLOCKS,
     pasteHandler,
-    extensions: [cursorCenteringExtension, searchExtension, rangeCheckToggleExtension()],
+    extensions: [
+      cursorCenteringExtension,
+      searchExtension,
+      rangeCheckToggleExtension(),
+    ],
     uploadFile: uploadImage,
     resolveFileUrl: resolveImageUrl,
-  });
+  })
 
-  useImperativeHandle(ref, () => ({ editor }), [editor]);
+  useImperativeHandle(ref, () => ({ editor }), [editor])
 
-  useLinkClickHandler(editor);
-  useCopyToast(editor);
+  useLinkClickHandler(editor)
+  useCopyToast(editor)
 
   /**
    * After every file upload completes, ensure the uploaded image block has a
@@ -167,29 +184,29 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
    */
   useEffect(() => {
     const onUploadEnd = (blockId?: string) => {
-      if (!blockId) return;
-      const block = editor.getBlock(blockId);
+      if (!blockId) return
+      const block = editor.getBlock(blockId)
       if (
         block &&
-        block.type === "image" &&
-        typeof block.props === "object" &&
+        block.type === 'image' &&
+        typeof block.props === 'object' &&
         block.props !== null &&
-        "caption" in block.props &&
-        (block.props as Record<string, unknown>).caption === ""
+        'caption' in block.props &&
+        (block.props as Record<string, unknown>).caption === ''
       ) {
         const name =
-          ("name" in block.props &&
-            typeof (block.props as Record<string, unknown>).name === "string" &&
+          ('name' in block.props &&
+            typeof (block.props as Record<string, unknown>).name === 'string' &&
             (block.props as Record<string, unknown>).name) ||
-          "image";
+          'image'
         editor.updateBlock(block, {
           props: { caption: name as string },
-        } as any);
+        } as any)
       }
-    };
+    }
 
-    return editor.onUploadEnd(onUploadEnd);
-  }, [editor]);
+    return editor.onUploadEnd(onUploadEnd)
+  }, [editor])
 
   /**
    * Subscribes to the BlockNote SuggestionMenu extension store and calls
@@ -204,49 +221,58 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
    * callback and may not yet be available when the React `useEffect` first runs.
    */
   useEffect(() => {
-    if (!onSuggestionMenuOpen) return;
+    if (!onSuggestionMenuOpen) return
 
     // Narrowed by the guard above — safe to capture in the closure.
-    const notifyOpen = onSuggestionMenuOpen;
-    let unsubscribeStore: (() => void) | undefined;
+    const notifyOpen = onSuggestionMenuOpen
+    let unsubscribeStore: (() => void) | undefined
 
     function setupStoreSubscription() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ext = editor.getExtension("suggestionMenu") as { store: { state: unknown; subscribe: (cb: () => void) => () => void } } | undefined;
-      if (!ext) return;
+      const ext = editor.getExtension('suggestionMenu') as
+        | {
+            store: {
+              state: unknown
+              subscribe: (cb: () => void) => () => void
+            }
+          }
+        | undefined
+      if (!ext) return
 
       // Start with wasShown = false regardless of the initial store state,
       // so that the first transition to shown always triggers the callback.
-      let wasShown = false;
+      let wasShown = false
       unsubscribeStore = ext.store.subscribe(() => {
-        const state = ext.store.state as { show?: boolean; referencePos?: DOMRect } | undefined;
+        const state = ext.store.state as
+          | { show?: boolean; referencePos?: DOMRect }
+          | undefined
         // BlockNote's UiElementPosition always has a `show` boolean; use it
         // instead of checking for undefined so we correctly track open/close.
-        const isShown = state?.show === true;
+        const isShown = state?.show === true
         if (isShown && !wasShown) {
-          const cursorClientY = state?.referencePos?.top ?? 0;
+          const cursorClientY = state?.referencePos?.top ?? 0
           // Defer the scroll so it runs after ProseMirror's own scrollIntoView
           // (which fires synchronously on the same transaction).
-          requestAnimationFrame(() => notifyOpen(cursorClientY));
+          requestAnimationFrame(() => notifyOpen(cursorClientY))
         }
-        wasShown = isShown;
-      });
+        wasShown = isShown
+      })
     }
 
     // editor.onMount() returns an unsubscribe function at runtime even though
     // the TypeScript declaration says void. We cast to capture it for cleanup.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const unsubscribeMount = (editor.onMount as any)(() => {
-      setupStoreSubscription();
-    }) as (() => void) | void;
+      setupStoreSubscription()
+    }) as (() => void) | undefined
 
     return () => {
-      unsubscribeMount?.();
-      unsubscribeStore?.();
-    };
-  }, [editor, onSuggestionMenuOpen]);
+      unsubscribeMount?.()
+      unsubscribeStore?.()
+    }
+  }, [editor, onSuggestionMenuOpen])
 
-  const search = useSearchReplace(editor);
+  const search = useSearchReplace(editor)
 
   /**
    * Walks the editor document tree and sets `caption` to `"image"` on any
@@ -264,24 +290,24 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     const walk = (blocks: typeof editor.document) => {
       for (const block of blocks) {
         if (
-          block.type === "image" &&
-          typeof block.props === "object" &&
+          block.type === 'image' &&
+          typeof block.props === 'object' &&
           block.props !== null &&
-          "caption" in block.props &&
-          (block.props as Record<string, unknown>).caption === ""
+          'caption' in block.props &&
+          (block.props as Record<string, unknown>).caption === ''
         ) {
-          const props = block.props as Record<string, unknown>;
+          const props = block.props as Record<string, unknown>
           const caption =
-            (typeof props.name === "string" && props.name) || "image";
-          editor.updateBlock(block, { props: { caption } } as any);
+            (typeof props.name === 'string' && props.name) || 'image'
+          editor.updateBlock(block, { props: { caption } } as any)
         }
         if (block.children?.length) {
-          walk(block.children);
+          walk(block.children)
         }
       }
-    };
-    walk(editor.document);
-  }, [editor]);
+    }
+    walk(editor.document)
+  }, [editor])
 
   /**
    * Loads note content into the BlockNote editor when `noteId` changes.
@@ -297,67 +323,75 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
    * loading.
    */
   useEffect(() => {
-    let stale = false;
-    loadingRef.current = true;
+    let stale = false
+    loadingRef.current = true
     if (!noteId) {
-      editor.replaceBlocks(editor.document, BLOCKS);
-      backfillImageCaptions();
+      editor.replaceBlocks(editor.document, BLOCKS)
+      backfillImageCaptions()
       queueMicrotask(() => {
         if (!stale) {
-          loadingRef.current = false;
-          onContentLoaded?.();
+          loadingRef.current = false
+          onContentLoaded?.()
         }
-      });
-      return;
+      })
+      return
     }
 
     getNote(noteId)
       .then((note) => {
-        if (stale) return;
+        if (stale) return
         if (note) {
           try {
-            editor.replaceBlocks(editor.document, JSON.parse(note.content) as any);
+            editor.replaceBlocks(
+              editor.document,
+              JSON.parse(note.content) as any
+            )
           } catch {
-            editor.replaceBlocks(editor.document, BLOCKS);
+            editor.replaceBlocks(editor.document, BLOCKS)
           }
-          backfillImageCaptions();
+          backfillImageCaptions()
         } else {
-          toast.error("Note not found");
+          toast.error('Note not found')
         }
       })
       .catch(() => {
-        if (!stale) toast.error("Failed to load note");
+        if (!stale) toast.error('Failed to load note')
       })
       .finally(() => {
         if (!stale) {
-          loadingRef.current = false;
-          onContentLoaded?.();
+          loadingRef.current = false
+          onContentLoaded?.()
         }
-      });
+      })
 
     return () => {
-      stale = true;
-    };
-  }, [noteId, editor, backfillImageCaptions]);
+      stale = true
+    }
+  }, [noteId, editor, backfillImageCaptions, onContentLoaded])
 
   const handleChange = useCallback(() => {
-    if (loadingRef.current) return;
+    if (loadingRef.current) return
     // Ensure every image block has a non-empty caption so the bubble menu
     // hover-target always exists (issue #40).  This covers the `text/html`
     // paste path where `onUploadEnd` is not fired (e.g. right-click → Copy
     // Image in Chrome).  `backfillImageCaptions` only calls `updateBlock`
     // when it actually finds an empty caption, so the subsequent re-trigger
     // of `onChange` is a no-op and does not cause an infinite loop.
-    backfillImageCaptions();
-    scheduleSave(JSON.stringify(editor.document));
-  }, [editor, scheduleSave, backfillImageCaptions]);
+    backfillImageCaptions()
+    scheduleSave(JSON.stringify(editor.document))
+  }, [editor, scheduleSave, backfillImageCaptions])
 
   return (
     <>
       <div
         className="w-full px-8 pb-[60vh]"
         data-editor-root
-        style={{ "--editor-font-size": `${fontSize}px`, "--editor-font-family": fontFamily } as React.CSSProperties}
+        style={
+          {
+            '--editor-font-size': `${fontSize}px`,
+            '--editor-font-family': fontFamily,
+          } as React.CSSProperties
+        }
       >
         <BlockNoteView
           editor={editor}
@@ -373,12 +407,10 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
               </FormattingToolbar>
             )}
           />
-          <LinkToolbarController
-            linkToolbar={CustomLinkToolbar}
-          />
+          <LinkToolbarController linkToolbar={CustomLinkToolbar} />
         </BlockNoteView>
       </div>
       <SearchReplacePanel {...search} />
     </>
-  );
-});
+  )
+})

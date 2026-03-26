@@ -13,17 +13,17 @@
  * completes, the state moves to `done` and the splash can be unmounted.
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { storeInitPromise } from "@/app/providers/store-provider";
-import { MIN_DISPLAY_MS, FADE_DURATION_MS } from "../lib/constants";
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { storeInitPromise } from '@/app/providers/store-provider'
+import { FADE_DURATION_MS, MIN_DISPLAY_MS } from '../lib/constants'
 
-type SplashPhase = "active" | "fading" | "done";
+type SplashPhase = 'active' | 'fading' | 'done'
 
 interface SplashLifecycle {
   /** Current phase of the splash screen. */
-  phase: SplashPhase;
+  phase: SplashPhase
   /** Handler to attach to the overlay's `onTransitionEnd` event. */
-  onFadeComplete: () => void;
+  onFadeComplete: () => void
 }
 
 /**
@@ -33,33 +33,33 @@ interface SplashLifecycle {
  *          fade-out transition end event.
  */
 export function useSplashLifecycle(): SplashLifecycle {
-  const [phase, setPhase] = useState<SplashPhase>("active");
-  const disposedRef = useRef(false);
+  const [phase, setPhase] = useState<SplashPhase>('active')
+  const disposedRef = useRef(false)
 
   useEffect(() => {
-    disposedRef.current = false;
+    disposedRef.current = false
 
     const minTimer = new Promise<void>((resolve) =>
-      setTimeout(resolve, MIN_DISPLAY_MS),
-    );
+      setTimeout(resolve, MIN_DISPLAY_MS)
+    )
 
     Promise.all([storeInitPromise, minTimer]).then(() => {
       if (!disposedRef.current) {
-        setPhase("fading");
+        setPhase('fading')
       }
-    });
+    })
 
     return () => {
-      disposedRef.current = true;
-    };
-  }, []);
+      disposedRef.current = true
+    }
+  }, [])
 
   const onFadeComplete = useCallback(() => {
-    setPhase("done");
-  }, []);
+    setPhase('done')
+  }, [])
 
-  return { phase, onFadeComplete };
+  return { phase, onFadeComplete }
 }
 
 /** Duration of the CSS fade-out transition, exported for the UI layer. */
-export { FADE_DURATION_MS };
+export { FADE_DURATION_MS }

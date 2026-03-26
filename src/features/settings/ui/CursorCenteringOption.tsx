@@ -1,7 +1,7 @@
-import { useCursorCentering } from "@/features/editor";
-import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
+import { Label } from '@/components/ui/label'
+import { Slider } from '@/components/ui/slider'
+import { Switch } from '@/components/ui/switch'
+import { useCursorCentering } from '@/features/editor'
 
 /**
  * Settings section for configuring the cursor-centering behavior.
@@ -19,11 +19,12 @@ import { Switch } from "@/components/ui/switch";
  * ```
  */
 export function CursorCenteringOption() {
-  const { enabled, targetRatio, setEnabled, setTargetRatio } = useCursorCentering();
+  const { enabled, targetRatio, setEnabled, setTargetRatio } =
+    useCursorCentering()
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="px-3 text-xs font-medium text-muted-foreground">
+      <p className="px-3 font-medium text-muted-foreground text-xs">
         Cursor Centering
       </p>
       <div className="flex items-center justify-between px-3">
@@ -40,7 +41,7 @@ export function CursorCenteringOption() {
         <div className="flex flex-col gap-2 px-3">
           <div className="flex items-center justify-between">
             <Label className="text-sm">Position</Label>
-            <span className="text-xs text-muted-foreground tabular-nums">
+            <span className="text-muted-foreground text-xs tabular-nums">
               {Math.round(targetRatio * 100)}%
             </span>
           </div>
@@ -55,5 +56,5 @@ export function CursorCenteringOption() {
         </div>
       )}
     </div>
-  );
+  )
 }

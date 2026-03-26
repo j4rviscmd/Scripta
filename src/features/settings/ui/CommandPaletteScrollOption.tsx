@@ -1,7 +1,7 @@
-import { useCommandPaletteScroll } from "@/features/editor";
-import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
+import { Label } from '@/components/ui/label'
+import { Slider } from '@/components/ui/slider'
+import { Switch } from '@/components/ui/switch'
+import { useCommandPaletteScroll } from '@/features/editor'
 
 /**
  * Settings section for configuring the command-palette scroll behaviour.
@@ -22,11 +22,11 @@ import { Switch } from "@/components/ui/switch";
  */
 export function CommandPaletteScrollOption() {
   const { enabled, targetFraction, setEnabled, setTargetFraction } =
-    useCommandPaletteScroll();
+    useCommandPaletteScroll()
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="px-3 text-xs font-medium text-muted-foreground">
+      <p className="px-3 font-medium text-muted-foreground text-xs">
         Command Palette Scroll
       </p>
       <div className="flex items-center justify-between px-3">
@@ -43,13 +43,15 @@ export function CommandPaletteScrollOption() {
         <div className="flex flex-col gap-2 px-3">
           <div className="flex items-center justify-between">
             <Label className="text-sm">Cursor position on open</Label>
-            <span className="text-xs text-muted-foreground tabular-nums">
+            <span className="text-muted-foreground text-xs tabular-nums">
               {Math.round(targetFraction * 100)}%
             </span>
           </div>
           <Slider
             value={[targetFraction]}
-            onValueChange={(v) => setTargetFraction(Array.isArray(v) ? v[0] : v)}
+            onValueChange={(v) =>
+              setTargetFraction(Array.isArray(v) ? v[0] : v)
+            }
             min={0}
             max={0.9}
             step={0.05}
@@ -58,5 +60,5 @@ export function CommandPaletteScrollOption() {
         </div>
       )}
     </div>
-  );
+  )
 }

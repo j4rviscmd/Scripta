@@ -6,8 +6,8 @@
  * and manages mount/dispose tied to the canvas ref lifecycle.
  */
 
-import { useEffect, useRef, type RefObject } from "react";
-import type { SplashSceneHandle } from "../lib/createScene";
+import { type RefObject, useEffect, useRef } from 'react'
+import type { SplashSceneHandle } from '../lib/createScene'
 
 /**
  * Mounts the Three.js splash scene onto the given canvas element.
@@ -23,24 +23,24 @@ import type { SplashSceneHandle } from "../lib/createScene";
  */
 export function useThreeScene(
   canvasRef: RefObject<HTMLCanvasElement | null>,
-  enabled: boolean,
+  enabled: boolean
 ): void {
-  const sceneRef = useRef<SplashSceneHandle | null>(null);
+  const sceneRef = useRef<SplashSceneHandle | null>(null)
 
   useEffect(() => {
-    if (!enabled || !canvasRef.current) return;
+    if (!enabled || !canvasRef.current) return
 
-    let disposed = false;
+    let disposed = false
 
-    import("../lib/createScene").then(({ createSplashScene }) => {
-      if (disposed || !canvasRef.current) return;
-      sceneRef.current = createSplashScene(canvasRef.current);
-    });
+    import('../lib/createScene').then(({ createSplashScene }) => {
+      if (disposed || !canvasRef.current) return
+      sceneRef.current = createSplashScene(canvasRef.current)
+    })
 
     return () => {
-      disposed = true;
-      sceneRef.current?.dispose();
-      sceneRef.current = null;
-    };
-  }, [canvasRef, enabled]);
+      disposed = true
+      sceneRef.current?.dispose()
+      sceneRef.current = null
+    }
+  }, [canvasRef, enabled])
 }

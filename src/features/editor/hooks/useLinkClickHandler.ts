@@ -1,6 +1,6 @@
-import { useEffect } from "react";
-import { openUrl } from "@tauri-apps/plugin-opener";
-import type { BlockNoteEditor } from "@blocknote/core";
+import type { BlockNoteEditor } from '@blocknote/core'
+import { openUrl } from '@tauri-apps/plugin-opener'
+import { useEffect } from 'react'
 
 /**
  * Intercepts link clicks in the BlockNote editor and opens them in the
@@ -12,31 +12,31 @@ import type { BlockNoteEditor } from "@blocknote/core";
 export function useLinkClickHandler(editor: BlockNoteEditor): void {
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tiptap = (editor as any)._tiptapEditor;
-    if (!tiptap) return;
+    const tiptap = (editor as any)._tiptapEditor
+    if (!tiptap) return
 
-    const editorDom = tiptap.view.dom as HTMLElement;
+    const editorDom = tiptap.view.dom as HTMLElement
 
     const handleClick = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      const anchor = target.closest("a[href]");
-      if (!anchor) return;
+      const target = event.target as HTMLElement
+      const anchor = target.closest('a[href]')
+      if (!anchor) return
 
-      event.preventDefault();
-      event.stopPropagation();
+      event.preventDefault()
+      event.stopPropagation()
 
-      const href = anchor.getAttribute("href");
-      if (!href) return;
+      const href = anchor.getAttribute('href')
+      if (!href) return
 
       openUrl(href).catch(() => {
-        console.error("Failed to open URL:", href);
-      });
-    };
+        console.error('Failed to open URL:', href)
+      })
+    }
 
-    editorDom.addEventListener("click", handleClick, true);
+    editorDom.addEventListener('click', handleClick, true)
 
     return () => {
-      editorDom.removeEventListener("click", handleClick, true);
-    };
-  }, [editor]);
+      editorDom.removeEventListener('click', handleClick, true)
+    }
+  }, [editor])
 }
