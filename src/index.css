@@ -386,6 +386,53 @@ span[data-style-type="backgroundColor"][data-value="yellow"] {
 }
 
 /*
+ * Code block syntax highlighting – theme-aware overrides.
+ *
+ * Shiki's dual-theme mode (configured in `codeBlockConfig.ts`) emits inline
+ * styles on each token with the light colour as `color` and the dark colour
+ * as a `--shiki-dark` CSS variable.  The code block wrapper node receives a
+ * `rootStyle` containing `background-color` (light) and `--shiki-dark-bg`
+ * (dark).
+ *
+ * The rules below:
+ *   1. Override BlockNote's hardcoded `#161616` background with theme-aware
+ *      colours so the code block blends with the surrounding content.
+ *   2. Switch token colours to the dark palette when `.dark` is present on
+ *      the document root.
+ */
+
+/* ---- Light mode code block background ---- */
+.bn-block-content[data-content-type="codeBlock"] {
+  background-color: oklch(0.97 0 0) !important;
+  color: oklch(0.145 0 0) !important;
+}
+
+/* ---- Dark mode code block background ---- */
+.dark .bn-block-content[data-content-type="codeBlock"] {
+  background-color: oklch(0.18 0 0) !important;
+  color: oklch(0.92 0 0) !important;
+}
+
+/* ---- Dark mode: activate Shiki dark-theme CSS variables ---- */
+.dark .bn-block-content[data-content-type="codeBlock"] [style*="--shiki-dark-bg"],
+.dark .bn-block-content[data-content-type="codeBlock"] pre {
+  background-color: var(--shiki-dark-bg) !important;
+  color: var(--shiki-dark) !important;
+}
+
+.dark .bn-block-content[data-content-type="codeBlock"] .shiki {
+  color: var(--shiki-dark) !important;
+}
+
+/* ---- Language selector label inside code blocks ---- */
+.bn-block-content[data-content-type="codeBlock"] > div > select {
+  color: oklch(0.4 0 0) !important;
+}
+.dark .bn-block-content[data-content-type="codeBlock"] > div > select {
+  color: oklch(0.8 0 0) !important;
+}
+
+/*
  * Image block hover area expansion.
  *
  * When an image block has no caption, the clickable/hoverable area is limited
