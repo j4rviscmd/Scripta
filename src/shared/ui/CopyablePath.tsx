@@ -50,7 +50,7 @@ function CopyablePath({ path }: CopyablePathProps) {
           <Copy className="size-3.5" />
         )}
       </button>
-      <span className="break-all">{path}</span>
+      <span className="break-all select-text">{path}</span>
     </div>
   )
 }
