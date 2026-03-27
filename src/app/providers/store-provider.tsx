@@ -1,8 +1,4 @@
 import { LazyStore } from '@tauri-apps/plugin-store'
-import {
-  restoreStateCurrent,
-  StateFlags,
-} from '@tauri-apps/plugin-window-state'
 import { createContext, type ReactNode, use, useContext } from 'react'
 import type { Theme } from '@/app/providers/theme-provider'
 import {
@@ -89,13 +85,6 @@ export const storeInitPromise = Promise.all([
   configDefaults.windowStateRestoreEnabled = restoreEnabled
   if (storedTitlePrefix != null) {
     configDefaults.windowTitlePrefixEnabled = storedTitlePrefix
-  }
-  if (restoreEnabled) {
-    try {
-      await restoreStateCurrent(StateFlags.POSITION | StateFlags.SIZE)
-    } catch (err) {
-      console.error('Failed to restore window state:', err)
-    }
   }
 })
 

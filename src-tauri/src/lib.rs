@@ -2,9 +2,9 @@ mod db;
 mod file_io;
 mod groups;
 mod link_preview;
+mod window;
 
 use tauri::Manager;
-use tauri_plugin_window_state::StateFlags;
 
 /// Initializes and runs the Tauri application.
 ///
@@ -14,14 +14,16 @@ use tauri_plugin_window_state::StateFlags;
 /// - **store** — Persistent key-value config storage.
 /// - **dialog** — Native file/message dialogs.
 /// - **fs** — Scoped filesystem access.
-/// - **window-state** — Saves and optionally restores window position and
-///   size across launches (initial restore is skipped for the `"main"`
-///   window so the frontend can decide via a user setting).
 ///
-/// During setup the SQLite database is initialized and a
+/// During setup the SQLite database is initialized, a
 /// [`LinkPreviewCache`](link_preview::LinkPreviewCache) is registered as
-/// managed state. All note CRUD and utility commands are then registered
-/// via the invoke handler.
+/// managed state, and the main window is created via
+/// [`window::create_main_window`]. Window position and size are restored
+/// from `config.json` when the user has enabled the setting; otherwise
+/// the window opens at the default 1200×800 dimensions.
+///
+/// On window close the current geometry is persisted to `config.json`
+/// so it can be restored on the next launch.
 ///
 /// # Panics
 ///
@@ -37,18 +39,18 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .plugin(
-            tauri_plugin_window_state::Builder::new()
-                .with_state_flags(StateFlags::POSITION | StateFlags::SIZE)
-                .skip_initial_state("main")
-                .build(),
-        )
         .setup(|app| {
             db::init_db(app.handle())?;
             app.manage(link_preview::LinkPreviewCache(std::sync::Mutex::new(
                 std::collections::HashMap::new(),
             )));
+            window::create_main_window(app.handle())?;
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                window::save_window_geometry(window.app_handle());
+            }
         })
         .invoke_handler(tauri::generate_handler![
             db::get_note,
