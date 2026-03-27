@@ -42,7 +42,10 @@ export function SidebarSearch({
         variant="ghost"
         size="icon"
         className="h-8 w-8 shrink-0"
-        onClick={onNewNote}
+        onClick={(e) => {
+          e.currentTarget.blur()
+          onNewNote()
+        }}
       >
         <Plus className="h-4 w-4" />
       </Button>
