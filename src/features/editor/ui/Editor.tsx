@@ -38,6 +38,7 @@ import {
 } from '..'
 import { getNote } from '../api/notes'
 import { useAutoSave } from '../hooks/useAutoSave'
+import { useClipboardTightenList } from '../hooks/useClipboardTightenList'
 import { useCopyToast } from '../hooks/useCopyToast'
 import { useEditorFontSize } from '../hooks/useEditorFontSize'
 import { useLinkClickHandler } from '../hooks/useLinkClickHandler'
@@ -202,6 +203,8 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 
   useLinkClickHandler(editor)
   useCopyToast(editor)
+  // Rewrite clipboard text/plain so Markdown lists are tight (no blank lines between items).
+  useClipboardTightenList(editor)
 
   /**
    * After every file upload completes, ensure the uploaded image block has a
