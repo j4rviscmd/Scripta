@@ -12,6 +12,7 @@ import {
   useCreateBlockNote,
 } from '@blocknote/react'
 import { BlockNoteView } from '@blocknote/shadcn'
+import type { Transaction } from 'prosemirror-state'
 import {
   forwardRef,
   useCallback,
@@ -20,14 +21,10 @@ import {
   useMemo,
   useRef,
 } from 'react'
-import { useToolbarConfig } from '@/app/providers/toolbar-config-provider'
-import { CustomLinkToolbar } from './CustomLinkToolbar'
-import { SearchReplacePanel } from './SearchReplacePanel'
-import '@blocknote/shadcn/style.css'
-import '@blocknote/core/fonts/inter.css'
 import { toast } from 'sonner'
 import { useEditorFont } from '@/app/providers/editor-font-provider'
 import { useTheme } from '@/app/providers/theme-provider'
+import { useToolbarConfig } from '@/app/providers/toolbar-config-provider'
 import type { SaveStatus } from '..'
 import {
   cursorCenteringExtension,
@@ -49,10 +46,57 @@ import { codeBlockOptions } from '../lib/codeBlockConfig'
 import { DEFAULT_BLOCKS } from '../lib/constants'
 import { rangeCheckToggleExtension } from '../lib/rangeCheckToggle'
 import { slashMenuEmacsKeysExtension } from '../lib/slashMenuEmacsKeys'
+import { CustomLinkToolbar } from './CustomLinkToolbar'
 import { HighlightButton } from './HighlightButton'
+import { SearchReplacePanel } from './SearchReplacePanel'
+import '@blocknote/shadcn/style.css'
+import '@blocknote/core/fonts/inter.css'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const BLOCKS = DEFAULT_BLOCKS as any
+
+/**
+ * Returns a fallback caption for an image block whose caption is empty.
+ *
+ * Uses the block's `name` prop (e.g. alt text from `<img>` HTML) when
+ * available, otherwise falls back to the literal string `"image"`.
+ * Returns `null` if the block is not an image or already has a non-empty caption.
+ */
+function getImageCaptionFallback(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  block: any
+): string | null {
+  if (block?.type !== 'image') return null
+  const props = block.props as Record<string, unknown> | undefined
+  if (!props || props.caption !== '') return null
+  return (typeof props.name === 'string' && props.name) || 'image'
+}
+
+/**
+ * Temporarily patches `view.dispatch` so that every transaction dispatched
+ * during `fn` carries `setMeta("addToHistory", false)`.
+ *
+ * This prevents prosemirror-history from recording programmatic content
+ * loads (e.g. `replaceBlocks`, `backfillImageCaptions`) as undoable steps.
+ */
+function withSuppressedHistory(
+  view: { dispatch: (tr: Transaction) => void } | null,
+  fn: () => void
+): void {
+  if (!view) {
+    fn()
+    return
+  }
+  const originalDispatch = view.dispatch
+  view.dispatch = (tr: Transaction) => {
+    originalDispatch(tr.setMeta('addToHistory', false))
+  }
+  try {
+    fn()
+  } finally {
+    view.dispatch = originalDispatch
+  }
+}
 
 /**
  * Custom BlockNote schema with Shiki-powered syntax highlighting for code blocks.
@@ -60,6 +104,9 @@ const BLOCKS = DEFAULT_BLOCKS as any
  * Replaces the default `codeBlock` spec with one configured via
  * {@link codeBlockOptions}, which provides a Shiki highlighter and the full
  * set of supported programming languages.
+ *
+ * All other block specs (paragraph, heading, bulletList, image, etc.) are
+ * inherited from {@link defaultBlockSpecs} unchanged.
  */
 const schema = BlockNoteSchema.create({
   blockSpecs: {
@@ -101,6 +148,11 @@ export interface EditorHandle {
 /**
  * Set of toolbar item keys that are context-dependent (always rendered,
  * self-hide when irrelevant). These are NOT user-configurable.
+ *
+ * Pass-through items are prepended to the formatting toolbar in their
+ * original order before any user-configurable items.
+ *
+ * @see formattingToolbarItems - the `useMemo` that consumes this set
  */
 const PASS_THROUGH_KEYS = new Set([
   'blockTypeSelect',
@@ -122,6 +174,20 @@ const PASS_THROUGH_KEYS = new Set([
  * content from the backend; otherwise it renders the default blank
  * document. Changes are debounced and auto-saved via the
  * {@link useAutoSave} hook.
+ *
+ * The component is implemented as a `forwardRef` that exposes the
+ * underlying {@link BlockNoteEditor} instance through {@link EditorHandle}.
+ *
+ * Rendered structure:
+ * - A wrapper `<div>` with CSS custom properties for font size and family.
+ * - A {@link BlockNoteView} with custom formatting toolbar and link toolbar.
+ * - A {@link SearchReplacePanel} for find/replace functionality.
+ *
+ * @example
+ * ```tsx
+ * const handleRef = useRef<EditorHandle>(null);
+ * <Editor ref={handleRef} noteId="abc123" onNoteSaved={(id) => console.log(id)} />
+ * ```
  */
 export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   {
@@ -227,22 +293,10 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     const onUploadEnd = (blockId?: string) => {
       if (!blockId) return
       const block = editor.getBlock(blockId)
-      if (
-        block &&
-        block.type === 'image' &&
-        typeof block.props === 'object' &&
-        block.props !== null &&
-        'caption' in block.props &&
-        (block.props as Record<string, unknown>).caption === ''
-      ) {
-        const name =
-          ('name' in block.props &&
-            typeof (block.props as Record<string, unknown>).name === 'string' &&
-            (block.props as Record<string, unknown>).name) ||
-          'image'
-        editor.updateBlock(block, {
-          props: { caption: name as string },
-        } as any)
+      if (!block) return
+      const caption = getImageCaptionFallback(block)
+      if (caption) {
+        editor.updateBlock(block, { props: { caption } } as any)
       }
     }
 
@@ -339,16 +393,8 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   const backfillImageCaptions = useCallback(() => {
     const walk = (blocks: typeof editor.document) => {
       for (const block of blocks) {
-        if (
-          block.type === 'image' &&
-          typeof block.props === 'object' &&
-          block.props !== null &&
-          'caption' in block.props &&
-          (block.props as Record<string, unknown>).caption === ''
-        ) {
-          const props = block.props as Record<string, unknown>
-          const caption =
-            (typeof props.name === 'string' && props.name) || 'image'
+        const caption = getImageCaptionFallback(block)
+        if (caption) {
           editor.updateBlock(block, { props: { caption } } as any)
         }
         if (block.children?.length) {
@@ -376,8 +422,10 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     let stale = false
     loadingRef.current = true
     if (!noteId) {
-      editor.replaceBlocks(editor.document, BLOCKS)
-      backfillImageCaptions()
+      withSuppressedHistory(editor.prosemirrorView, () => {
+        editor.replaceBlocks(editor.document, BLOCKS)
+        backfillImageCaptions()
+      })
       queueMicrotask(() => {
         if (!stale) {
           loadingRef.current = false
@@ -391,15 +439,17 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       .then((note) => {
         if (stale) return
         if (note) {
-          try {
-            editor.replaceBlocks(
-              editor.document,
-              JSON.parse(note.content) as any
-            )
-          } catch {
-            editor.replaceBlocks(editor.document, BLOCKS)
-          }
-          backfillImageCaptions()
+          withSuppressedHistory(editor.prosemirrorView, () => {
+            try {
+              editor.replaceBlocks(
+                editor.document,
+                JSON.parse(note.content) as any
+              )
+            } catch {
+              editor.replaceBlocks(editor.document, BLOCKS)
+            }
+            backfillImageCaptions()
+          })
         } else {
           toast.error('Note not found')
         }
@@ -419,6 +469,22 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     }
   }, [noteId, editor, backfillImageCaptions, onContentLoaded])
 
+  /**
+   * Callback invoked by BlockNote on every document change.
+   *
+   * While the editor is still loading (`loadingRef.current === true`) the
+   * callback exits early to prevent auto-save from firing on the initial
+   * content population.  Otherwise it:
+   *
+   * 1. Calls {@link backfillImageCaptions} to ensure every image block has a
+   *    non-empty caption (covers the `text/html` paste path where
+   *    `onUploadEnd` is not fired, e.g. right-click "Copy Image" in Chrome).
+   * 2. Schedules a debounced auto-save of the serialized document.
+   *
+   * `backfillImageCaptions` only calls `updateBlock` when it finds an empty
+   * caption, so the subsequent re-trigger of `onChange` is a no-op and does
+   * not cause an infinite loop.
+   */
   const handleChange = useCallback(() => {
     if (loadingRef.current) return
     // Ensure every image block has a non-empty caption so the bubble menu
