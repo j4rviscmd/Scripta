@@ -60,6 +60,10 @@ function AppContent() {
   // Initialises commandPaletteScrollConfig from the persisted store on mount.
   useCommandPaletteScroll()
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
+  // True once the persisted lastNoteId has been loaded from the store.
+  // Prevents the window title from flashing "Untitled" before the stored
+  // note ID is available.
+  const [noteIdInitialized, setNoteIdInitialized] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(configDefaults.sidebarOpen)
   const [refreshKey, setRefreshKey] = useState(0)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
@@ -131,6 +135,9 @@ function AppContent() {
       .catch((err) => {
         console.error('Failed to load lastNoteId:', err)
       })
+      .finally(() => {
+        setNoteIdInitialized(true)
+      })
   }, [editorStore])
 
   // Register keyboard shortcuts for editor font size (Cmd/Alt + Plus/Minus).
@@ -197,6 +204,9 @@ function AppContent() {
   )
 
   useEffect(() => {
+    // Wait until the persisted lastNoteId has been loaded before updating the
+    // window title to avoid a flash of "Untitled".
+    if (!noteIdInitialized) return
     const appWindow = getCurrentWindow()
     if (!selectedNoteId) {
       appWindow.setTitle('Scripta - Untitled')
@@ -216,7 +226,7 @@ function AppContent() {
     return () => {
       stale = true
     }
-  }, [selectedNoteId])
+  }, [selectedNoteId, noteIdInitialized])
 
   /**
    * Callback invoked after a note is auto-saved.
