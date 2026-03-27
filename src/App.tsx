@@ -11,6 +11,10 @@ import { configDefaults, useAppStore } from '@/app/providers/store-provider'
 import { ThemeProvider } from '@/app/providers/theme-provider'
 import { ToolbarConfigProvider } from '@/app/providers/toolbar-config-provider'
 import {
+  useWindowTitlePrefix,
+  WindowTitlePrefixProvider,
+} from '@/app/providers/window-title-prefix-provider'
+import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
@@ -31,6 +35,7 @@ import {
   readTextFile,
   togglePinNote,
   useCommandPaletteScroll,
+  useCursorAutoHideEffect,
   writeTextFile,
 } from '@/features/editor'
 import { commandPaletteScrollConfig } from '@/features/editor/lib/commandPaletteScrollConfig'
@@ -59,6 +64,11 @@ function AppContent() {
     useFontSize()
   // Initialises commandPaletteScrollConfig from the persisted store on mount.
   useCommandPaletteScroll()
+  // Registers global mouse listeners that hide the cursor after inactivity.
+  // Reads cursorAutoHideConfig directly so settings changes from the UI
+  // take effect immediately without re-mounting.
+  useCursorAutoHideEffect()
+  const { enabled: titlePrefixEnabled } = useWindowTitlePrefix()
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
   // True once the persisted lastNoteId has been loaded from the store.
   // Prevents the window title from flashing "Untitled" before the stored
@@ -69,7 +79,9 @@ function AppContent() {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const editorRef = useRef<EditorHandle>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const isHeaderHidden = useScrollDirection(scrollContainerRef)
+  const { isHidden: isHeaderHidden } = useScrollDirection(scrollContainerRef, {
+    noteId: selectedNoteId,
+  })
   const isScrolledDown = useScrollPosition(scrollContainerRef)
   const { onContentLoaded: onScrollLoaded, saveScrollPosition } =
     useBlockScrollMemory({
@@ -82,7 +94,15 @@ function AppContent() {
       noteId: selectedNoteId,
     })
 
-  /** Combined content-loaded callback that restores both scroll and cursor. */
+  /**
+   * Combined content-loaded callback that restores both scroll position
+   * and cursor position after editor content has been loaded for a note.
+   *
+   * @remarks
+   * This delegates to {@link useBlockScrollMemory.onContentLoaded} and
+   * {@link useCursorMemory.onContentLoaded} so that the editor returns
+   * to the exact visual state the user last saw.
+   */
   const handleContentLoaded = useCallback(() => {
     onCursorLoaded()
     onScrollLoaded()
@@ -99,7 +119,12 @@ function AppContent() {
     ],
   })
 
-  /** Smoothly scrolls the editor content area back to the top. */
+  /**
+   * Smoothly scrolls the editor content area back to the top.
+   *
+   * @remarks
+   * No-op when the scroll container ref is not attached.
+   */
   const scrollToTop = useCallback(() => {
     const el = scrollContainerRef.current
     if (!el) return
@@ -160,6 +185,8 @@ function AppContent() {
   /**
    * Persists the sidebar open/close state to the config store
    * and updates the local UI state.
+   *
+   * @param open - `true` to open the sidebar, `false` to close it.
    */
   const handleSidebarOpenChange = useCallback(
     (open: boolean) => {
@@ -174,6 +201,8 @@ function AppContent() {
   /**
    * Persists the given note ID (or removes it when `null`) to the
    * editor store so it can be restored on next app launch.
+   *
+   * @param id - The note ID to persist, or `null` to clear the stored value.
    */
   const persistLastNoteId = useCallback(
     (id: string | null) => {
@@ -190,6 +219,8 @@ function AppContent() {
   /**
    * Switches the active note. Saves the scroll position for the
    * previously selected note and persists the new selection.
+   *
+   * @param id - The ID of the note to select, or `null` to deselect.
    */
   const selectNote = useCallback(
     (id: string | null) => {
@@ -208,17 +239,17 @@ function AppContent() {
     // window title to avoid a flash of "Untitled".
     if (!noteIdInitialized) return
     const appWindow = getCurrentWindow()
+    const formatTitle = (title: string) =>
+      titlePrefixEnabled ? `Scripta - ${title}` : title
     if (!selectedNoteId) {
-      appWindow.setTitle('Scripta - Untitled')
+      appWindow.setTitle(formatTitle('Untitled'))
       return
     }
     let stale = false
     getNote(selectedNoteId)
       .then((note) => {
         if (stale) return
-        appWindow.setTitle(
-          note ? `Scripta - ${note.title}` : 'Scripta - Untitled'
-        )
+        appWindow.setTitle(formatTitle(note ? note.title : 'Untitled'))
       })
       .catch(() => {
         if (!stale) console.error('Failed to load note for window title')
@@ -226,11 +257,13 @@ function AppContent() {
     return () => {
       stale = true
     }
-  }, [selectedNoteId, noteIdInitialized])
+  }, [selectedNoteId, noteIdInitialized, titlePrefixEnabled])
 
   /**
    * Callback invoked after a note is auto-saved.
    * Bumps the refresh key so the sidebar reflects the updated title.
+   *
+   * @param id - The ID of the note that was saved.
    */
   const handleNoteSaved = useCallback((id: string) => {
     setSelectedNoteId((current) => {
@@ -240,7 +273,11 @@ function AppContent() {
     setRefreshKey((v) => v + 1)
   }, [])
 
-  /** Creates a new note with default content and selects it. */
+  /**
+   * Creates a new note with default content and selects it.
+   *
+   * @throws Shows an error toast if note creation fails.
+   */
   const handleNewNote = useCallback(async () => {
     try {
       const note = await createNote(
@@ -257,6 +294,9 @@ function AppContent() {
   /**
    * Deletes the specified note. If the deleted note was currently
    * selected, falls back to the first remaining note or `null`.
+   *
+   * @param noteId - The ID of the note to delete.
+   * @throws Shows an error toast if deletion fails.
    */
   const handleDeleteNote = useCallback(
     async (noteId: string) => {
@@ -275,7 +315,13 @@ function AppContent() {
     [selectedNoteId, selectNote]
   )
 
-  /** Toggles the pinned state of the given note and refreshes the sidebar. */
+  /**
+   * Toggles the pinned state of the given note and refreshes the sidebar.
+   *
+   * @param noteId - The ID of the note whose pin state should be toggled.
+   * @param pinned - The new pinned state to apply.
+   * @throws Shows an error toast if the toggle operation fails.
+   */
   const handleTogglePin = useCallback(
     async (noteId: string, pinned: boolean) => {
       try {
@@ -288,7 +334,12 @@ function AppContent() {
     []
   )
 
-  /** Exports the given note as a Markdown file via a native save dialog. */
+  /**
+   * Exports the given note as a Markdown file via a native save dialog.
+   *
+   * @param noteId - The ID of the note to export.
+   * @throws Shows an error toast if the note is not found or export fails.
+   */
   const handleExportNote = useCallback(async (noteId: string) => {
     const editor = editorRef.current?.editor
     if (!editor) return
@@ -317,7 +368,11 @@ function AppContent() {
     }
   }, [])
 
-  /** Imports a Markdown file as a new note via a native open dialog. */
+  /**
+   * Imports a Markdown file as a new note via a native open dialog.
+   *
+   * @throws Shows an error toast if the file cannot be read or parsed.
+   */
   const handleImportNote = useCallback(async () => {
     const editor = editorRef.current?.editor
     if (!editor) return
@@ -420,7 +475,9 @@ function App() {
       <FontSizeProvider>
         <EditorFontProvider>
           <ToolbarConfigProvider>
-            <AppContent />
+            <WindowTitlePrefixProvider>
+              <AppContent />
+            </WindowTitlePrefixProvider>
           </ToolbarConfigProvider>
         </EditorFontProvider>
       </FontSizeProvider>

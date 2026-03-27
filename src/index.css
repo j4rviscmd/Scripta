@@ -482,3 +482,42 @@ span[data-style-type="backgroundColor"][data-value="yellow"] {
   color: transparent;
   background: transparent;
 }
+
+/*
+ * Cursor auto-hide
+ *
+ * When the `cursor-autohide-hidden` class is present on <html>, the mouse
+ * cursor is hidden for all elements except interactive overlays (dialogs,
+ * menus, dropdowns) which keep the default cursor so the user can still
+ * interact with them intuitively.
+ */
+html.cursor-autohide-hidden,
+html.cursor-autohide-hidden * {
+  cursor: none !important;
+}
+
+html.cursor-autohide-hidden [role="dialog"],
+html.cursor-autohide-hidden [role="menu"],
+html.cursor-autohide-hidden [role="listbox"],
+html.cursor-autohide-hidden .bn-suggestion-menu,
+html.cursor-autohide-hidden .bn-link-toolbar,
+html.cursor-autohide-hidden .bn-color-picker-dropdown,
+html.cursor-autohide-hidden .bn-formatting-toolbar,
+html.cursor-autohide-hidden .bn-table-handle-menu,
+html.cursor-autohide-hidden [data-slot="select-content"],
+html.cursor-autohide-hidden [data-slot="dropdown-menu-content"] {
+  cursor: auto !important;
+}
+
+html.cursor-autohide-hidden [role="dialog"] *,
+html.cursor-autohide-hidden [role="menu"] *,
+html.cursor-autohide-hidden [role="listbox"] *,
+html.cursor-autohide-hidden .bn-suggestion-menu *,
+html.cursor-autohide-hidden .bn-link-toolbar *,
+html.cursor-autohide-hidden .bn-color-picker-dropdown *,
+html.cursor-autohide-hidden .bn-formatting-toolbar *,
+html.cursor-autohide-hidden .bn-table-handle-menu *,
+html.cursor-autohide-hidden [data-slot="select-content"] *,
+html.cursor-autohide-hidden [data-slot="dropdown-menu-content"] * {
+  cursor: auto !important;
+}

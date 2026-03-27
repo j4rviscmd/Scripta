@@ -18,6 +18,10 @@ export {
 } from './api/notes'
 export type { SaveStatus } from './hooks/useAutoSave'
 export { useCommandPaletteScroll } from './hooks/useCommandPaletteScroll'
+export {
+  useCursorAutoHide,
+  useCursorAutoHideEffect,
+} from './hooks/useCursorAutoHide'
 export { useCursorCentering } from './hooks/useCursorCentering'
 export { useEditorFontSize } from './hooks/useEditorFontSize'
 export type { UseSearchReplaceReturn } from './hooks/useSearchReplace'
@@ -42,6 +46,7 @@ export {
   exportToMarkdown,
   fixBlockNoteTableExport,
 } from './lib/markdown-export'
+export { checklistSplitFixExtension } from './lib/checklistSplitFix'
 export { rangeCheckToggleExtension } from './lib/rangeCheckToggle'
 export { searchExtension } from './lib/searchExtension'
 export { slashMenuEmacsKeysExtension } from './lib/slashMenuEmacsKeys'

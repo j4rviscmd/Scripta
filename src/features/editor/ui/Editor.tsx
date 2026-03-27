@@ -20,6 +20,7 @@ import {
   useImperativeHandle,
   useMemo,
   useRef,
+  useState,
 } from 'react'
 import { toast } from 'sonner'
 import { useEditorFont } from '@/app/providers/editor-font-provider'
@@ -27,6 +28,7 @@ import { useTheme } from '@/app/providers/theme-provider'
 import { useToolbarConfig } from '@/app/providers/toolbar-config-provider'
 import type { SaveStatus } from '..'
 import {
+  checklistSplitFixExtension,
   cursorCenteringExtension,
   cursorVimKeysExtension,
   imeCompositionGuard,
@@ -207,6 +209,15 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   ref
 ) {
   const loadingRef = useRef(true)
+  /**
+   * Whether the editor content has finished loading and is safe to display.
+   *
+   * Starts as `false` so the editor wrapper renders with `opacity-0`,
+   * preventing a flash of stale/default content. Set to `true` once
+   * the note content (or the empty-note default) has been fully applied
+   * to the editor inside the content-loading `useEffect`.
+   */
+  const [contentReady, setContentReady] = useState(false)
   const { resolvedTheme } = useTheme()
   const { fontSize } = useEditorFontSize()
   const { fontFamily } = useEditorFont()
@@ -267,6 +278,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       imeCompositionGuard,
       cursorCenteringExtension,
       searchExtension,
+      checklistSplitFixExtension(),
       rangeCheckToggleExtension(),
       slashMenuEmacsKeysExtension(),
       cursorVimKeysExtension(),
@@ -425,6 +437,12 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
    * rapidly, earlier fetch responses are discarded.  `loadingRef` is used
    * by `handleChange` to suppress auto-save until the content has finished
    * loading.
+   *
+   * Once loading completes (either synchronously for the no-id path or
+   * in the `.finally()` block for fetched notes), `setContentReady(true)`
+   * is called to flip the editor wrapper from `opacity-0` to `opacity-100`,
+   * preventing a flash of stale/default content before the real note
+   * appears.
    */
   useEffect(() => {
     let stale = false
@@ -437,6 +455,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       queueMicrotask(() => {
         if (!stale) {
           loadingRef.current = false
+          setContentReady(true)
           onContentLoaded?.()
         }
       })
@@ -468,6 +487,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       .finally(() => {
         if (!stale) {
           loadingRef.current = false
+          setContentReady(true)
           onContentLoaded?.()
         }
       })
@@ -507,8 +527,11 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 
   return (
     <>
+      {/* Editor wrapper — starts invisible (`opacity-0`) and transitions to
+          `opacity-100` once `contentReady` is true, preventing a flash of
+          stale/default content while the real note loads. */}
       <div
-        className="w-full min-h-screen px-8 pb-[60vh]"
+        className={`w-full min-h-screen px-8 pb-[60vh] ${contentReady ? 'opacity-100' : 'opacity-0'}`}
         data-editor-root
         style={
           {

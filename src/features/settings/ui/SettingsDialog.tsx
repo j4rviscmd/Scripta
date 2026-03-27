@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
 import { CommandPaletteScrollOption } from './CommandPaletteScrollOption'
+import { CursorAutoHideOption } from './CursorAutoHideOption'
 import { CursorCenteringOption } from './CursorCenteringOption'
 import { EditorFontOption } from './EditorFontOption'
 import { FontSizeOption } from './FontSizeOption'
@@ -76,6 +77,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         </div>
         <Separator />
         <CursorCenteringOption />
+        <Separator />
+        <CursorAutoHideOption />
         <Separator />
         <CommandPaletteScrollOption />
         <Separator />
