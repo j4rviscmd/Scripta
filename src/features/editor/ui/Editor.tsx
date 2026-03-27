@@ -31,6 +31,7 @@ import {
   checklistSplitFixExtension,
   cursorCenteringExtension,
   cursorVimKeysExtension,
+  imeCompositionGuard,
   resolveImageUrl,
   searchExtension,
   uploadImage,
@@ -274,6 +275,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     initialContent: DEFAULT_BLOCKS,
     pasteHandler,
     extensions: [
+      imeCompositionGuard,
       cursorCenteringExtension,
       searchExtension,
       checklistSplitFixExtension(),

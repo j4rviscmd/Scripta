@@ -42,6 +42,7 @@ export {
   IMAGE_DIR,
   MAX_IMAGE_SIZE_BYTES,
 } from './lib/imageUploadConfig'
+export { imeCompositionGuard } from './lib/imeCompositionGuard'
 export {
   exportToMarkdown,
   fixBlockNoteTableExport,
