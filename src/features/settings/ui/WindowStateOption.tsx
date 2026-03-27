@@ -1,15 +1,19 @@
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { useWindowState } from '../hooks/useWindowState'
+import { WindowTitlePrefixOption } from './WindowTitlePrefixOption'
 
 /**
- * Settings section for configuring window position/size restoration.
+ * Settings section for window-related preferences.
  *
- * Provides an ON/OFF toggle that controls whether the window restores
- * its last-saved position and size on startup. When OFF, the window
- * always opens at 1200×800 centered on screen.
+ * Groups the following toggles under a single "Window" heading:
  *
- * @returns The rendered window state settings control.
+ * - **Restore position & size** — Whether the window restores its
+ *   last-saved position and dimensions on startup.
+ * - **Show app name in title bar** — Whether the `"Scripta - "` prefix
+ *   is displayed before the note title.
+ *
+ * @returns The rendered window settings section.
  *
  * @example
  * ```tsx
@@ -33,6 +37,7 @@ export function WindowStateOption() {
           onCheckedChange={setEnabled}
         />
       </div>
+      <WindowTitlePrefixOption />
     </div>
   )
 }

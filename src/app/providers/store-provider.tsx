@@ -15,6 +15,10 @@ import {
   DEFAULT_WINDOW_STATE_RESTORE,
   WINDOW_STATE_STORE_KEY,
 } from '@/features/settings/lib/windowStateConfig'
+import {
+  DEFAULT_WINDOW_TITLE_PREFIX,
+  WINDOW_TITLE_PREFIX_STORE_KEY,
+} from '@/features/settings/lib/windowTitleConfig'
 
 /**
  * Module-scoped singleton store instances.
@@ -43,6 +47,8 @@ export const configDefaults = {
   theme: 'system' as Theme,
   /** Toolbar item order and visibility. Falls back to all-visible canonical order. */
   toolbarConfig: DEFAULT_TOOLBAR_CONFIG as ToolbarItemConfig[],
+  /** Whether to show the "Scripta - " prefix in the window title. Falls back to `true` if not persisted. */
+  windowTitlePrefixEnabled: DEFAULT_WINDOW_TITLE_PREFIX,
 }
 
 /**
@@ -56,13 +62,19 @@ export const storeInitPromise = Promise.all([
   configStore.init(),
   editorStateStore.init(),
 ]).then(async () => {
-  const [storedSidebarOpen, storedWindowRestore, storedTheme, storedToolbar] =
-    await Promise.all([
-      configStore.get<boolean>('sidebarOpen'),
-      configStore.get<boolean>(WINDOW_STATE_STORE_KEY),
-      configStore.get<string>('theme'),
-      configStore.get<ToolbarItemConfig[]>(TOOLBAR_CONFIG_STORE_KEY),
-    ])
+  const [
+    storedSidebarOpen,
+    storedWindowRestore,
+    storedTheme,
+    storedToolbar,
+    storedTitlePrefix,
+  ] = await Promise.all([
+    configStore.get<boolean>('sidebarOpen'),
+    configStore.get<boolean>(WINDOW_STATE_STORE_KEY),
+    configStore.get<string>('theme'),
+    configStore.get<ToolbarItemConfig[]>(TOOLBAR_CONFIG_STORE_KEY),
+    configStore.get<boolean>(WINDOW_TITLE_PREFIX_STORE_KEY),
+  ])
   if (storedSidebarOpen != null) {
     configDefaults.sidebarOpen = storedSidebarOpen
   }
@@ -75,6 +87,9 @@ export const storeInitPromise = Promise.all([
   }
   const restoreEnabled = storedWindowRestore ?? DEFAULT_WINDOW_STATE_RESTORE
   configDefaults.windowStateRestoreEnabled = restoreEnabled
+  if (storedTitlePrefix != null) {
+    configDefaults.windowTitlePrefixEnabled = storedTitlePrefix
+  }
   if (restoreEnabled) {
     try {
       await restoreStateCurrent(StateFlags.POSITION | StateFlags.SIZE)
