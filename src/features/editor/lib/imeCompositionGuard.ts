@@ -23,7 +23,7 @@ let blockedStructural = false
  * orphaned DOM block elements created by WebKit's intermediate DOM
  * mutations.
  */
-let preCompositionBlockIds = new Set<string>()
+const preCompositionBlockIds = new Set<string>()
 
 /**
  * BlockNote extension that prevents unwanted line breaks during IME
@@ -74,7 +74,7 @@ export const imeCompositionGuard = createExtension({
         }
 
         const hasStructural = tr.steps.some(
-          (step) => 'gapFrom' in step || (step as any).structure === true,
+          (step) => 'gapFrom' in step || (step as any).structure === true
         )
         if (hasStructural) {
           blockedStructural = true
@@ -97,7 +97,12 @@ export const imeCompositionGuard = createExtension({
       /** Stores the ProseMirror editor view reference for use in DOM event handlers. */
       view(editorView) {
         pmView = editorView
-        return { update() {}, destroy() { pmView = null } }
+        return {
+          update() {},
+          destroy() {
+            pmView = null
+          },
+        }
       },
     }),
   ],
@@ -110,19 +115,23 @@ export const imeCompositionGuard = createExtension({
      * editor to `plaintext-only` contentEditable mode to prevent
      * WebKit from creating block-level elements during composition.
      */
-    dom.addEventListener('compositionstart', () => {
-      composing = true
-      blockedStructural = false
-      if (!pmView) return
+    dom.addEventListener(
+      'compositionstart',
+      () => {
+        composing = true
+        blockedStructural = false
+        if (!pmView) return
 
-      preCompositionBlockIds.clear()
-      pmView.state.doc.descendants((node: any) => {
-        if (node.type.name === 'blockContainer' && node.attrs.id) {
-          preCompositionBlockIds.add(node.attrs.id)
-        }
-      })
-      pmView.dom.contentEditable = 'plaintext-only'
-    }, { signal })
+        preCompositionBlockIds.clear()
+        pmView.state.doc.descendants((node: any) => {
+          if (node.type.name === 'blockContainer' && node.attrs.id) {
+            preCompositionBlockIds.add(node.attrs.id)
+          }
+        })
+        pmView.dom.contentEditable = 'plaintext-only'
+      },
+      { signal }
+    )
 
     /**
      * Cleans up after an IME composition session ends.
@@ -137,26 +146,30 @@ export const imeCompositionGuard = createExtension({
      * browser events from the composition to settle before normal
      * transaction processing resumes.
      */
-    dom.addEventListener('compositionend', () => {
-      if (!pmView) return
+    dom.addEventListener(
+      'compositionend',
+      () => {
+        if (!pmView) return
 
-      const domBlocks = Array.from<Element>(
-        pmView.dom.querySelectorAll('[data-node-type="blockContainer"]'),
-      )
-      for (const el of domBlocks) {
-        const id = el.getAttribute('data-id')
-        if (!id || !preCompositionBlockIds.has(id)) {
-          el.remove()
+        const domBlocks = Array.from<Element>(
+          pmView.dom.querySelectorAll('[data-node-type="blockContainer"]')
+        )
+        for (const el of domBlocks) {
+          const id = el.getAttribute('data-id')
+          if (!id || !preCompositionBlockIds.has(id)) {
+            el.remove()
+          }
         }
-      }
-      pmView.updateState(pmView.state)
-      pmView.dom.contentEditable = 'true'
+        pmView.updateState(pmView.state)
+        pmView.dom.contentEditable = 'true'
 
-      setTimeout(() => {
-        composing = false
-        blockedStructural = false
-      }, 500)
-    }, { signal })
+        setTimeout(() => {
+          composing = false
+          blockedStructural = false
+        }, 500)
+      },
+      { signal }
+    )
 
     /**
      * Prevents `insertLineBreak` input events during composition.
@@ -172,7 +185,7 @@ export const imeCompositionGuard = createExtension({
           e.preventDefault()
         }
       },
-      { capture: true, signal },
+      { capture: true, signal }
     )
 
     /**
@@ -191,7 +204,7 @@ export const imeCompositionGuard = createExtension({
           e.stopImmediatePropagation()
         }
       },
-      { capture: true, signal },
+      { capture: true, signal }
     )
   },
 })

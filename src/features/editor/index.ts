@@ -26,10 +26,10 @@ export { useCursorCentering } from './hooks/useCursorCentering'
 export { useEditorFontSize } from './hooks/useEditorFontSize'
 export type { UseSearchReplaceReturn } from './hooks/useSearchReplace'
 export { useSearchReplace } from './hooks/useSearchReplace'
+export { checklistSplitFixExtension } from './lib/checklistSplitFix'
 export { DEFAULT_BLOCKS, DEFAULT_CONTENT, extractTitle } from './lib/constants'
 export { cursorCenteringExtension } from './lib/cursorCentering'
 export { cursorVimKeysExtension } from './lib/cursorVimKeys'
-export { imeCompositionGuard } from './lib/imeCompositionGuard'
 export {
   DEFAULT_FONT_SIZE,
   FONT_SIZE_STEP,
@@ -42,11 +42,11 @@ export {
   IMAGE_DIR,
   MAX_IMAGE_SIZE_BYTES,
 } from './lib/imageUploadConfig'
+export { imeCompositionGuard } from './lib/imeCompositionGuard'
 export {
   exportToMarkdown,
   fixBlockNoteTableExport,
 } from './lib/markdown-export'
-export { checklistSplitFixExtension } from './lib/checklistSplitFix'
 export { rangeCheckToggleExtension } from './lib/rangeCheckToggle'
 export { searchExtension } from './lib/searchExtension'
 export { slashMenuEmacsKeysExtension } from './lib/slashMenuEmacsKeys'
