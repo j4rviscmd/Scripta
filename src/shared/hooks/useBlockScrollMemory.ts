@@ -145,7 +145,10 @@ export function useBlockScrollMemory({
       if (!container) return
 
       const savedBlockId = positionsRef.current[targetNoteId]
-      if (!savedBlockId) return
+      if (!savedBlockId) {
+        container.scrollTop = 0
+        return
+      }
 
       const escaped = CSS.escape(savedBlockId)
       const blockEl = container.querySelector<HTMLElement>(

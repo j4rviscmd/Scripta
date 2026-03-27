@@ -74,8 +74,9 @@ function AppContent() {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const editorRef = useRef<EditorHandle>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const { isHidden: isHeaderHidden, resetHeader } =
-    useScrollDirection(scrollContainerRef)
+  const { isHidden: isHeaderHidden } = useScrollDirection(scrollContainerRef, {
+    noteId: selectedNoteId,
+  })
   const isScrolledDown = useScrollPosition(scrollContainerRef)
   const { onContentLoaded: onScrollLoaded, saveScrollPosition } =
     useBlockScrollMemory({
@@ -88,7 +89,15 @@ function AppContent() {
       noteId: selectedNoteId,
     })
 
-  /** Combined content-loaded callback that restores both scroll and cursor. */
+  /**
+   * Combined content-loaded callback that restores both scroll position
+   * and cursor position after editor content has been loaded for a note.
+   *
+   * @remarks
+   * This delegates to {@link useBlockScrollMemory.onContentLoaded} and
+   * {@link useCursorMemory.onContentLoaded} so that the editor returns
+   * to the exact visual state the user last saw.
+   */
   const handleContentLoaded = useCallback(() => {
     onCursorLoaded()
     onScrollLoaded()
@@ -105,7 +114,12 @@ function AppContent() {
     ],
   })
 
-  /** Smoothly scrolls the editor content area back to the top. */
+  /**
+   * Smoothly scrolls the editor content area back to the top.
+   *
+   * @remarks
+   * No-op when the scroll container ref is not attached.
+   */
   const scrollToTop = useCallback(() => {
     const el = scrollContainerRef.current
     if (!el) return
@@ -166,6 +180,8 @@ function AppContent() {
   /**
    * Persists the sidebar open/close state to the config store
    * and updates the local UI state.
+   *
+   * @param open - `true` to open the sidebar, `false` to close it.
    */
   const handleSidebarOpenChange = useCallback(
     (open: boolean) => {
@@ -180,6 +196,8 @@ function AppContent() {
   /**
    * Persists the given note ID (or removes it when `null`) to the
    * editor store so it can be restored on next app launch.
+   *
+   * @param id - The note ID to persist, or `null` to clear the stored value.
    */
   const persistLastNoteId = useCallback(
     (id: string | null) => {
@@ -196,6 +214,8 @@ function AppContent() {
   /**
    * Switches the active note. Saves the scroll position for the
    * previously selected note and persists the new selection.
+   *
+   * @param id - The ID of the note to select, or `null` to deselect.
    */
   const selectNote = useCallback(
     (id: string | null) => {
@@ -205,15 +225,8 @@ function AppContent() {
       }
       setSelectedNoteId(id)
       persistLastNoteId(id)
-      resetHeader()
     },
-    [
-      selectedNoteId,
-      saveScrollPosition,
-      saveCursorPosition,
-      persistLastNoteId,
-      resetHeader,
-    ]
+    [selectedNoteId, saveScrollPosition, saveCursorPosition, persistLastNoteId]
   )
 
   useEffect(() => {
@@ -244,6 +257,8 @@ function AppContent() {
   /**
    * Callback invoked after a note is auto-saved.
    * Bumps the refresh key so the sidebar reflects the updated title.
+   *
+   * @param id - The ID of the note that was saved.
    */
   const handleNoteSaved = useCallback((id: string) => {
     setSelectedNoteId((current) => {
@@ -253,7 +268,11 @@ function AppContent() {
     setRefreshKey((v) => v + 1)
   }, [])
 
-  /** Creates a new note with default content and selects it. */
+  /**
+   * Creates a new note with default content and selects it.
+   *
+   * @throws Shows an error toast if note creation fails.
+   */
   const handleNewNote = useCallback(async () => {
     try {
       const note = await createNote(
@@ -270,6 +289,9 @@ function AppContent() {
   /**
    * Deletes the specified note. If the deleted note was currently
    * selected, falls back to the first remaining note or `null`.
+   *
+   * @param noteId - The ID of the note to delete.
+   * @throws Shows an error toast if deletion fails.
    */
   const handleDeleteNote = useCallback(
     async (noteId: string) => {
@@ -288,7 +310,13 @@ function AppContent() {
     [selectedNoteId, selectNote]
   )
 
-  /** Toggles the pinned state of the given note and refreshes the sidebar. */
+  /**
+   * Toggles the pinned state of the given note and refreshes the sidebar.
+   *
+   * @param noteId - The ID of the note whose pin state should be toggled.
+   * @param pinned - The new pinned state to apply.
+   * @throws Shows an error toast if the toggle operation fails.
+   */
   const handleTogglePin = useCallback(
     async (noteId: string, pinned: boolean) => {
       try {
@@ -301,7 +329,12 @@ function AppContent() {
     []
   )
 
-  /** Exports the given note as a Markdown file via a native save dialog. */
+  /**
+   * Exports the given note as a Markdown file via a native save dialog.
+   *
+   * @param noteId - The ID of the note to export.
+   * @throws Shows an error toast if the note is not found or export fails.
+   */
   const handleExportNote = useCallback(async (noteId: string) => {
     const editor = editorRef.current?.editor
     if (!editor) return
@@ -330,7 +363,11 @@ function AppContent() {
     }
   }, [])
 
-  /** Imports a Markdown file as a new note via a native open dialog. */
+  /**
+   * Imports a Markdown file as a new note via a native open dialog.
+   *
+   * @throws Shows an error toast if the file cannot be read or parsed.
+   */
   const handleImportNote = useCallback(async () => {
     const editor = editorRef.current?.editor
     if (!editor) return
