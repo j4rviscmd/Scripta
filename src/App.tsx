@@ -11,6 +11,10 @@ import { configDefaults, useAppStore } from '@/app/providers/store-provider'
 import { ThemeProvider } from '@/app/providers/theme-provider'
 import { ToolbarConfigProvider } from '@/app/providers/toolbar-config-provider'
 import {
+  useWindowTitlePrefix,
+  WindowTitlePrefixProvider,
+} from '@/app/providers/window-title-prefix-provider'
+import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
@@ -36,10 +40,6 @@ import {
 } from '@/features/editor'
 import { commandPaletteScrollConfig } from '@/features/editor/lib/commandPaletteScrollConfig'
 import { NoteSidebar } from '@/features/sidebar'
-import {
-  useWindowTitlePrefix,
-  WindowTitlePrefixProvider,
-} from '@/app/providers/window-title-prefix-provider'
 import { cn } from '@/lib/utils'
 import { useBlockScrollMemory } from '@/shared/hooks/useBlockScrollMemory'
 import { useCursorMemory } from '@/shared/hooks/useCursorMemory'

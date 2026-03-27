@@ -1,6 +1,6 @@
+import { useWindowTitlePrefix } from '@/app/providers/window-title-prefix-provider'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { useWindowTitlePrefix } from '@/app/providers/window-title-prefix-provider'
 
 /**
  * Settings toggle for the "Scripta - " window title prefix.

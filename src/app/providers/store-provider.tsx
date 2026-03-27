@@ -62,14 +62,19 @@ export const storeInitPromise = Promise.all([
   configStore.init(),
   editorStateStore.init(),
 ]).then(async () => {
-  const [storedSidebarOpen, storedWindowRestore, storedTheme, storedToolbar, storedTitlePrefix] =
-    await Promise.all([
-      configStore.get<boolean>('sidebarOpen'),
-      configStore.get<boolean>(WINDOW_STATE_STORE_KEY),
-      configStore.get<string>('theme'),
-      configStore.get<ToolbarItemConfig[]>(TOOLBAR_CONFIG_STORE_KEY),
-      configStore.get<boolean>(WINDOW_TITLE_PREFIX_STORE_KEY),
-    ])
+  const [
+    storedSidebarOpen,
+    storedWindowRestore,
+    storedTheme,
+    storedToolbar,
+    storedTitlePrefix,
+  ] = await Promise.all([
+    configStore.get<boolean>('sidebarOpen'),
+    configStore.get<boolean>(WINDOW_STATE_STORE_KEY),
+    configStore.get<string>('theme'),
+    configStore.get<ToolbarItemConfig[]>(TOOLBAR_CONFIG_STORE_KEY),
+    configStore.get<boolean>(WINDOW_TITLE_PREFIX_STORE_KEY),
+  ])
   if (storedSidebarOpen != null) {
     configDefaults.sidebarOpen = storedSidebarOpen
   }

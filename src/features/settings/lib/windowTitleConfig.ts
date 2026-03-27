@@ -7,5 +7,4 @@ export const DEFAULT_WINDOW_TITLE_PREFIX = true
  * When `true`, the window title is formatted as `"Scripta - {note title}"`.
  * When `false`, only the note title is shown (e.g. `"My Note"`).
  */
-export const WINDOW_TITLE_PREFIX_STORE_KEY =
-  'windowTitlePrefixEnabled' as const
+export const WINDOW_TITLE_PREFIX_STORE_KEY = 'windowTitlePrefixEnabled' as const

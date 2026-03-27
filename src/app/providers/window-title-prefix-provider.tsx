@@ -48,10 +48,7 @@ export function WindowTitlePrefixProvider({
     [configStore]
   )
 
-  const value = useMemo(
-    () => ({ enabled, setEnabled }),
-    [enabled, setEnabled]
-  )
+  const value = useMemo(() => ({ enabled, setEnabled }), [enabled, setEnabled])
 
   return (
     <WindowTitlePrefixContext.Provider value={value}>
