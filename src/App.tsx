@@ -74,7 +74,8 @@ function AppContent() {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const editorRef = useRef<EditorHandle>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const isHeaderHidden = useScrollDirection(scrollContainerRef)
+  const { isHidden: isHeaderHidden, resetHeader } =
+    useScrollDirection(scrollContainerRef)
   const isScrolledDown = useScrollPosition(scrollContainerRef)
   const { onContentLoaded: onScrollLoaded, saveScrollPosition } =
     useBlockScrollMemory({
@@ -204,8 +205,15 @@ function AppContent() {
       }
       setSelectedNoteId(id)
       persistLastNoteId(id)
+      resetHeader()
     },
-    [selectedNoteId, saveScrollPosition, saveCursorPosition, persistLastNoteId]
+    [
+      selectedNoteId,
+      saveScrollPosition,
+      saveCursorPosition,
+      persistLastNoteId,
+      resetHeader,
+    ]
   )
 
   useEffect(() => {

@@ -24,7 +24,9 @@ interface ScrollDirectionOptions {
  *
  * @param containerRef - Ref to the scrollable container element.
  * @param options - Configuration options. See {@link ScrollDirectionOptions}.
- * @returns `true` when the header should be hidden, `false` otherwise.
+ * @returns An object containing:
+ *   - `isHidden` - `true` when the header should be hidden, `false` otherwise.
+ *   - `resetHeader` - Imperative function to force the header visible and clear internal state.
  */
 export function useScrollDirection(
   containerRef: React.RefObject<HTMLElement | null>,
@@ -160,5 +162,20 @@ export function useScrollDirection(
     }
   }, [containerRef, threshold, setHidden])
 
-  return isHidden
+  /**
+   * Forces the header to become visible and clears all internal
+   * accumulated state (wheel delta, suppress timer, etc.).
+   *
+   * Call this when the scroll context changes fundamentally (e.g.
+   * switching to a different note) so the header is not left in a
+   * stale hidden state.
+   */
+  const resetHeader = useCallback(() => {
+    suppressScrollShow.current = false
+    accumulatedDelta.current = 0
+    clearTimeout(suppressTimer.current)
+    setHidden(false)
+  }, [setHidden])
+
+  return { isHidden, resetHeader }
 }
