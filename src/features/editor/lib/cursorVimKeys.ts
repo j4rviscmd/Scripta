@@ -1,5 +1,5 @@
 import { createExtension } from '@blocknote/core'
-import { Selection, TextSelection } from '@tiptap/pm/state'
+import { NodeSelection, Selection, TextSelection } from '@tiptap/pm/state'
 
 /**
  * BlockNote extension that adds Vim-style cursor movement keyboard shortcuts
@@ -174,14 +174,21 @@ export const cursorVimKeysExtension = createExtension(({ editor }) => {
           // If the cursor is at the end/start of the current textblock,
           // move to the next/previous block (mirrors ProseMirror's selectVertically).
           const atBoundary = view.endOfTextblock(dir > 0 ? 'down' : 'up')
-          if (atBoundary || !$head.parent.inlineContent) {
-            // Resolve the position just outside the current block, then find
-            // the nearest valid selection in the target direction.
-            const $start = !$head.parent.inlineContent
-              ? $head
-              : $head.depth
-                ? state.doc.resolve(dir > 0 ? $head.after() : $head.before())
-                : null
+          const isNodeSel = selection instanceof NodeSelection
+          if (atBoundary || isNodeSel || !$head.parent.inlineContent) {
+            // For NodeSelection (e.g. image block) or non-inline blocks, resolve
+            // a position just outside the current node so findFrom can jump to
+            // the neighbour block. Using $head directly would re-select the same
+            // node when scanning backward.
+            const $start = isNodeSel
+              ? state.doc.resolve(
+                  dir > 0 ? $head.after($head.depth) : $head.before($head.depth)
+                )
+              : !$head.parent.inlineContent
+                ? $head
+                : $head.depth
+                  ? state.doc.resolve(dir > 0 ? $head.after() : $head.before())
+                  : null
             if ($start) {
               const next = Selection.findFrom($start, dir)
               if (next) {
