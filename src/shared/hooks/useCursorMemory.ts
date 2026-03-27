@@ -66,7 +66,10 @@ export function useCursorMemory({ editorRef, noteId }: UseCursorMemoryOptions) {
       })
   }, [editorStore])
 
-  /** Persists the in-memory position map to the store (fire-and-forget). */
+  /**
+   * Persists the in-memory position map to the tauri-plugin-store.
+   * Errors are logged but not propagated (fire-and-forget).
+   */
   const persistPositions = useCallback(() => {
     editorStore
       .set('cursorPositions', { ...positionsRef.current })
@@ -75,7 +78,12 @@ export function useCursorMemory({ editorRef, noteId }: UseCursorMemoryOptions) {
       })
   }, [editorStore])
 
-  /** Persists the currently focused block ID for the given note. */
+  /**
+   * Reads the currently focused block ID from the editor and stores it
+   * under the given note ID. Triggers an async persist to the store.
+   *
+   * @param targetNoteId - The note ID to associate the cursor position with.
+   */
   const saveCursorPosition = useCallback(
     (targetNoteId: string) => {
       const editor = editorRef.current?.editor
@@ -90,9 +98,10 @@ export function useCursorMemory({ editorRef, noteId }: UseCursorMemoryOptions) {
     [editorRef, persistPositions]
   )
 
-  /** Focuses the editor on the next animation frame. */
+  /** Focuses the editor after layout and paint are complete. */
   const focusEditor = useCallback(
-    (editor: BlockNoteEditor) => requestAnimationFrame(() => editor.focus()),
+    (editor: BlockNoteEditor) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => editor.focus())),
     []
   )
 
@@ -115,7 +124,13 @@ export function useCursorMemory({ editorRef, noteId }: UseCursorMemoryOptions) {
     [focusEditor]
   )
 
-  /** Restores the cursor to the saved block for the current note. */
+  /**
+   * Restores the cursor to the previously saved block for the current note.
+   * Falls back to the first block when the saved block no longer exists.
+   * On the first invocation (app startup), waits for the splash screen to
+   * be removed before focusing; on subsequent invocations, focuses after
+   * a single frame delay.
+   */
   const restoreCursorPosition = useCallback(() => {
     const editor = editorRef.current?.editor
     if (!editor) return
