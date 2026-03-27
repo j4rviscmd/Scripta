@@ -37,6 +37,7 @@ import { commandPaletteScrollConfig } from '@/features/editor/lib/commandPalette
 import { NoteSidebar } from '@/features/sidebar'
 import { cn } from '@/lib/utils'
 import { useBlockScrollMemory } from '@/shared/hooks/useBlockScrollMemory'
+import { useCursorMemory } from '@/shared/hooks/useCursorMemory'
 import { useScrollDirection } from '@/shared/hooks/useScrollDirection'
 import { useScrollIsolation } from '@/shared/hooks/useScrollIsolation'
 import { useScrollPosition } from '@/shared/hooks/useScrollPosition'
@@ -66,10 +67,22 @@ function AppContent() {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const isHeaderHidden = useScrollDirection(scrollContainerRef)
   const isScrolledDown = useScrollPosition(scrollContainerRef)
-  const { onContentLoaded, saveScrollPosition } = useBlockScrollMemory({
-    containerRef: scrollContainerRef,
-    noteId: selectedNoteId,
-  })
+  const { onContentLoaded: onScrollLoaded, saveScrollPosition } =
+    useBlockScrollMemory({
+      containerRef: scrollContainerRef,
+      noteId: selectedNoteId,
+    })
+  const { onContentLoaded: onCursorLoaded, saveCursorPosition } =
+    useCursorMemory({
+      editorRef,
+      noteId: selectedNoteId,
+    })
+
+  /** Combined content-loaded callback that restores both scroll and cursor. */
+  const handleContentLoaded = useCallback(() => {
+    onCursorLoaded()
+    onScrollLoaded()
+  }, [onCursorLoaded, onScrollLoaded])
   useScrollIsolation(scrollContainerRef, {
     selectors: [
       '.bn-suggestion-menu',
@@ -175,11 +188,12 @@ function AppContent() {
     (id: string | null) => {
       if (selectedNoteId) {
         saveScrollPosition(selectedNoteId)
+        saveCursorPosition(selectedNoteId)
       }
       setSelectedNoteId(id)
       persistLastNoteId(id)
     },
-    [selectedNoteId, saveScrollPosition, persistLastNoteId]
+    [selectedNoteId, saveScrollPosition, saveCursorPosition, persistLastNoteId]
   )
 
   useEffect(() => {
@@ -363,7 +377,7 @@ function AppContent() {
               noteId={selectedNoteId}
               onNoteSaved={handleNoteSaved}
               onStatusChange={setSaveStatus}
-              onContentLoaded={onContentLoaded}
+              onContentLoaded={handleContentLoaded}
               onSuggestionMenuOpen={scrollCursorToTop}
             />
             <div className="pointer-events-none sticky bottom-5 z-10 flex justify-end pr-7">
