@@ -51,6 +51,12 @@ import { rangeCheckToggleExtension } from '../lib/rangeCheckToggle'
 import { slashMenuEmacsKeysExtension } from '../lib/slashMenuEmacsKeys'
 import { HighlightButton } from './HighlightButton'
 
+/**
+ * Default editor blocks cast to `any` to satisfy BlockNote's generic overloads.
+ *
+ * Uses the {@link DEFAULT_BLOCKS} constant which defines the initial empty
+ * document structure shown when no persisted content is loaded.
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const BLOCKS = DEFAULT_BLOCKS as any
 
@@ -419,6 +425,13 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     }
   }, [noteId, editor, backfillImageCaptions, onContentLoaded])
 
+  /**
+   * Handles editor content changes by back-filling image captions and
+   * scheduling an auto-save.
+   *
+   * Skipped while the editor is still loading initial content
+   * (`loadingRef.current === true`) to prevent spurious writes.
+   */
   const handleChange = useCallback(() => {
     if (loadingRef.current) return
     // Ensure every image block has a non-empty caption so the bubble menu
@@ -434,7 +447,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   return (
     <>
       <div
-        className="w-full px-8 pb-[60vh]"
+        className="w-full min-h-screen px-8 pb-[60vh]"
         data-editor-root
         style={
           {
