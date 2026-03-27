@@ -42,5 +42,6 @@ export {
 } from './lib/markdown-export'
 export { rangeCheckToggleExtension } from './lib/rangeCheckToggle'
 export { searchExtension } from './lib/searchExtension'
+export { slashMenuEmacsKeysExtension } from './lib/slashMenuEmacsKeys'
 export type { EditorHandle } from './ui/Editor'
 export { Editor } from './ui/Editor'
