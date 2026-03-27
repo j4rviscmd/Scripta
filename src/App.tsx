@@ -11,6 +11,10 @@ import { configDefaults, useAppStore } from '@/app/providers/store-provider'
 import { ThemeProvider } from '@/app/providers/theme-provider'
 import { ToolbarConfigProvider } from '@/app/providers/toolbar-config-provider'
 import {
+  useWindowTitlePrefix,
+  WindowTitlePrefixProvider,
+} from '@/app/providers/window-title-prefix-provider'
+import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
@@ -64,6 +68,7 @@ function AppContent() {
   // Reads cursorAutoHideConfig directly so settings changes from the UI
   // take effect immediately without re-mounting.
   useCursorAutoHideEffect()
+  const { enabled: titlePrefixEnabled } = useWindowTitlePrefix()
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
   // True once the persisted lastNoteId has been loaded from the store.
   // Prevents the window title from flashing "Untitled" before the stored
@@ -234,17 +239,17 @@ function AppContent() {
     // window title to avoid a flash of "Untitled".
     if (!noteIdInitialized) return
     const appWindow = getCurrentWindow()
+    const formatTitle = (title: string) =>
+      titlePrefixEnabled ? `Scripta - ${title}` : title
     if (!selectedNoteId) {
-      appWindow.setTitle('Scripta - Untitled')
+      appWindow.setTitle(formatTitle('Untitled'))
       return
     }
     let stale = false
     getNote(selectedNoteId)
       .then((note) => {
         if (stale) return
-        appWindow.setTitle(
-          note ? `Scripta - ${note.title}` : 'Scripta - Untitled'
-        )
+        appWindow.setTitle(formatTitle(note ? note.title : 'Untitled'))
       })
       .catch(() => {
         if (!stale) console.error('Failed to load note for window title')
@@ -252,7 +257,7 @@ function AppContent() {
     return () => {
       stale = true
     }
-  }, [selectedNoteId, noteIdInitialized])
+  }, [selectedNoteId, noteIdInitialized, titlePrefixEnabled])
 
   /**
    * Callback invoked after a note is auto-saved.
@@ -470,7 +475,9 @@ function App() {
       <FontSizeProvider>
         <EditorFontProvider>
           <ToolbarConfigProvider>
-            <AppContent />
+            <WindowTitlePrefixProvider>
+              <AppContent />
+            </WindowTitlePrefixProvider>
           </ToolbarConfigProvider>
         </EditorFontProvider>
       </FontSizeProvider>
