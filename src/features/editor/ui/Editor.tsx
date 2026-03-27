@@ -52,6 +52,12 @@ import { SearchReplacePanel } from './SearchReplacePanel'
 import '@blocknote/shadcn/style.css'
 import '@blocknote/core/fonts/inter.css'
 
+/**
+ * Default editor blocks cast to `any` to satisfy BlockNote's generic overloads.
+ *
+ * Uses the {@link DEFAULT_BLOCKS} constant which defines the initial empty
+ * document structure shown when no persisted content is loaded.
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const BLOCKS = DEFAULT_BLOCKS as any
 
@@ -500,7 +506,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   return (
     <>
       <div
-        className="w-full px-8 pb-[60vh]"
+        className="w-full min-h-screen px-8 pb-[60vh]"
         data-editor-root
         style={
           {
