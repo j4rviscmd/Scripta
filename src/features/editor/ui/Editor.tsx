@@ -46,6 +46,7 @@ import { useSearchReplace } from '../hooks/useSearchReplace'
 import { codeBlockOptions } from '../lib/codeBlockConfig'
 import { DEFAULT_BLOCKS } from '../lib/constants'
 import { rangeCheckToggleExtension } from '../lib/rangeCheckToggle'
+import { slashMenuEmacsKeysExtension } from '../lib/slashMenuEmacsKeys'
 import { HighlightButton } from './HighlightButton'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -191,6 +192,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       cursorCenteringExtension,
       searchExtension,
       rangeCheckToggleExtension(),
+      slashMenuEmacsKeysExtension(),
     ],
     uploadFile: uploadImage,
     resolveFileUrl: resolveImageUrl,
