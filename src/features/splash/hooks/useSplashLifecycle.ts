@@ -13,6 +13,7 @@
  * completes, the state moves to `done` and the splash can be unmounted.
  */
 
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { storeInitPromise } from '@/app/providers/store-provider'
 import { FADE_DURATION_MS, MIN_DISPLAY_MS } from '../lib/constants'
@@ -21,6 +22,13 @@ import { notifySplashFading } from '../lib/splash-state'
 /** Phases of the splash screen lifecycle. */
 type SplashPhase = 'active' | 'fading' | 'done'
 
+/**
+ * Shape returned by {@link useSplashLifecycle}.
+ *
+ * Provides the current lifecycle phase and a callback that must be wired to
+ * the overlay element's `onTransitionEnd` so the hook can advance from
+ * `fading` to `done`.
+ */
 interface SplashLifecycle {
   /** Current phase of the splash screen. */
   phase: SplashPhase
@@ -41,11 +49,10 @@ export function useSplashLifecycle(): SplashLifecycle {
   useEffect(() => {
     disposedRef.current = false
 
-    const minTimer = new Promise<void>((resolve) =>
-      setTimeout(resolve, MIN_DISPLAY_MS)
-    )
+    const wait = (ms: number) =>
+      new Promise<void>((resolve) => setTimeout(resolve, ms))
 
-    Promise.all([storeInitPromise, minTimer]).then(() => {
+    Promise.all([storeInitPromise, wait(MIN_DISPLAY_MS)]).then(() => {
       if (!disposedRef.current) {
         notifySplashFading()
         setPhase('fading')
@@ -56,6 +63,18 @@ export function useSplashLifecycle(): SplashLifecycle {
       disposedRef.current = true
     }
   }, [])
+
+  // Re-enable window operations once the splash is fully dismissed.
+  useEffect(() => {
+    if (phase !== 'done') return
+    const appWindow = getCurrentWindow()
+    Promise.all([
+      appWindow.setResizable(true),
+      appWindow.setMaximizable(true),
+    ]).catch((e) => {
+      console.error('Failed to re-enable window operations:', e)
+    })
+  }, [phase])
 
   const onFadeComplete = useCallback(() => {
     setPhase('done')
