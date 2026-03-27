@@ -521,6 +521,43 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     scheduleSave(JSON.stringify(editor.document))
   }, [editor, scheduleSave, backfillImageCaptions])
 
+  /**
+   * Handles clicks on the editor wrapper's padding area.
+   *
+   * The editor wrapper has generous bottom padding (`pb-[60vh]`) so that
+   * users can scroll content above the virtual keyboard on mobile devices.
+   * Clicking in this padding zone does not naturally focus the editor
+   * because the click target is outside the `.bn-editor` contenteditable
+   * region. This callback detects such clicks and programmatically focuses
+   * the editor with the cursor placed at the end of the last block.
+   *
+   * If the click originated inside `.bn-editor` (including any of its
+   * descendant elements), the callback returns early and lets the default
+   * browser behaviour handle focus normally.
+   *
+   * @param e - The mouse event from the wrapper `<div>`.
+   *
+   * @example
+   * ```tsx
+   * <div onClick={handleWrapperClick}>
+   *   <BlockNoteView editor={editor} />
+   * </div>
+   * ```
+   */
+  const handleWrapperClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const target = e.target as HTMLElement
+      if (target.closest('.bn-editor')) return
+
+      const lastBlock = editor.document[editor.document.length - 1]
+      if (lastBlock) {
+        editor.setTextCursorPosition(lastBlock, 'end')
+      }
+      editor.focus()
+    },
+    [editor]
+  )
+
   return (
     <>
       {/* Editor wrapper — starts invisible (`opacity-0`) and transitions to
@@ -529,6 +566,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       <div
         className={`w-full min-h-screen px-8 pb-[60vh] ${contentReady ? 'opacity-100' : 'opacity-0'}`}
         data-editor-root
+        onClick={handleWrapperClick}
         style={
           {
             '--editor-font-size': `${fontSize}px`,
