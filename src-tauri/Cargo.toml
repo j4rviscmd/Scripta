@@ -25,4 +25,3 @@ chrono = { version = "0.4", features = ["serde"] }
 reqwest = { version = "0.12", features = ["rustls-tls"], default-features = false }
 scraper = "0.23"
 tauri-plugin-fs = "2"
-tauri-plugin-window-state = "2"
