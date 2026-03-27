@@ -5,9 +5,13 @@ import { CENTERING_EVENT } from '@/shared/lib/events'
 /**
  * Configuration options for {@link useScrollDirection}.
  */
+type HeaderHiddenMap = Record<string, boolean>
+
 interface ScrollDirectionOptions {
   /** Minimum accumulated scroll delta (px) before toggling header visibility. Defaults to `10`. */
   threshold?: number
+  /** The currently active note ID, or `null` when no note is selected. */
+  noteId?: string | null
 }
 
 /**
@@ -26,29 +30,59 @@ interface ScrollDirectionOptions {
  * @param options - Configuration options. See {@link ScrollDirectionOptions}.
  * @returns An object containing:
  *   - `isHidden` - `true` when the header should be hidden, `false` otherwise.
- *   - `resetHeader` - Imperative function to force the header visible and clear internal state.
  */
 export function useScrollDirection(
   containerRef: React.RefObject<HTMLElement | null>,
   options: ScrollDirectionOptions = {}
 ) {
-  const { threshold = 10 } = options
+  const { threshold = 10, noteId = null } = options
   const { editorState: editorStore } = useAppStore()
   const [isHidden, setIsHidden] = useState(false)
+  const noteIdRef = useRef(noteId)
+  const mapRef = useRef<HeaderHiddenMap>({})
+  const mapLoadedRef = useRef(false)
 
-  // Load persisted header hidden state from the store on first mount.
+  useEffect(() => {
+    noteIdRef.current = noteId
+  }, [noteId])
+
+  // Load persisted header hidden map from the store on first mount.
+  // Also migrates the legacy `headerHidden` boolean key.
   useEffect(() => {
     editorStore
-      .get<boolean>('headerHidden')
-      .then((val) => {
-        if (val !== undefined) setIsHidden(val)
+      .get<HeaderHiddenMap>('headerHiddenMap')
+      .then((map) => {
+        if (map) mapRef.current = map
+        return editorStore.get<boolean>('headerHidden')
+      })
+      .then((legacy) => {
+        // One-time migration: promote legacy boolean to the current note.
+        if (legacy != null) {
+          if (noteIdRef.current) {
+            mapRef.current[noteIdRef.current] = legacy
+          }
+          editorStore.delete('headerHidden').catch(() => {})
+        }
+        mapLoadedRef.current = true
+        if (noteIdRef.current) {
+          const saved = mapRef.current[noteIdRef.current]
+          if (saved !== undefined) setIsHidden(saved)
+        }
       })
       .catch((err) => {
-        console.error('Failed to load headerHidden:', err)
+        console.error('Failed to load headerHiddenMap:', err)
+        mapLoadedRef.current = true
       })
   }, [editorStore])
 
-  /** Updates the hidden state and persists it to the store. */
+  /** Persists the in-memory map to the store (fire-and-forget). */
+  const persistMap = useCallback(() => {
+    editorStore.set('headerHiddenMap', { ...mapRef.current }).catch((err) => {
+      console.error('Failed to persist headerHiddenMap:', err)
+    })
+  }, [editorStore])
+
+  /** Updates the hidden state and persists it per-note to the store. */
   const setHidden = useCallback(
     (value: boolean) => {
       setIsHidden(value)
@@ -59,12 +93,16 @@ export function useScrollDirection(
           suppressScrollShow.current = false
         }, 300)
       }
-      editorStore.set('headerHidden', value).catch((err) => {
-        console.error('Failed to persist headerHidden:', err)
-      })
+      const currentNoteId = noteIdRef.current
+      if (currentNoteId) {
+        mapRef.current[currentNoteId] = value
+        persistMap()
+      }
     },
-    [editorStore]
+    [persistMap]
   )
+
+  // --- Refs for wheel-event throttling and edge guards ---
   /** Accumulated vertical wheel delta (px) since the last animation-frame flush. */
   const accumulatedDelta = useRef(0)
   /** Whether an `requestAnimationFrame` callback is already scheduled. */
@@ -78,13 +116,29 @@ export function useScrollDirection(
   /** ID of the pending `requestAnimationFrame` callback, used for cleanup on unmount. */
   const rafId = useRef<number>(0)
 
+  // --- Refs for the suppress-scroll-show guard ---
   // Suppresses the scroll-to-top auto-show for a short period after hiding
-  // the header, preventing the feedback loop where header collapse → container
-  // resize → scrollTop clamp to 0 → header re-shown → repeat.
+  // the header, preventing the feedback loop where header collapse -> container
+  // resize -> scrollTop clamp to 0 -> header re-shown -> repeat.
   const suppressScrollShow = useRef(false)
   const suppressTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined
   )
+
+  // Restore header state when noteId changes.
+  // If the store hasn't loaded yet, defer restoration to the load effect.
+  useEffect(() => {
+    if (!noteId) {
+      setIsHidden(false)
+      return
+    }
+    if (!mapLoadedRef.current) return
+    const saved = mapRef.current[noteId]
+    suppressScrollShow.current = false
+    accumulatedDelta.current = 0
+    clearTimeout(suppressTimer.current)
+    setIsHidden(saved ?? false)
+  }, [noteId])
 
   useEffect(() => {
     const container = containerRef.current
@@ -162,20 +216,5 @@ export function useScrollDirection(
     }
   }, [containerRef, threshold, setHidden])
 
-  /**
-   * Forces the header to become visible and clears all internal
-   * accumulated state (wheel delta, suppress timer, etc.).
-   *
-   * Call this when the scroll context changes fundamentally (e.g.
-   * switching to a different note) so the header is not left in a
-   * stale hidden state.
-   */
-  const resetHeader = useCallback(() => {
-    suppressScrollShow.current = false
-    accumulatedDelta.current = 0
-    clearTimeout(suppressTimer.current)
-    setHidden(false)
-  }, [setHidden])
-
-  return { isHidden, resetHeader }
+  return { isHidden }
 }
