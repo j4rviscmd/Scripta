@@ -283,16 +283,25 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       let wasShown = false
       unsubscribeStore = ext.store.subscribe(() => {
         const state = ext.store.state as
-          | { show?: boolean; referencePos?: DOMRect }
+          | {
+              show?: boolean
+              referencePos?: DOMRect
+              triggerCharacter?: string
+            }
           | undefined
         // BlockNote's UiElementPosition always has a `show` boolean; use it
         // instead of checking for undefined so we correctly track open/close.
         const isShown = state?.show === true
         if (isShown && !wasShown) {
-          const cursorClientY = state?.referencePos?.top ?? 0
-          // Defer the scroll so it runs after ProseMirror's own scrollIntoView
-          // (which fires synchronously on the same transaction).
-          requestAnimationFrame(() => notifyOpen(cursorClientY))
+          // Only scroll for the slash ("/") command palette.
+          // Other suggestion menus (e.g. emoji picker triggered by ":") should
+          // not cause the scroll-to-cursor behaviour.
+          if (state?.triggerCharacter === '/') {
+            const cursorClientY = state?.referencePos?.top ?? 0
+            // Defer the scroll so it runs after ProseMirror's own scrollIntoView
+            // (which fires synchronously on the same transaction).
+            requestAnimationFrame(() => notifyOpen(cursorClientY))
+          }
         }
         wasShown = isShown
       })
