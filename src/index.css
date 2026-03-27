@@ -94,7 +94,7 @@ body {
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
+  --popover-foreground: oklch(0.85 0 0);
   --primary: oklch(0.922 0 0);
   --primary-foreground: oklch(0.205 0 0);
   --secondary: oklch(0.269 0 0);
@@ -162,10 +162,6 @@ body {
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -174,11 +170,15 @@ body {
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --font-heading: var(--font-sans);
-  --font-sans: 'Geist Variable', sans-serif;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  --font-heading: var(--font-sans);
+  --font-sans: 'Geist Variable', sans-serif;
 }
 
 /*
@@ -331,11 +331,11 @@ span[data-style-type="backgroundColor"][data-value="yellow"] {
 }
 
 /*
- * Search match highlight styles.
+ * Search match highlights.
  *
- * Applied by the editor's search-and-replace feature. Uses `box-decoration-break: clone`
- * so the highlight wraps cleanly across line breaks within a match.
- * The `-current` variant uses a stronger colour to indicate the active match.
+ * Uses `box-decoration-break: clone` for clean line-break wrapping.
+ * The `-current` variant indicates the active match with a stronger colour.
+ * Dark mode uses semi-transparent greens tuned for comfortable reading.
  */
 .search-match,
 .search-match-current {
@@ -346,22 +346,12 @@ span[data-style-type="backgroundColor"][data-value="yellow"] {
 .search-match {
   background-color: oklch(0.88 0.08 155);
 }
-
 .search-match-current {
   background-color: oklch(0.7 0.18 155);
 }
-
-/*
- * Dark mode search highlights.
- *
- * Uses semi-transparent greens so the highlights remain visible without
- * overwhelming the dark background. Opacity values are tuned for
- * comfortable reading over extended sessions.
- */
 .dark .search-match {
   background-color: oklch(0.35 0.06 155 / 40%);
 }
-
 .dark .search-match-current {
   background-color: oklch(0.45 0.15 155 / 55%);
 }
@@ -412,43 +402,26 @@ span[data-style-type="backgroundColor"][data-value="yellow"] {
 /*
  * Code block syntax highlighting – theme-aware overrides.
  *
- * Shiki's dual-theme mode (configured in `codeBlockConfig.ts`) emits inline
- * styles on each token with the light colour as `color` and the dark colour
- * as a `--shiki-dark` CSS variable.  The code block wrapper node receives a
- * `rootStyle` containing `background-color` (light) and `--shiki-dark-bg`
- * (dark).
- *
- * The rules below:
- *   1. Override BlockNote's hardcoded `#161616` background with theme-aware
- *      colours so the code block blends with the surrounding content.
- *   2. Switch token colours to the dark palette when `.dark` is present on
- *      the document root.
+ * Shiki's dual-theme mode emits inline styles with the light colour as `color`
+ * and the dark colour as `--shiki-dark`. These rules override BlockNote's
+ * hardcoded `#161616` background and activate the dark palette in `.dark`.
  */
-
-/* ---- Light mode code block background ---- */
 .bn-block-content[data-content-type="codeBlock"] {
   background-color: oklch(0.97 0 0) !important;
   color: oklch(0.145 0 0) !important;
 }
-
-/* ---- Dark mode code block background ---- */
 .dark .bn-block-content[data-content-type="codeBlock"] {
   background-color: oklch(0.18 0 0) !important;
   color: oklch(0.92 0 0) !important;
 }
-
-/* ---- Dark mode: activate Shiki dark-theme CSS variables ---- */
 .dark .bn-block-content[data-content-type="codeBlock"] [style*="--shiki-dark-bg"],
 .dark .bn-block-content[data-content-type="codeBlock"] pre {
   background-color: var(--shiki-dark-bg) !important;
   color: var(--shiki-dark) !important;
 }
-
 .dark .bn-block-content[data-content-type="codeBlock"] .shiki {
   color: var(--shiki-dark) !important;
 }
-
-/* ---- Language selector label inside code blocks ---- */
 .bn-block-content[data-content-type="codeBlock"] > div > select {
   color: oklch(0.4 0 0) !important;
 }
