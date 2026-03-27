@@ -31,6 +31,7 @@ import {
   readTextFile,
   togglePinNote,
   useCommandPaletteScroll,
+  useCursorAutoHideEffect,
   writeTextFile,
 } from '@/features/editor'
 import { commandPaletteScrollConfig } from '@/features/editor/lib/commandPaletteScrollConfig'
@@ -59,6 +60,10 @@ function AppContent() {
     useFontSize()
   // Initialises commandPaletteScrollConfig from the persisted store on mount.
   useCommandPaletteScroll()
+  // Registers global mouse listeners that hide the cursor after inactivity.
+  // Reads cursorAutoHideConfig directly so settings changes from the UI
+  // take effect immediately without re-mounting.
+  useCursorAutoHideEffect()
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
   // True once the persisted lastNoteId has been loaded from the store.
   // Prevents the window title from flashing "Untitled" before the stored
