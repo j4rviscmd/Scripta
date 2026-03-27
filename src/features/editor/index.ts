@@ -18,6 +18,10 @@ export {
 } from './api/notes'
 export type { SaveStatus } from './hooks/useAutoSave'
 export { useCommandPaletteScroll } from './hooks/useCommandPaletteScroll'
+export {
+  useCursorAutoHide,
+  useCursorAutoHideEffect,
+} from './hooks/useCursorAutoHide'
 export { useCursorCentering } from './hooks/useCursorCentering'
 export { useEditorFontSize } from './hooks/useEditorFontSize'
 export type { UseSearchReplaceReturn } from './hooks/useSearchReplace'
