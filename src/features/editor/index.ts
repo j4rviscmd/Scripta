@@ -45,6 +45,7 @@ export {
   exportToMarkdown,
   fixBlockNoteTableExport,
 } from './lib/markdown-export'
+export { checklistSplitFixExtension } from './lib/checklistSplitFix'
 export { rangeCheckToggleExtension } from './lib/rangeCheckToggle'
 export { searchExtension } from './lib/searchExtension'
 export { slashMenuEmacsKeysExtension } from './lib/slashMenuEmacsKeys'
