@@ -31,6 +31,7 @@ import { useTheme } from '@/app/providers/theme-provider'
 import type { SaveStatus } from '..'
 import {
   cursorCenteringExtension,
+  cursorVimKeysExtension,
   resolveImageUrl,
   searchExtension,
   uploadImage,
@@ -194,6 +195,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       searchExtension,
       rangeCheckToggleExtension(),
       slashMenuEmacsKeysExtension(),
+      cursorVimKeysExtension(),
     ],
     uploadFile: uploadImage,
     resolveFileUrl: resolveImageUrl,

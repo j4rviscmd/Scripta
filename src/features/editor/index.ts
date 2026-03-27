@@ -24,6 +24,7 @@ export type { UseSearchReplaceReturn } from './hooks/useSearchReplace'
 export { useSearchReplace } from './hooks/useSearchReplace'
 export { DEFAULT_BLOCKS, DEFAULT_CONTENT, extractTitle } from './lib/constants'
 export { cursorCenteringExtension } from './lib/cursorCentering'
+export { cursorVimKeysExtension } from './lib/cursorVimKeys'
 export {
   DEFAULT_FONT_SIZE,
   FONT_SIZE_STEP,
