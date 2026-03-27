@@ -50,19 +50,39 @@ export function useScrollDirection(
   const setHidden = useCallback(
     (value: boolean) => {
       setIsHidden(value)
+      if (value) {
+        suppressScrollShow.current = true
+        clearTimeout(suppressTimer.current)
+        suppressTimer.current = setTimeout(() => {
+          suppressScrollShow.current = false
+        }, 300)
+      }
       editorStore.set('headerHidden', value).catch((err) => {
         console.error('Failed to persist headerHidden:', err)
       })
     },
     [editorStore]
   )
+  /** Accumulated vertical wheel delta (px) since the last animation-frame flush. */
   const accumulatedDelta = useRef(0)
+  /** Whether an `requestAnimationFrame` callback is already scheduled. */
   const ticking = useRef(false)
+  /** When `true`, wheel events are ignored to prevent toggles triggered by click-induced scrolls. */
   const clickLock = useRef(false)
+  /** Timer handle for releasing {@link clickLock} after a 200 ms cooldown. */
   const clickTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined
   )
+  /** ID of the pending `requestAnimationFrame` callback, used for cleanup on unmount. */
   const rafId = useRef<number>(0)
+
+  // Suppresses the scroll-to-top auto-show for a short period after hiding
+  // the header, preventing the feedback loop where header collapse → container
+  // resize → scrollTop clamp to 0 → header re-shown → repeat.
+  const suppressScrollShow = useRef(false)
+  const suppressTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined
+  )
 
   useEffect(() => {
     const container = containerRef.current
@@ -111,6 +131,7 @@ export function useScrollDirection(
 
     /** Forces the header to become visible when the container is scrolled back to the very top. */
     const handleScroll = () => {
+      if (suppressScrollShow.current) return
       if (container.scrollTop <= 0) {
         setHidden(false)
         accumulatedDelta.current = 0
@@ -135,6 +156,7 @@ export function useScrollDirection(
       document.removeEventListener(CENTERING_EVENT, handleCentering)
       cancelAnimationFrame(rafId.current)
       clearTimeout(clickTimer.current)
+      clearTimeout(suppressTimer.current)
     }
   }, [containerRef, threshold, setHidden])
 
