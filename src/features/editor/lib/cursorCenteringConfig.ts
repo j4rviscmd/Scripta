@@ -1,6 +1,8 @@
 /** Default values used when no persisted setting exists. */
 export const DEFAULT_CURSOR_CENTERING = {
+  /** Whether cursor centering is active by default. */
   enabled: true,
+  /** Vertical position ratio (0 = top, 1 = bottom) at which the cursor is kept during typing. */
   targetRatio: 0.6,
 }
 
@@ -15,7 +17,10 @@ export const DEFAULT_CURSOR_CENTERING = {
  * Updated via the {@link useCursorCentering} hook, which also
  * persists the values to `configStore`.
  */
-export const cursorCenteringConfig = { ...DEFAULT_CURSOR_CENTERING }
+export const cursorCenteringConfig: {
+  enabled: boolean
+  targetRatio: number
+} = { ...DEFAULT_CURSOR_CENTERING }
 
 /** Store key names for persistence via `configStore`. */
 export const CURSOR_CENTERING_STORE_KEYS = {
