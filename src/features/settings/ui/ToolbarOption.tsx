@@ -38,6 +38,12 @@ import {
   RiUnderline,
 } from 'react-icons/ri'
 import { useToolbarConfig } from '@/app/providers/toolbar-config-provider'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -98,15 +104,10 @@ function SortableToolbarItem({
     isDragging,
   } = useSortable({ id: item.key })
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  }
-
   return (
     <div
       ref={setNodeRef}
-      style={style}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
         'flex items-center justify-between rounded-md px-3 py-1.5',
         isDragging && 'z-50 bg-accent opacity-80 shadow-sm'
@@ -180,41 +181,45 @@ export function ToolbarOption() {
   )
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between px-3">
-        <p className="font-medium text-muted-foreground text-xs">
+    <Accordion defaultValue={[]}>
+      <AccordionItem value="toolbar">
+        <AccordionTrigger className="py-2 text-xs">
           Formatting Toolbar
-        </p>
-        {isCustomized && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 gap-1 px-2 text-xs"
-            onClick={reset}
+        </AccordionTrigger>
+        <AccordionContent>
+          {isCustomized && (
+            <div className="flex justify-end px-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 gap-1 px-2 text-xs"
+                onClick={reset}
+              >
+                <RotateCcw className="h-3 w-3" />
+                Reset
+              </Button>
+            </div>
+          )}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
           >
-            <RotateCcw className="h-3 w-3" />
-            Reset
-          </Button>
-        )}
-      </div>
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext
-          items={items.map((i) => i.key)}
-          strategy={verticalListSortingStrategy}
-        >
-          {items.map((item) => (
-            <SortableToolbarItem
-              key={item.key}
-              item={item}
-              onToggle={toggleVisibility}
-            />
-          ))}
-        </SortableContext>
-      </DndContext>
-    </div>
+            <SortableContext
+              items={items.map((i) => i.key)}
+              strategy={verticalListSortingStrategy}
+            >
+              {items.map((item) => (
+                <SortableToolbarItem
+                  key={item.key}
+                  item={item}
+                  onToggle={toggleVisibility}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
+        </AccordionContent>
+      </AccordionItem>
+    </Accordion>
   )
 }
