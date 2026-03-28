@@ -55,6 +55,7 @@ interface NoteSidebarProps {
   onNewNote: () => void
   onDeleteNote: (noteId: string) => void
   onTogglePin: (noteId: string, pinned: boolean) => void
+  onToggleLock: (noteId: string, locked: boolean) => void
   onExportNote: (noteId: string) => void
   onDuplicateNote: (noteId: string) => void
   onImportNote: () => void
@@ -75,6 +76,7 @@ export function NoteSidebar({
   onNewNote,
   onDeleteNote,
   onTogglePin,
+  onToggleLock,
   onExportNote,
   onDuplicateNote,
   onImportNote,
@@ -231,6 +233,7 @@ export function NoteSidebar({
         selectedNoteId={selectedNoteId}
         onSelectNote={onSelectNote}
         onTogglePin={handleTogglePin}
+        onToggleLock={onToggleLock}
         onDeleteNote={() => setDeleteTarget(note.id)}
         onExportNote={onExportNote}
         onDuplicateNote={onDuplicateNote}
@@ -243,6 +246,7 @@ export function NoteSidebar({
       selectedNoteId,
       onSelectNote,
       handleTogglePin,
+      onToggleLock,
       onDuplicateNote,
       onExportNote,
       handleMoveToGroup,

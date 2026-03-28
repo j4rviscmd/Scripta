@@ -3,8 +3,10 @@ import {
   Check,
   Copy,
   Download,
+  FileLock,
   FileText,
   FolderInput,
+  LockOpen,
   Pin,
   PinOff,
   Trash2,
@@ -32,6 +34,7 @@ import { cn } from '@/lib/utils'
  * @property selectedNoteId - The ID of the currently selected note, or `null`.
  * @property onSelectNote - Callback invoked when the user clicks this note.
  * @property onTogglePin - Callback to pin or unpin the note.
+ * @property onToggleLock - Callback to lock or unlock the note.
  * @property onDeleteNote - Callback invoked when the user confirms deletion.
  * @property onDuplicateNote - Callback invoked to duplicate the note.
  * @property onExportNote - Callback invoked to export the note as Markdown.
@@ -44,6 +47,7 @@ interface NoteItemProps {
   selectedNoteId: string | null
   onSelectNote: (id: string) => void
   onTogglePin: (id: string, pinned: boolean) => void
+  onToggleLock: (id: string, locked: boolean) => void
   onDeleteNote: () => void
   onDuplicateNote: (noteId: string) => void
   onExportNote: (noteId: string) => void
@@ -62,6 +66,7 @@ export function NoteItem({
   selectedNoteId,
   onSelectNote,
   onTogglePin,
+  onToggleLock,
   onDeleteNote,
   onDuplicateNote,
   onExportNote,
@@ -97,14 +102,18 @@ export function NoteItem({
             onClick={() => onSelectNote(note.id)}
             className={cn(note.isPinned && 'hover:bg-primary/5')}
           >
-            {note.isPinned ? (
+            {note.isPinned && (
               <Pin
                 className={cn(
                   'h-4 w-4 shrink-0 fill-primary/20 text-primary',
                   justPinnedId === note.id && 'animate-pin-bounce'
                 )}
               />
-            ) : (
+            )}
+            {!note.isPinned && note.isLocked && (
+              <FileLock className="h-4 w-4 shrink-0" />
+            )}
+            {!note.isPinned && !note.isLocked && (
               <FileText className="h-4 w-4 shrink-0" />
             )}
             <div className="flex flex-col overflow-hidden">
@@ -123,6 +132,16 @@ export function NoteItem({
               <Pin className="h-4 w-4" />
             )}
             {note.isPinned ? 'Unpin' : 'Pin to top'}
+          </ContextMenuItem>
+          <ContextMenuItem
+            onClick={() => onToggleLock(note.id, !note.isLocked)}
+          >
+            {note.isLocked ? (
+              <LockOpen className="h-4 w-4" />
+            ) : (
+              <FileLock className="h-4 w-4" />
+            )}
+            {note.isLocked ? 'Unlock' : 'Lock'}
           </ContextMenuItem>
           <ContextMenuSub>
             <ContextMenuSubTrigger>
