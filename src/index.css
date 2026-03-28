@@ -294,6 +294,30 @@ span[data-style-type="backgroundColor"][data-value="highlight"] {
 }
 
 /*
+ * Color toolbar button – active state.
+ *
+ * When a text or background color is applied, the color button gets
+ * the same visual treatment as other active toolbar buttons (bold,
+ * italic, etc.), using bg-accent to match the Toggle pressed state.
+ */
+.color-active {
+  background-color: var(--accent);
+  color: var(--accent-foreground);
+}
+
+/*
+ * Color toolbar button – match Toggle button sizing.
+ *
+ * The color button renders as a Button (not Toggle) because it lives
+ * inside a Menu.Trigger. Match the Toggle's tighter padding so the
+ * button width is consistent with other toolbar buttons.
+ */
+.bn-button:has(.bn-color-icon) {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+/*
  * Override BlockNote link colour in dark mode.
  *
  * Must be placed outside `@layer base` to win specificity over
@@ -528,8 +552,8 @@ html.cursor-autohide-hidden * {
  * Interactive overlays that keep the cursor visible during auto-hide.
  *
  * The `:is()` pseudo-class avoids repeating the `html.cursor-autohide-hidden`
- * ancestor for every selector.  The first rule targets the overlay containers
- * themselves; the second targets their descendants.
+ * ancestor for every selector. Targets both the overlay containers and their
+ * descendants to ensure the cursor remains usable inside menus and dialogs.
  */
 html.cursor-autohide-hidden :is(
   [role="dialog"],
@@ -542,10 +566,7 @@ html.cursor-autohide-hidden :is(
   .bn-table-handle-menu,
   [data-slot="select-content"],
   [data-slot="dropdown-menu-content"]
-) {
-  cursor: auto !important;
-}
-
+),
 html.cursor-autohide-hidden :is(
   [role="dialog"],
   [role="menu"],
