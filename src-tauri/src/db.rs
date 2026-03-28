@@ -112,26 +112,16 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
     .map_err(|e| format!("failed to init schema: {e}"))?;
 
     // Migration: add is_pinned column if it does not exist (existing databases).
-    if conn
-        .execute(
-            "ALTER TABLE notes ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0",
-            [],
-        )
-        .is_err()
-    {
-        // Column already exists — ignore the error.
-    }
+    let _ = conn.execute(
+        "ALTER TABLE notes ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0",
+        [],
+    );
 
     // Migration: add group_id column if it does not exist.
-    if conn
-        .execute(
-            "ALTER TABLE notes ADD COLUMN group_id TEXT REFERENCES groups(id) ON DELETE SET NULL",
-            [],
-        )
-        .is_err()
-    {
-        // Column already exists — ignore the error.
-    }
+    let _ = conn.execute(
+        "ALTER TABLE notes ADD COLUMN group_id TEXT REFERENCES groups(id) ON DELETE SET NULL",
+        [],
+    );
 
     app.manage(DbState(Mutex::new(conn)));
     Ok(())
@@ -343,4 +333,93 @@ pub fn delete_note(state: tauri::State<DbState>, id: String) -> Result<(), Strin
     conn.execute("DELETE FROM notes WHERE id = ?1", rusqlite::params![id])
         .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+/// Duplicates an existing note, copying its content and group membership.
+///
+/// The duplicated note receives a new UUID, a title suffixed with " (copy)",
+/// `is_pinned = false`, and the same `group_id` as the original.
+///
+/// # Arguments
+///
+/// * `state` - Managed database state injected by Tauri.
+/// * `id` - The UUID of the note to duplicate.
+///
+/// # Returns
+///
+/// The newly created [`Note`].
+///
+/// # Errors
+///
+/// Returns a `String` if the database lock is poisoned, the source note is
+/// not found, or the INSERT fails.
+#[tauri::command]
+pub fn duplicate_note(state: tauri::State<DbState>, id: String) -> Result<Note, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+
+    let source = conn
+        .query_row(
+            "SELECT id, title, content, created_at, updated_at, is_pinned, group_id FROM notes WHERE id = ?1",
+            rusqlite::params![id],
+            note_from_row,
+        )
+        .map_err(|e| e.to_string())?;
+
+    let new_id = uuid::Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().to_rfc3339();
+    let title = format!("{} (copy)", source.title);
+
+    // Update the first heading block's text in the content JSON so the H1
+    // heading also carries the "(copy)" suffix, matching the sidebar label.
+    let content = rewrite_first_heading(&source.content, &title);
+
+    conn.execute(
+        "INSERT INTO notes (id, title, content, created_at, updated_at, is_pinned, group_id) VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6)",
+        rusqlite::params![new_id, title, content, now, now, source.group_id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(Note {
+        id: new_id,
+        title,
+        content,
+        created_at: now.clone(),
+        updated_at: now,
+        is_pinned: false,
+        group_id: source.group_id,
+    })
+}
+
+/// Rewrites the text of the first heading block in a BlockNote content JSON.
+///
+/// BlockNote content is a JSON array of block objects.  Each block may have a
+/// `content` array of inline objects whose `text` field holds the visible
+/// string.  This function finds the first block whose `type` is `"heading"`
+/// and replaces the **concatenated** text of its inline content with `new_title`.
+///
+/// If the content cannot be parsed or no heading block is found, the original
+/// content string is returned unchanged.
+fn rewrite_first_heading(content_json: &str, new_title: &str) -> String {
+    let mut blocks: Vec<serde_json::Value> = match serde_json::from_str(content_json) {
+        Ok(v) => v,
+        Err(_) => return content_json.to_owned(),
+    };
+
+    for block in blocks.iter_mut() {
+        let block_type = block.get("type").and_then(|t| t.as_str()).unwrap_or("");
+        if block_type != "heading" {
+            continue;
+        }
+        if let Some(inline_content) = block.get_mut("content").and_then(|c| c.as_array_mut()) {
+            if let Some(first_inline) = inline_content.first_mut() {
+                first_inline["text"] = serde_json::Value::String(new_title.to_owned());
+            }
+            // Truncate any additional inline nodes after the first so the
+            // title stays coherent (e.g. bold prefix + plain suffix).
+            inline_content.truncate(1);
+            break;
+        }
+    }
+
+    serde_json::to_string(&blocks).unwrap_or_else(|_| content_json.to_owned())
 }

@@ -90,6 +90,19 @@ export async function togglePinNote(
 }
 
 /**
+ * Duplicates an existing note.
+ *
+ * Creates a new note with the same content and group as the original.
+ * The title is suffixed with " (copy)" and the pin state is not inherited.
+ *
+ * @param id - The UUID of the note to duplicate.
+ * @returns The newly created duplicate note.
+ */
+export async function duplicateNote(id: string): Promise<Note> {
+  return invoke<Note>('duplicate_note', { id })
+}
+
+/**
  * Reads a text file and returns its content.
  *
  * @param path - Absolute path to the file.
