@@ -64,17 +64,12 @@ pub fn create_main_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Err
         .maximizable(false)
         .disable_drag_drop_handler();
 
-    match geometry {
-        Some(geo) => {
-            builder = builder
-                .inner_size(geo.width, geo.height)
-                .position(geo.x, geo.y);
-        }
-        None => {
-            builder = builder.inner_size(DEFAULT_WIDTH, DEFAULT_HEIGHT);
-            // Position is omitted so the OS centres the window.
-        }
-    }
+    builder = match geometry {
+        Some(geo) => builder
+            .inner_size(geo.width, geo.height)
+            .position(geo.x, geo.y),
+        None => builder.inner_size(DEFAULT_WIDTH, DEFAULT_HEIGHT),
+    };
 
     let window = builder.build()?;
     window.set_focus()?;
@@ -117,13 +112,14 @@ pub fn save_window_geometry(app: &AppHandle) {
 }
 
 /// Reads the saved geometry from `config.json` if restoration is
-/// enabled and the saved position is within a visible monitor.
+/// enabled and the saved position and size fit within a visible monitor.
 ///
 /// Returns `None` when:
 /// - The `windowStateRestoreEnabled` setting is `false`.
 /// - No saved geometry exists.
 /// - The saved position is outside all connected monitors (e.g. an
 ///   external monitor was disconnected).
+/// - The saved size exceeds every connected monitor's resolution.
 fn read_saved_geometry(app: &AppHandle) -> Option<WindowGeometry> {
     let store = app.store("config.json").ok()?;
 
@@ -139,30 +135,29 @@ fn read_saved_geometry(app: &AppHandle) -> Option<WindowGeometry> {
     let raw = store.get(GEOMETRY_STORE_KEY)?;
     let geo: WindowGeometry = serde_json::from_value(raw).ok()?;
 
-    if geo.width <= 0.0 || geo.height <= 0.0 {
-        return None;
-    }
+    let is_valid = geo.width > 0.0
+        && geo.height > 0.0
+        && is_position_on_screen(app, geo.x, geo.y)
+        && fits_on_any_monitor(app, geo.width, geo.height);
 
-    if is_position_on_screen(app, geo.x, geo.y) {
+    if is_valid {
         Some(geo)
     } else {
         None
     }
 }
 
+/// Returns the list of connected monitors, or an empty list when detection
+/// fails. Used by [`is_position_on_screen`] and [`fits_on_any_monitor`] so
+/// they share the same conservative fallback behaviour.
+fn available_monitors(app: &AppHandle) -> Vec<tauri::Monitor> {
+    app.available_monitors().unwrap_or_default()
+}
+
 /// Returns `true` when the given logical position falls within at
 /// least one connected monitor.
 fn is_position_on_screen(app: &AppHandle, x: f64, y: f64) -> bool {
-    let monitors = match app.available_monitors() {
-        Ok(m) => m,
-        Err(_) => return true, // assume on-screen when detection fails
-    };
-
-    if monitors.is_empty() {
-        return true;
-    }
-
-    monitors.iter().any(|m| {
+    available_monitors(app).iter().any(|m| {
         let pos = m.position();
         let size = m.size();
         let scale = m.scale_factor();
@@ -172,5 +167,20 @@ fn is_position_on_screen(app: &AppHandle, x: f64, y: f64) -> bool {
         let mh = size.height as f64 / scale;
 
         x >= mx && x < mx + mw && y >= my && y < my + mh
+    })
+}
+
+/// Returns `true` when the given logical size fits within at least one
+/// connected monitor's resolution. Falls back to `true` when monitor
+/// detection fails, matching the conservative approach of
+/// [`is_position_on_screen`].
+fn fits_on_any_monitor(app: &AppHandle, width: f64, height: f64) -> bool {
+    available_monitors(app).iter().any(|m| {
+        let size = m.size();
+        let scale = m.scale_factor();
+        let mw = size.width as f64 / scale;
+        let mh = size.height as f64 / scale;
+
+        width <= mw && height <= mh
     })
 }
