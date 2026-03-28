@@ -43,9 +43,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
             db::init_db(app.handle())?;
-            app.manage(link_preview::LinkPreviewCache(Mutex::new(
-                HashMap::new(),
-            )));
+            app.manage(link_preview::LinkPreviewCache(Mutex::new(HashMap::new())));
             window::create_main_window(app.handle())?;
             Ok(())
         })
