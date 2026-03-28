@@ -15,6 +15,9 @@ const SAVED_DISPLAY_MS = 3000
  * - `saved`  – check icon only (fades out after 3 s)
  * - `error`  – warning icon + "Save failed"
  * - `idle`   – hidden
+ *
+ * @param props - Component props.
+ * @param props.status - The current save state to render.
  */
 export function SaveStatusIndicator({
   status,
@@ -29,24 +32,28 @@ export function SaveStatusIndicator({
     undefined
   )
 
+  // Synchronise the local display state with the upstream save status.
+  // Any previous auto-hide timer is cleared first to prevent stale callbacks.
   useEffect(() => {
     clearTimeout(savedTimerRef.current)
 
+    // "idle" means no save activity – hide the indicator immediately.
     if (status === 'idle') {
-      if (!savedTimerRef.current) {
-        setDisplay(null)
-      }
+      setDisplay(null)
       return
     }
 
     setDisplay(status)
 
+    // After showing the "saved" check icon, start a timer to fade it out.
     if (status === 'saved') {
       savedTimerRef.current = setTimeout(() => {
         savedTimerRef.current = undefined
         setDisplay(null)
       }, SAVED_DISPLAY_MS)
     }
+
+    return () => clearTimeout(savedTimerRef.current)
   }, [status])
 
   if (locked) {
@@ -70,10 +77,10 @@ export function SaveStatusIndicator({
       )}
       {display === 'saved' && <Check className="h-3.5 w-3.5 text-success" />}
       {display === 'error' && (
-        <>
-          <AlertCircle className="h-3.5 w-3.5 text-destructive" />
-          <span className="text-destructive">Save failed</span>
-        </>
+        <span className="inline-flex items-center gap-1 text-destructive">
+          <AlertCircle className="h-3.5 w-3.5" />
+          Save failed
+        </span>
       )}
     </span>
   )
