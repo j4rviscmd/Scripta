@@ -13,6 +13,7 @@ export {
   getNote,
   listNotes,
   readTextFile,
+  toggleLockNote,
   togglePinNote,
   updateNote,
   writeTextFile,
