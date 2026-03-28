@@ -12,6 +12,7 @@
     "store:default",
     "dialog:default",
     "fs:default",
+    "updater:default",
     {
       "identifier": "fs:allow-write-file",
       "allow": [{ "path": "$APPDATA/images" }, { "path": "$APPDATA/images/**" }]

@@ -89,8 +89,11 @@ Scripta remembers which note you had open, where you were scrolled to, and where
 
 Download the latest version from the [Releases](https://github.com/j4rviscmd/Scripta/releases/latest) page.
 
-- **macOS**: Download the `.dmg` file
-- **Windows**: Download the `.msi` installer
+|         Platform          |                                                           Download                                                           |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **macOS (Apple Silicon)** | [Scripta_macOS_arm64.dmg](https://github.com/j4rviscmd/Scripta/releases/latest/download/Scripta_macOS_arm64.dmg)             |
+| **macOS (Intel)**         | [Scripta_macOS_x64.dmg](https://github.com/j4rviscmd/Scripta/releases/latest/download/Scripta_macOS_x64.dmg)                 |
+| **Windows**               | [Scripta_Windows_x64-setup.exe](https://github.com/j4rviscmd/Scripta/releases/latest/download/Scripta_Windows_x64-setup.exe) |
 
 > [!NOTE]
 > macOS builds are not signed. On first launch, run:
