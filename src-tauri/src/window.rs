@@ -31,9 +31,13 @@ const RESTORE_ENABLED_KEY: &str = "windowStateRestoreEnabled";
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct WindowGeometry {
+    /// Logical x-coordinate of the window's top-left corner.
     x: f64,
+    /// Logical y-coordinate of the window's top-left corner.
     y: f64,
+    /// Logical width of the window's content area.
     width: f64,
+    /// Logical height of the window's content area.
     height: f64,
 }
 
@@ -48,14 +52,17 @@ struct WindowGeometry {
 /// The window is created with `resizable(false)` and
 /// `maximizable(false)` so the splash screen cannot be resized.
 /// The frontend unlocks these constraints once the splash has faded
-/// out.
+/// out. The built-in Tauri drag-and-drop handler is disabled via
+/// `disable_drag_drop_handler()` so the frontend can manage file
+/// drop events with its own logic.
 pub fn create_main_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let geometry = read_saved_geometry(app);
 
     let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
         .title(WINDOW_TITLE)
         .resizable(false)
-        .maximizable(false);
+        .maximizable(false)
+        .disable_drag_drop_handler();
 
     match geometry {
         Some(geo) => {

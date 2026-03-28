@@ -96,6 +96,12 @@ let docChangedInLastTr = false
  *   the document actually changed (i.e. the user typed something).
  * - The scroll offset is clamped to `[0, maxScroll]` so that short
  *   documents keep the cursor near the top (no centre-jump).
+ *
+ * **Drag-and-drop scroll fix:**
+ * Additionally, a DOM-level drag/drop listener captures the scroll
+ * container's `scrollTop` at drag-start and aggressively restores
+ * it after drop to prevent the browser from jumping to the old
+ * cursor position.
  */
 export const cursorCenteringExtension = createExtension({
   key: 'cursorCentering',
@@ -109,6 +115,65 @@ export const cursorCenteringExtension = createExtension({
           docChangedInLastTr = tr.docChanged
           return {}
         },
+      },
+      view(editorView) {
+        const container = findScrollContainer(editorView.dom)
+        let savedScrollTop = 0
+        let guardScrollUntil = 0
+
+        const onDragStart = () => {
+          if (container) {
+            savedScrollTop = container.scrollTop
+          }
+        }
+
+        const onDrop = () => {
+          if (!container) return
+          // Do NOT update savedScrollTop here — use the value from
+          // dragstart, which captures the scroll position BEFORE
+          // auto-scroll or selection-triggered scroll during drag.
+
+          // Guard against scroll changes for the next 500ms.
+          guardScrollUntil = Date.now() + 500
+
+          const restore = () => {
+            if (Date.now() < guardScrollUntil) {
+              container.scrollTop = savedScrollTop
+            }
+          }
+          requestAnimationFrame(restore)
+          setTimeout(restore, 0)
+          setTimeout(restore, 16)
+          setTimeout(restore, 50)
+          setTimeout(restore, 100)
+          setTimeout(restore, 200)
+          setTimeout(restore, 300)
+          setTimeout(restore, 400)
+        }
+
+        // Intercept scroll events on the container during the guard window
+        const onScroll = () => {
+          if (
+            container &&
+            Date.now() < guardScrollUntil &&
+            container.scrollTop !== savedScrollTop
+          ) {
+            container.scrollTop = savedScrollTop
+          }
+        }
+
+        // Use capture phase to intercept before any other handlers
+        document.addEventListener('dragstart', onDragStart, true)
+        editorView.dom.addEventListener('drop', onDrop, true)
+        container?.addEventListener('scroll', onScroll, { passive: false })
+
+        return {
+          destroy() {
+            document.removeEventListener('dragstart', onDragStart, true)
+            editorView.dom.removeEventListener('drop', onDrop, true)
+            container?.removeEventListener('scroll', onScroll)
+          },
+        }
       },
       props: {
         scrollMargin: {
