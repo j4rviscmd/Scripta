@@ -90,19 +90,19 @@ body {
  */
 .dark {
   --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
+  --foreground: oklch(0.92 0.01 75);
   --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
+  --card-foreground: oklch(0.92 0.01 75);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.85 0 0);
   --primary: oklch(0.922 0 0);
   --primary-foreground: oklch(0.205 0 0);
   --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
+  --secondary-foreground: oklch(0.92 0.01 75);
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
   --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --accent-foreground: oklch(0.92 0.01 75);
   --destructive: oklch(0.704 0.191 22.216);
   --error-muted: oklch(0.22 0.06 27);
   --border: oklch(1 0 0 / 10%);
@@ -116,7 +116,7 @@ body {
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.708 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-primary-foreground: oklch(0.92 0.01 75);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.85 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
@@ -266,6 +266,18 @@ body {
 }
 
 /*
+ * Dark-mode editor text colour override.
+ *
+ * BlockNote defines its own text colour via --bn-colors-editor-text
+ * (defaults to #cfcfcf in dark mode) which is independent of the
+ * app's --foreground token. This override bridges the two so that
+ * editor text follows the same warm-cream foreground colour.
+ */
+.dark .bn-container {
+  --bn-colors-editor-text: var(--foreground);
+}
+
+/*
  * Notion-style pastel inline code.
  *
  * Applies a warm cream background to inline `<code>` elements inside BlockNote
@@ -288,10 +300,11 @@ body {
 }
 
 /*
- * Highlighter markers – shared shape.
+ * Highlighter markers.
  *
- * Both "yellow" (colour-picker) and "highlight" (dedicated highlighter) use
- * the same padding / margin / border-radius to emulate a highlighter stroke.
+ * "yellow" (colour-picker) and "highlight" (dedicated highlighter) share the
+ * same padding / margin / border-radius to emulate a highlighter stroke.
+ * Each variant uses a distinct shade so the two can diverge independently.
  */
 span[data-style-type="backgroundColor"][data-value="yellow"],
 span[data-style-type="backgroundColor"][data-value="highlight"] {
@@ -300,41 +313,19 @@ span[data-style-type="backgroundColor"][data-value="highlight"] {
   border-radius: 0.2em;
 }
 
-/*
- * Highlighter marker (yellow) - light mode.
- *
- * Targets BlockNote's background-colour attribute selector to render a
- * yellow highlighter effect. Slight padding and rounding emulate a
- * real highlighter stroke.
- */
+/* Yellow (colour-picker) */
 span[data-style-type="backgroundColor"][data-value="yellow"] {
   background-color: oklch(0.92 0.17 90);
 }
-
-/*
- * Highlighter marker (yellow) - dark mode.
- *
- * Uses a deeper amber with forced dark text to ensure legibility
- * when the highlighter is applied in dark mode.
- */
 .dark span[data-style-type="backgroundColor"][data-value="yellow"] {
   background-color: oklch(0.55 0.18 85);
   color: oklch(0.25 0.05 85);
 }
 
-/*
- * Highlighter marker (fluorescent) - light mode.
- *
- * Dedicated highlighter style that is independent from the colour
- * picker's "yellow" so the two can use different shades.
- */
+/* Highlight (dedicated highlighter) */
 span[data-style-type="backgroundColor"][data-value="highlight"] {
   background-color: oklch(0.96 0.11 95);
 }
-
-/*
- * Highlighter marker (fluorescent) - dark mode.
- */
 .dark span[data-style-type="backgroundColor"][data-value="highlight"] {
   background-color: oklch(0.75 0.10 95);
   color: oklch(0.25 0.05 85);
@@ -382,12 +373,17 @@ span[data-style-type="backgroundColor"][data-value="highlight"] {
 }
 
 /*
- * Editor font size override.
+ * Editor font size and family override.
  *
- * The Editor component sets a `--editor-font-size` custom property on the
- * `[data-editor-root]` element. This rule propagates that value into
- * BlockNote's default styles so all editor content respects the user's
- * chosen font size. Falls back to 16px when the property is not set.
+ * The Editor component sets custom properties (`--editor-font-size`,
+ * `--editor-font-family`) on the `[data-editor-root]` element. This rule
+ * propagates those values into BlockNote's default styles so all editor
+ * content respects the user's chosen font settings. Falls back to 16px /
+ * Geist Variable when the properties are not set.
+ *
+ * Targeting `.bn-default-styles` is necessary because BlockNote applies its
+ * own font rules through that class; overriding at a higher scope would be
+ * ignored due to specificity.
  */
 [data-editor-root] .bn-default-styles {
   font-size: var(--editor-font-size, 16px);
@@ -477,6 +473,9 @@ span[data-style-type="backgroundColor"][data-value="highlight"] {
   background-color: var(--border);
   border-radius: 4px;
   border: 2px solid transparent;
+  /* background-clip restricts the visible thumb paint to the content area
+     inside the transparent border, creating an inset scrollbar that does
+     not touch the track edges. */
   background-clip: content-box;
 }
 
@@ -488,7 +487,14 @@ span[data-style-type="backgroundColor"][data-value="highlight"] {
   background: transparent;
 }
 
-/* Standard scrollbar properties (progressive enhancement – Firefox and future WebKit) */
+/*
+ * Standard scrollbar properties (progressive enhancement – Firefox and future WebKit).
+ *
+ * `scrollbar-width: thin` produces a narrower native scrollbar without the
+ * full custom styling of -webkit-scrollbar. `scrollbar-color` sets the
+ * thumb and track colours respectively. These are kept in sync with the
+ * -webkit rules above so both rendering paths look consistent.
+ */
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
@@ -521,6 +527,7 @@ span[data-style-type="backgroundColor"][data-value="highlight"] {
 .dark .bn-block-content[data-content-type="codeBlock"] .shiki {
   color: var(--shiki-dark) !important;
 }
+/* Language selector dropdown inside code blocks (light mode) */
 .bn-block-content[data-content-type="codeBlock"] > div > select {
   color: oklch(0.4 0 0) !important;
 }
