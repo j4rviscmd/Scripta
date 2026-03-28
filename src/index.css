@@ -199,9 +199,56 @@ body {
   body {
     @apply bg-background text-foreground;
   }
-  [data-editor-root] {
-    @apply select-text;
-  }
+}
+
+/*
+ * Editor text-selection overrides – placed OUTSIDE @layer base.
+ *
+ * BlockNote's stylesheets live outside any @layer, so rules declared
+ * inside Tailwind's @layer base lose the cascade battle.  The same
+ * pattern already used for the dark-mode editor background override
+ * (see below) is applied here so that user-select: text wins over
+ * both the global select-none and any library defaults.
+ *
+ * When the editor is read-only (editable={false}), ProseMirror sets
+ * contentEditable="false" on the .ProseMirror element.  On WebKit
+ * (Tauri's WKWebView) this implicitly forces user-select: none on
+ * the subtree.  An un-layered rule with a specific selector is
+ * required to override this behaviour.
+ */
+[data-editor-root] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+[data-editor-root] .ProseMirror {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/*
+ * Hide editing UI elements (drag handles, side menu, suggestion menu)
+ * when the editor is locked.  The editor stays editable={true} so text
+ * selection works in WebKit, but all editing transactions are blocked by
+ * the readOnlyGuard ProseMirror plugin.
+ */
+[data-editor-root][data-locked] .bn-drag-handle,
+[data-editor-root][data-locked] .bn-side-menu,
+[data-editor-root][data-locked] .bn-add-block-button,
+[data-editor-root][data-locked] .bn-suggestion-menu {
+  display: none !important;
+}
+
+/*
+ * Locked-editor cursor override.
+ *
+ * While the editor remains editable={true} for text selection, the default
+ * text cursor (I-beam) is replaced with the standard pointer so it is clear
+ * the document cannot be edited.
+ */
+[data-editor-root][data-locked] .ProseMirror,
+[data-editor-root][data-locked] .ProseMirror * {
+  cursor: default;
+  caret-color: transparent;
 }
 
 /*

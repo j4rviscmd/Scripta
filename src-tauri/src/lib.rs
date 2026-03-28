@@ -61,6 +61,7 @@ pub fn run() {
             db::delete_note,
             db::duplicate_note,
             db::toggle_pin,
+            db::toggle_lock,
             groups::list_groups,
             groups::create_group,
             groups::rename_group,

@@ -48,6 +48,7 @@ import { useSearchReplace } from '../hooks/useSearchReplace'
 import { codeBlockOptions } from '../lib/codeBlockConfig'
 import { DEFAULT_BLOCKS } from '../lib/constants'
 import { rangeCheckToggleExtension } from '../lib/rangeCheckToggle'
+import { readOnlyGuardExtension, setReadOnly } from '../lib/readOnlyGuard'
 import { slashMenuEmacsKeysExtension } from '../lib/slashMenuEmacsKeys'
 import { CustomColorStyleButton } from './CustomColorStyleButton'
 import { CustomLinkToolbar } from './CustomLinkToolbar'
@@ -137,11 +138,15 @@ const schema = BlockNoteSchema.create({
  */
 interface EditorProps {
   noteId: string | null
+  /** Whether the editor is in read-only mode. Defaults to `false`. */
+  locked?: boolean
   onNoteSaved?: (id: string) => void
   onStatusChange?: (status: SaveStatus) => void
   onContentLoaded?: () => void
   /** Called with the cursor's clientY coordinate when the suggestion menu (slash command palette) opens. */
   onSuggestionMenuOpen?: (cursorClientY: number) => void
+  /** Called when the lock state of the loaded note is determined. */
+  onLockStateChange?: (locked: boolean) => void
 }
 
 /**
@@ -202,10 +207,12 @@ const PASS_THROUGH_KEYS = new Set([
 export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   {
     noteId,
+    locked = false,
     onNoteSaved,
     onStatusChange,
     onContentLoaded,
     onSuggestionMenuOpen,
+    onLockStateChange,
   },
   ref
 ) {
@@ -285,6 +292,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       searchExtension,
       checklistSplitFixExtension(),
       rangeCheckToggleExtension(),
+      readOnlyGuardExtension,
       slashMenuEmacsKeysExtension(),
       cursorVimKeysExtension(),
     ],
@@ -293,6 +301,11 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   })
 
   useImperativeHandle(ref, () => ({ editor }), [editor])
+
+  // Sync the locked prop to the module-level flag read by the ProseMirror plugin.
+  useEffect(() => {
+    setReadOnly(locked)
+  }, [locked])
 
   useLinkClickHandler(editor)
   useCopyToast(editor)
@@ -462,6 +475,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
           loadingRef.current = false
           setContentReady(true)
           onContentLoaded?.()
+          onLockStateChange?.(false)
         }
       })
       return
@@ -471,6 +485,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       .then((note) => {
         if (stale) return
         if (note) {
+          onLockStateChange?.(note.isLocked)
           withSuppressedHistory(editor.prosemirrorView, () => {
             try {
               editor.replaceBlocks(
@@ -500,7 +515,13 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     return () => {
       stale = true
     }
-  }, [noteId, editor, backfillImageCaptions, onContentLoaded])
+  }, [
+    noteId,
+    editor,
+    backfillImageCaptions,
+    onContentLoaded,
+    onLockStateChange,
+  ])
 
   /**
    * Callback invoked by BlockNote on every document change.
@@ -532,6 +553,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       <div
         className={`w-full min-h-screen px-8 pb-[60vh] ${contentReady ? 'opacity-100' : 'opacity-0'}`}
         data-editor-root
+        data-locked={locked || undefined}
         style={
           {
             '--editor-font-size': `${fontSize}px`,
@@ -541,19 +563,24 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       >
         <BlockNoteView
           editor={editor}
+          editable={true}
           theme={resolvedTheme}
           onChange={handleChange}
           formattingToolbar={false}
           linkToolbar={false}
         >
-          <FormattingToolbarController
-            formattingToolbar={() => (
-              <FormattingToolbar blockTypeSelectItems={[]}>
-                {formattingToolbarItems}
-              </FormattingToolbar>
-            )}
-          />
-          <LinkToolbarController linkToolbar={CustomLinkToolbar} />
+          {!locked && (
+            <>
+              <FormattingToolbarController
+                formattingToolbar={() => (
+                  <FormattingToolbar blockTypeSelectItems={[]}>
+                    {formattingToolbarItems}
+                  </FormattingToolbar>
+                )}
+              />
+              <LinkToolbarController linkToolbar={CustomLinkToolbar} />
+            </>
+          )}
         </BlockNoteView>
       </div>
       <SearchReplacePanel {...search} />
