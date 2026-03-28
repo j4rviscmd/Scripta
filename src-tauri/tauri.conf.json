@@ -28,6 +28,15 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/j4rviscmd/Scripta/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDcxOUJGMkIxRjAwOTcwQTIKUldTaWNBbndzZktiY1FWb3lCdFcxU3FDMGFoc1g0ckVMV3BDcWt4WkdaZnp5WnVVR1RMUDNZT2cK"
+    }
   }
 }
