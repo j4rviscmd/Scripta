@@ -8,5 +8,5 @@
  * time has elapsed, then fades out and unmounts.
  */
 
-export { splashFadingPromise } from './lib/splash-state'
+export { splashDonePromise, splashFadingPromise } from './lib/splash-state'
 export { SplashScreen } from './ui/SplashScreen'

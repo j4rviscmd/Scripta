@@ -76,7 +76,8 @@ pub fn create_main_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Err
         }
     }
 
-    builder.build()?;
+    let window = builder.build()?;
+    window.set_focus()?;
     Ok(())
 }
 

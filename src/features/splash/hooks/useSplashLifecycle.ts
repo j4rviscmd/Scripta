@@ -17,7 +17,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { storeInitPromise } from '@/app/providers/store-provider'
 import { FADE_DURATION_MS, MIN_DISPLAY_MS } from '../lib/constants'
-import { notifySplashFading } from '../lib/splash-state'
+import { notifySplashDone, notifySplashFading } from '../lib/splash-state'
 
 /** Phases of the splash screen lifecycle. */
 type SplashPhase = 'active' | 'fading' | 'done'
@@ -67,6 +67,7 @@ export function useSplashLifecycle(): SplashLifecycle {
   // Re-enable window operations once the splash is fully dismissed.
   useEffect(() => {
     if (phase !== 'done') return
+    notifySplashDone()
     const appWindow = getCurrentWindow()
     Promise.all([
       appWindow.setResizable(true),
