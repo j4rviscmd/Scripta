@@ -31,7 +31,6 @@ export const TOOLBAR_ITEM_LABELS: Record<string, string> = {
   nestBlockButton: 'Indent',
   unnestBlockButton: 'Outdent',
   createLinkButton: 'Create Link',
-  addCommentButton: 'Comment',
 }
 
 /** Default toolbar layout — all items visible, in canonical order. */
@@ -48,7 +47,6 @@ export const DEFAULT_TOOLBAR_CONFIG: ToolbarItemConfig[] = [
   { key: 'nestBlockButton', visible: true },
   { key: 'unnestBlockButton', visible: true },
   { key: 'createLinkButton', visible: true },
-  { key: 'addCommentButton', visible: true },
 ]
 
 /** Store key for persistence via configStore. */

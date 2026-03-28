@@ -178,7 +178,6 @@ const PASS_THROUGH_KEYS = new Set([
   'fileDeleteButton',
   'fileDownloadButton',
   'filePreviewButton',
-  'addTiptapCommentButton',
 ])
 
 /**
@@ -216,6 +215,13 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   },
   ref
 ) {
+  /**
+   * Tracks whether the editor is still loading initial content.
+   *
+   * While `true`, `handleChange` exits early to prevent auto-save from
+   * firing on programmatic content population (e.g. `replaceBlocks`).
+   * Set to `false` once the note content has been fully applied.
+   */
   const loadingRef = useRef(true)
   /**
    * Whether the editor content has finished loading and is safe to display.
@@ -226,11 +232,16 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
    * to the editor inside the content-loading `useEffect`.
    */
   const [contentReady, setContentReady] = useState(false)
+  /** Resolved theme ("light" or "dark") passed to BlockNoteView. */
   const { resolvedTheme } = useTheme()
+  /** User-configured editor font size in pixels. */
   const { fontSize } = useEditorFontSize()
+  /** User-configured editor font family string. */
   const { fontFamily } = useEditorFont()
+  /** User-configured toolbar item order and visibility from the persistent store. */
   const { items: toolbarItemConfigs } = useToolbarConfig()
 
+  /** Keeps the cursor vertically centered in the viewport during navigation. */
   useCursorCentering()
 
   /**
@@ -271,17 +282,21 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     return [...passThroughItems, ...configuredItems]
   }, [toolbarItemConfigs])
 
+  /** Debounced auto-save hook (500 ms delay). Only active when `noteId` is non-null. */
   const { scheduleSave, saveStatus } = useAutoSave(
     500,
     noteId ?? undefined,
     onNoteSaved
   )
+  /** Intercepts pasted content to extract and handle embedded links. */
   const pasteHandler = useLinkPreview()
 
+  /** Propagates the current save status to the parent component. */
   useEffect(() => {
     onStatusChange?.(saveStatus)
   }, [saveStatus, onStatusChange])
 
+  /** BlockNote editor instance with custom schema, extensions, and image handling. */
   const editor = useCreateBlockNote({
     schema,
     initialContent: DEFAULT_BLOCKS,
@@ -300,6 +315,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     resolveFileUrl: resolveImageUrl,
   })
 
+  /** Exposes the editor instance to parent components via the forwarded ref. */
   useImperativeHandle(ref, () => ({ editor }), [editor])
 
   // Sync the locked prop to the module-level flag read by the ProseMirror plugin.
@@ -307,7 +323,9 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     setReadOnly(locked)
   }, [locked])
 
+  /** Intercepts Cmd/Ctrl+Click on links inside the editor to open them in the browser. */
   useLinkClickHandler(editor)
+  /** Shows a toast notification when the user copies content from the editor. */
   useCopyToast(editor)
   // Rewrite clipboard text/plain so Markdown lists are tight (no blank lines between items).
   useClipboardTightenList(editor)
@@ -414,6 +432,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     }
   }, [editor, onSuggestionMenuOpen])
 
+  /** Search & replace state for the {@link SearchReplacePanel}. */
   const search = useSearchReplace(editor)
 
   /**

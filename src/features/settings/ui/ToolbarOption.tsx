@@ -29,7 +29,6 @@ import {
   RiAlignLeft,
   RiAlignRight,
   RiBold,
-  RiChat3Line,
   RiIndentDecrease,
   RiIndentIncrease,
   RiItalic,
@@ -45,7 +44,9 @@ import type { ToolbarItemConfig } from '@/features/settings/lib/toolbarConfig'
 import { TOOLBAR_ITEM_LABELS } from '@/features/settings/lib/toolbarConfig'
 import { cn } from '@/lib/utils'
 
+/** Icon size in pixels used for all toolbar item icons in this settings panel. */
 const ICON_SIZE = 14
+/** Shared CSS class that prevents icons from shrinking in a flex layout. */
 const ICON_CLASS = 'shrink-0'
 
 /** Icons matching the actual BubbleMenu buttons. */
@@ -70,7 +71,6 @@ const TOOLBAR_ITEM_ICONS: Record<string, ReactNode> = {
     <RiIndentDecrease size={ICON_SIZE} className={ICON_CLASS} />
   ),
   createLinkButton: <RiLink size={ICON_SIZE} className={ICON_CLASS} />,
-  addCommentButton: <RiChat3Line size={ICON_SIZE} className={ICON_CLASS} />,
 }
 
 /**
@@ -159,6 +159,7 @@ export function ToolbarOption() {
   const { items, reorder, toggleVisibility, reset, isCustomized } =
     useToolbarConfig()
 
+  /** DnD sensors: pointer drag (5 px activation distance) and keyboard arrow keys. */
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, {
@@ -166,6 +167,12 @@ export function ToolbarOption() {
     })
   )
 
+  /**
+   * Handles the end of a drag event by computing the old and new indices
+   * and delegating to the `reorder` callback from the toolbar config provider.
+   *
+   * @param event - The drag-end event from `@dnd-kit/core`.
+   */
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       const { active, over } = event
