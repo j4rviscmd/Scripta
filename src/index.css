@@ -241,6 +241,19 @@ body {
 }
 
 /*
+ * Highlighter markers – shared shape.
+ *
+ * Both "yellow" (colour-picker) and "highlight" (dedicated highlighter) use
+ * the same padding / margin / border-radius to emulate a highlighter stroke.
+ */
+span[data-style-type="backgroundColor"][data-value="yellow"],
+span[data-style-type="backgroundColor"][data-value="highlight"] {
+  padding: 0.1em 0.15em;
+  margin-right: 0.1em;
+  border-radius: 0.2em;
+}
+
+/*
  * Highlighter marker (yellow) - light mode.
  *
  * Targets BlockNote's background-colour attribute selector to render a
@@ -249,9 +262,6 @@ body {
  */
 span[data-style-type="backgroundColor"][data-value="yellow"] {
   background-color: oklch(0.92 0.17 90);
-  padding: 0.1em 0.15em;
-  margin-right: 0.1em;
-  border-radius: 0.2em;
 }
 
 /*
@@ -262,6 +272,24 @@ span[data-style-type="backgroundColor"][data-value="yellow"] {
  */
 .dark span[data-style-type="backgroundColor"][data-value="yellow"] {
   background-color: oklch(0.55 0.18 85);
+  color: oklch(0.25 0.05 85);
+}
+
+/*
+ * Highlighter marker (fluorescent) - light mode.
+ *
+ * Dedicated highlighter style that is independent from the colour
+ * picker's "yellow" so the two can use different shades.
+ */
+span[data-style-type="backgroundColor"][data-value="highlight"] {
+  background-color: oklch(0.96 0.11 95);
+}
+
+/*
+ * Highlighter marker (fluorescent) - dark mode.
+ */
+.dark span[data-style-type="backgroundColor"][data-value="highlight"] {
+  background-color: oklch(0.75 0.10 95);
   color: oklch(0.25 0.05 85);
 }
 
@@ -496,28 +524,39 @@ html.cursor-autohide-hidden * {
   cursor: none !important;
 }
 
-html.cursor-autohide-hidden [role="dialog"],
-html.cursor-autohide-hidden [role="menu"],
-html.cursor-autohide-hidden [role="listbox"],
-html.cursor-autohide-hidden .bn-suggestion-menu,
-html.cursor-autohide-hidden .bn-link-toolbar,
-html.cursor-autohide-hidden .bn-color-picker-dropdown,
-html.cursor-autohide-hidden .bn-formatting-toolbar,
-html.cursor-autohide-hidden .bn-table-handle-menu,
-html.cursor-autohide-hidden [data-slot="select-content"],
-html.cursor-autohide-hidden [data-slot="dropdown-menu-content"] {
+/*
+ * Interactive overlays that keep the cursor visible during auto-hide.
+ *
+ * The `:is()` pseudo-class avoids repeating the `html.cursor-autohide-hidden`
+ * ancestor for every selector.  The first rule targets the overlay containers
+ * themselves; the second targets their descendants.
+ */
+html.cursor-autohide-hidden :is(
+  [role="dialog"],
+  [role="menu"],
+  [role="listbox"],
+  .bn-suggestion-menu,
+  .bn-link-toolbar,
+  .bn-color-picker-dropdown,
+  .bn-formatting-toolbar,
+  .bn-table-handle-menu,
+  [data-slot="select-content"],
+  [data-slot="dropdown-menu-content"]
+) {
   cursor: auto !important;
 }
 
-html.cursor-autohide-hidden [role="dialog"] *,
-html.cursor-autohide-hidden [role="menu"] *,
-html.cursor-autohide-hidden [role="listbox"] *,
-html.cursor-autohide-hidden .bn-suggestion-menu *,
-html.cursor-autohide-hidden .bn-link-toolbar *,
-html.cursor-autohide-hidden .bn-color-picker-dropdown *,
-html.cursor-autohide-hidden .bn-formatting-toolbar *,
-html.cursor-autohide-hidden .bn-table-handle-menu *,
-html.cursor-autohide-hidden [data-slot="select-content"] *,
-html.cursor-autohide-hidden [data-slot="dropdown-menu-content"] * {
+html.cursor-autohide-hidden :is(
+  [role="dialog"],
+  [role="menu"],
+  [role="listbox"],
+  .bn-suggestion-menu,
+  .bn-link-toolbar,
+  .bn-color-picker-dropdown,
+  .bn-formatting-toolbar,
+  .bn-table-handle-menu,
+  [data-slot="select-content"],
+  [data-slot="dropdown-menu-content"]
+) * {
   cursor: auto !important;
 }

@@ -26,6 +26,7 @@ import {
   createNote,
   DEFAULT_CONTENT,
   deleteNote,
+  duplicateNote,
   Editor,
   exportToMarkdown,
   extractTitle,
@@ -266,10 +267,7 @@ function AppContent() {
    * @param id - The ID of the note that was saved.
    */
   const handleNoteSaved = useCallback((id: string) => {
-    setSelectedNoteId((current) => {
-      if (current === null || current === id) return id
-      return current
-    })
+    setSelectedNoteId((current) => (current === null ? id : current))
     setRefreshKey((v) => v + 1)
   }, [])
 
@@ -332,6 +330,26 @@ function AppContent() {
       }
     },
     []
+  )
+
+  /**
+   * Duplicates the specified note and selects the newly created copy.
+   *
+   * @param noteId - The ID of the note to duplicate.
+   * @throws Shows an error toast if duplication fails.
+   */
+  const handleDuplicateNote = useCallback(
+    async (noteId: string) => {
+      try {
+        const duplicated = await duplicateNote(noteId)
+        selectNote(duplicated.id)
+        setRefreshKey((v) => v + 1)
+        toast.success('Note duplicated')
+      } catch {
+        toast.error('Failed to duplicate note')
+      }
+    },
+    [selectNote]
   )
 
   /**
@@ -411,6 +429,7 @@ function AppContent() {
           onNewNote={handleNewNote}
           onDeleteNote={handleDeleteNote}
           onTogglePin={handleTogglePin}
+          onDuplicateNote={handleDuplicateNote}
           onExportNote={handleExportNote}
           onImportNote={handleImportNote}
           refreshKey={refreshKey}
