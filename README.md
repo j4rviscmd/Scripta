@@ -69,7 +69,7 @@ Show only the formatting buttons you use. Hide the rest. Reorder them however yo
 
 ### Themes & Fonts
 
-Switch between **light**, **dark**, or **system** themes. Pick your favorite font from a curated selection.
+Switch between **light**, **dark**, or **system** themes. Choose from **1,900+ Google Fonts** to personalize your writing experience.
 
 ### Remembers Where You Left Off
 
