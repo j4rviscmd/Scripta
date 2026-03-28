@@ -74,6 +74,7 @@ pub fn run() {
             link_preview::fetch_link_title,
             file_io::read_text_file,
             file_io::write_text_file,
+            file_io::download_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
