@@ -564,6 +564,42 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     scheduleSave(JSON.stringify(editor.document))
   }, [editor, scheduleSave, backfillImageCaptions])
 
+  /**
+   * Handles clicks on the editor wrapper's padding area.
+   *
+   * The editor wrapper has generous bottom padding (`pb-[60vh]`) so that
+   * users can scroll content above the fold. Clicking in this padding zone
+   * does not naturally focus the editor because the click target is outside
+   * the `.bn-editor` contenteditable region. This callback detects such
+   * clicks and programmatically focuses the editor with the cursor placed
+   * at the end of the last block.
+   *
+   * Early-return guards:
+   * 1. **Locked mode** – when the editor is read-only (`locked` is `true`),
+   *    the callback is a no-op so that clicking the padding area does not
+   *    steal focus or move the cursor.
+   * 2. **Inside `.bn-editor`** – if the click originated inside the
+   *    contenteditable region (including any descendant elements), the
+   *    callback returns early and lets the default browser behaviour handle
+   *    focus normally.
+   *
+   * @param e - The React mouse event from the wrapper `<div>`.
+   */
+  const handleWrapperClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (locked) return
+      const target = e.target as HTMLElement
+      if (target.closest('.bn-editor')) return
+
+      const lastBlock = editor.document[editor.document.length - 1]
+      if (lastBlock) {
+        editor.setTextCursorPosition(lastBlock, 'end')
+      }
+      editor.focus()
+    },
+    [editor, locked]
+  )
+
   return (
     <>
       {/* Editor wrapper — starts invisible (`opacity-0`) and transitions to
@@ -573,6 +609,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
         className={`w-full min-h-screen px-8 pb-[60vh] ${contentReady ? 'opacity-100' : 'opacity-0'}`}
         data-editor-root
         data-locked={locked || undefined}
+        onClick={handleWrapperClick}
         style={
           {
             '--editor-font-size': `${fontSize}px`,
