@@ -49,6 +49,7 @@ import { codeBlockOptions } from '../lib/codeBlockConfig'
 import { DEFAULT_BLOCKS } from '../lib/constants'
 import { rangeCheckToggleExtension } from '../lib/rangeCheckToggle'
 import { slashMenuEmacsKeysExtension } from '../lib/slashMenuEmacsKeys'
+import { CustomColorStyleButton } from './CustomColorStyleButton'
 import { CustomLinkToolbar } from './CustomLinkToolbar'
 import { HighlightButton } from './HighlightButton'
 import { SearchReplacePanel } from './SearchReplacePanel'
@@ -246,7 +247,11 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
         itemMap.set(key, item)
       }
     }
-    // Add custom HighlightButton to the lookup
+
+    itemMap.set(
+      'colorStyleButton',
+      <CustomColorStyleButton key="colorStyleButton" />
+    )
     itemMap.set('highlightButton', <HighlightButton key="highlightButton" />)
 
     const configuredItems: React.ReactElement[] = []
@@ -515,12 +520,6 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
    */
   const handleChange = useCallback(() => {
     if (loadingRef.current) return
-    // Ensure every image block has a non-empty caption so the bubble menu
-    // hover-target always exists (issue #40).  This covers the `text/html`
-    // paste path where `onUploadEnd` is not fired (e.g. right-click → Copy
-    // Image in Chrome).  `backfillImageCaptions` only calls `updateBlock`
-    // when it actually finds an empty caption, so the subsequent re-trigger
-    // of `onChange` is a no-op and does not cause an infinite loop.
     backfillImageCaptions()
     scheduleSave(JSON.stringify(editor.document))
   }, [editor, scheduleSave, backfillImageCaptions])
