@@ -16,6 +16,8 @@ use tauri::Manager;
 /// - **store** — Persistent key-value config storage.
 /// - **dialog** — Native file/message dialogs.
 /// - **fs** — Scoped filesystem access.
+/// - **updater** — In-app update checking and installation.
+/// - **process** — Application process management (relaunch after update).
 ///
 /// During setup the SQLite database is initialized, a
 /// [`LinkPreviewCache`](link_preview::LinkPreviewCache) is registered as
@@ -42,6 +44,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_updater::Builder::default().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             db::init_db(app.handle())?;
             app.manage(link_preview::LinkPreviewCache(Mutex::new(HashMap::new())));

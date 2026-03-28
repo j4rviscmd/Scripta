@@ -10,6 +10,7 @@ import {
 import { configDefaults, useAppStore } from '@/app/providers/store-provider'
 import { ThemeProvider } from '@/app/providers/theme-provider'
 import { ToolbarConfigProvider } from '@/app/providers/toolbar-config-provider'
+import { UpdateProvider } from '@/app/providers/update-provider'
 import {
   useWindowTitlePrefix,
   WindowTitlePrefixProvider,
@@ -21,6 +22,7 @@ import {
 } from '@/components/ui/sidebar'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { UpdateDialog, useUpdateCheckOnLaunch } from '@/features/app-update'
 import type { EditorHandle, SaveStatus } from '@/features/editor'
 import {
   createNote,
@@ -70,6 +72,7 @@ function AppContent() {
   // Reads cursorAutoHideConfig directly so settings changes from the UI
   // take effect immediately without re-mounting.
   useCursorAutoHideEffect()
+  useUpdateCheckOnLaunch()
   const { enabled: titlePrefixEnabled } = useWindowTitlePrefix()
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
   // True once the persisted lastNoteId has been loaded from the store.
@@ -511,6 +514,7 @@ function AppContent() {
         </SidebarInset>
       </SidebarProvider>
       <Toaster position="bottom-right" />
+      <UpdateDialog />
     </TooltipProvider>
   )
 }
@@ -526,13 +530,17 @@ function AppContent() {
  * @returns The rendered application tree.
  */
 function App() {
+  const { config: configStore } = useAppStore()
+
   return (
     <ThemeProvider defaultTheme={configDefaults.theme}>
       <FontSizeProvider>
         <EditorFontProvider>
           <ToolbarConfigProvider>
             <WindowTitlePrefixProvider>
-              <AppContent />
+              <UpdateProvider configStore={configStore}>
+                <AppContent />
+              </UpdateProvider>
             </WindowTitlePrefixProvider>
           </ToolbarConfigProvider>
         </EditorFontProvider>

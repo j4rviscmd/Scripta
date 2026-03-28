@@ -13,6 +13,7 @@
     "dialog:default",
     "fs:default",
     "updater:default",
+    "process:allow-restart",
     {
       "identifier": "fs:allow-write-file",
       "allow": [{ "path": "$APPDATA/images" }, { "path": "$APPDATA/images/**" }]

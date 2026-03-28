@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
+import { CheckForUpdatesOption } from './CheckForUpdatesOption'
 import { CommandPaletteScrollOption } from './CommandPaletteScrollOption'
 import { CursorAutoHideOption } from './CursorAutoHideOption'
 import { CursorCenteringOption } from './CursorCenteringOption'
@@ -48,6 +49,7 @@ const themeOptions: Array<{ value: Theme; label: string; icon: LucideIcon }> = [
  * - **Editor font** — Editor font family selection (Google Fonts).
  * - **Toolbar** — Formatting toolbar item order and visibility via {@link ToolbarOption}.
  * - **Window state** — Restore window position and size on launch.
+ * - **Updates** — Manual update check via {@link CheckForUpdatesOption}.
  *
  * The dialog is controlled externally through the `open` and
  * `onOpenChange` props.
@@ -89,6 +91,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         <ToolbarOption />
         <Separator />
         <WindowStateOption />
+        <Separator />
+        <CheckForUpdatesOption />
       </DialogContent>
     </Dialog>
   )
