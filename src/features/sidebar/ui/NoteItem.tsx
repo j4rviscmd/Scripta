@@ -1,6 +1,7 @@
 import { useDraggable } from '@dnd-kit/core'
 import {
   Check,
+  Copy,
   Download,
   FileText,
   FolderInput,
@@ -24,12 +25,27 @@ import type { Group } from '@/features/groups'
 import { formatRelativeDate } from '@/features/groups'
 import { cn } from '@/lib/utils'
 
+/**
+ * Props for the {@link NoteItem} component.
+ *
+ * @property note - The note object to render.
+ * @property selectedNoteId - The ID of the currently selected note, or `null`.
+ * @property onSelectNote - Callback invoked when the user clicks this note.
+ * @property onTogglePin - Callback to pin or unpin the note.
+ * @property onDeleteNote - Callback invoked when the user confirms deletion.
+ * @property onDuplicateNote - Callback invoked to duplicate the note.
+ * @property onExportNote - Callback invoked to export the note as Markdown.
+ * @property onMoveToGroup - Callback invoked to move the note to a different group.
+ * @property groups - The full list of groups available for the "Move to group" submenu.
+ * @property justPinnedId - The ID of the note that was just pinned (for bounce animation), or `null`.
+ */
 interface NoteItemProps {
   note: Note
   selectedNoteId: string | null
   onSelectNote: (id: string) => void
   onTogglePin: (id: string, pinned: boolean) => void
   onDeleteNote: () => void
+  onDuplicateNote: (noteId: string) => void
   onExportNote: (noteId: string) => void
   onMoveToGroup: (noteId: string, groupId: string | null) => void
   groups: Group[]
@@ -47,6 +63,7 @@ export function NoteItem({
   onSelectNote,
   onTogglePin,
   onDeleteNote,
+  onDuplicateNote,
   onExportNote,
   onMoveToGroup,
   groups,
@@ -101,16 +118,11 @@ export function NoteItem({
         <ContextMenuContent>
           <ContextMenuItem onClick={() => onTogglePin(note.id, !note.isPinned)}>
             {note.isPinned ? (
-              <>
-                <PinOff className="h-4 w-4" />
-                Unpin
-              </>
+              <PinOff className="h-4 w-4" />
             ) : (
-              <>
-                <Pin className="h-4 w-4" />
-                Pin to top
-              </>
+              <Pin className="h-4 w-4" />
             )}
+            {note.isPinned ? 'Unpin' : 'Pin to top'}
           </ContextMenuItem>
           <ContextMenuSub>
             <ContextMenuSubTrigger>
@@ -139,6 +151,10 @@ export function NoteItem({
           <ContextMenuItem onClick={() => onExportNote(note.id)}>
             <Download className="h-4 w-4" />
             Export as Markdown
+          </ContextMenuItem>
+          <ContextMenuItem onClick={() => onDuplicateNote(note.id)}>
+            <Copy className="h-4 w-4" />
+            Duplicate
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem variant="destructive" onClick={onDeleteNote}>
