@@ -1,6 +1,6 @@
 # Scripta
 
-A beautiful, lightweight AI-powered note-taking app built with Tauri, React, and TypeScript.
+A beautifully simple note app that works offline. Fast, free, and distraction-free. For macOS & Windows.
 
 ## Recommended IDE Setup
 
