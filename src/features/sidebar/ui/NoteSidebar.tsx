@@ -37,6 +37,17 @@ import { UncategorizedSection } from './UncategorizedSection'
 
 /**
  * Props for the {@link NoteSidebar} component.
+ *
+ * @property selectedNoteId - The ID of the currently selected note, or `null`.
+ * @property onSelectNote - Callback invoked when the user selects a note.
+ * @property onNewNote - Callback invoked to create a new note.
+ * @property onDeleteNote - Callback invoked after a note has been deleted.
+ * @property onTogglePin - Callback to pin or unpin a note.
+ * @property onExportNote - Callback invoked to export a note as Markdown.
+ * @property onDuplicateNote - Callback invoked to duplicate a note.
+ * @property onImportNote - Callback invoked to import a Markdown file.
+ * @property refreshKey - A monotonically increasing key used to trigger data refresh.
+ * @property onRefresh - Callback invoked to bump the refresh key after a mutation.
  */
 interface NoteSidebarProps {
   selectedNoteId: string | null
@@ -45,6 +56,7 @@ interface NoteSidebarProps {
   onDeleteNote: (noteId: string) => void
   onTogglePin: (noteId: string, pinned: boolean) => void
   onExportNote: (noteId: string) => void
+  onDuplicateNote: (noteId: string) => void
   onImportNote: () => void
   refreshKey: number
   onRefresh: () => void
@@ -64,6 +76,7 @@ export function NoteSidebar({
   onDeleteNote,
   onTogglePin,
   onExportNote,
+  onDuplicateNote,
   onImportNote,
   refreshKey,
   onRefresh,
@@ -97,6 +110,13 @@ export function NoteSidebar({
     })
   )
 
+  /**
+   * Handles the start of a drag operation.
+   *
+   * Tracks the dragged note ID so the {@link DragOverlay} can render a preview.
+   *
+   * @param event - The drag-start event from `@dnd-kit`.
+   */
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const data = event.active.data.current
     if (data?.type === 'note') {
@@ -104,6 +124,15 @@ export function NoteSidebar({
     }
   }, [])
 
+  /**
+   * Handles the end of a drag operation.
+   *
+   * Supports two drag scenarios:
+   * 1. **Note -> Group/Uncategorized**: Moves the note to the target group.
+   * 2. **Group -> Group**: Reorders the groups by swapping positions.
+   *
+   * @param event - The drag-end event from `@dnd-kit`.
+   */
   const handleDragEnd = useCallback(
     async (event: DragEndEvent) => {
       setActiveDragNoteId(null)
@@ -116,16 +145,15 @@ export function NoteSidebar({
       // Note dropped on a group or uncategorized
       if (activeData?.type === 'note') {
         const noteId = activeData.noteId as string
+        let targetGroupId: string | null | undefined
         if (overData?.type === 'group') {
-          const groupId = overData.groupId as string
-          try {
-            await moveNote(noteId, groupId)
-          } catch {
-            toast.error('Failed to move note')
-          }
+          targetGroupId = overData.groupId as string
         } else if (overData?.type === 'uncategorized') {
+          targetGroupId = null
+        }
+        if (targetGroupId !== undefined) {
           try {
-            await moveNote(noteId, null)
+            await moveNote(noteId, targetGroupId)
           } catch {
             toast.error('Failed to move note')
           }
@@ -150,6 +178,13 @@ export function NoteSidebar({
     [groups, moveNote, reorder]
   )
 
+  /**
+   * Toggles the pin state of a note and triggers a brief bounce animation
+   * when pinning.
+   *
+   * @param noteId - The ID of the note to pin or unpin.
+   * @param pinned - `true` to pin, `false` to unpin.
+   */
   const handleTogglePin = useCallback(
     (noteId: string, pinned: boolean) => {
       onTogglePin(noteId, pinned)
@@ -161,6 +196,13 @@ export function NoteSidebar({
     [onTogglePin]
   )
 
+  /**
+   * Moves a note to a specified group (or to uncategorized).
+   *
+   * @param noteId - The ID of the note to move.
+   * @param groupId - The target group ID, or `null` for uncategorized.
+   * @throws Shows an error toast if the move operation fails.
+   */
   const handleMoveToGroup = useCallback(
     async (noteId: string, groupId: string | null) => {
       try {
@@ -172,6 +214,15 @@ export function NoteSidebar({
     [moveNote]
   )
 
+  /**
+   * Renders a single {@link NoteItem} with the current sidebar state and
+   * callbacks wired up.
+   *
+   * Memoised to avoid unnecessary re-renders when unrelated state changes.
+   *
+   * @param note - The note to render.
+   * @returns The rendered {@link NoteItem} element.
+   */
   const renderNoteItem = useCallback(
     (note: Note) => (
       <NoteItem
@@ -182,6 +233,7 @@ export function NoteSidebar({
         onTogglePin={handleTogglePin}
         onDeleteNote={() => setDeleteTarget(note.id)}
         onExportNote={onExportNote}
+        onDuplicateNote={onDuplicateNote}
         onMoveToGroup={handleMoveToGroup}
         groups={groups}
         justPinnedId={justPinnedId}
@@ -191,6 +243,7 @@ export function NoteSidebar({
       selectedNoteId,
       onSelectNote,
       handleTogglePin,
+      onDuplicateNote,
       onExportNote,
       handleMoveToGroup,
       groups,
@@ -198,6 +251,17 @@ export function NoteSidebar({
     ]
   )
 
+  /**
+   * Renders the main body of the sidebar based on the current state.
+   *
+   * Handles four visual states:
+   * - **noResults**: Shows a "no matches" message when a search yields nothing.
+   * - **isEmpty**: Shows a placeholder when there are no notes at all.
+   * - **isSearching**: Flattens all groups into date-bucketed results.
+   * - **default**: Renders pinned section, group sections, and uncategorized section.
+   *
+   * @returns The rendered sidebar body content.
+   */
   function renderSidebarBody(): React.ReactNode {
     if (noResults) {
       return (
@@ -208,6 +272,10 @@ export function NoteSidebar({
       )
     }
 
+    if (isEmpty) {
+      return <p className="p-4 text-muted-foreground text-sm">No notes yet</p>
+    }
+
     // During search: bypass groups, show flat date-grouped results
     if (isSearching) {
       const searchBuckets = bucketByDate(
@@ -215,9 +283,6 @@ export function NoteSidebar({
           .flatMap((g) => g.dateBuckets.flatMap((b) => b.items))
           .concat(uncategorized.flatMap((b) => b.items))
       )
-      if (searchBuckets.length === 0) {
-        return <p className="p-4 text-muted-foreground text-sm">No notes yet</p>
-      }
       return searchBuckets.map((bucket) => (
         <DateGroup
           key={bucket.label}
@@ -225,10 +290,6 @@ export function NoteSidebar({
           renderNoteItem={renderNoteItem}
         />
       ))
-    }
-
-    if (isEmpty) {
-      return <p className="p-4 text-muted-foreground text-sm">No notes yet</p>
     }
 
     const hasGroups = groups.length > 0

@@ -4,6 +4,8 @@ mod groups;
 mod link_preview;
 mod window;
 
+use std::collections::HashMap;
+use std::sync::Mutex;
 use tauri::Manager;
 
 /// Initializes and runs the Tauri application.
@@ -41,8 +43,8 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
             db::init_db(app.handle())?;
-            app.manage(link_preview::LinkPreviewCache(std::sync::Mutex::new(
-                std::collections::HashMap::new(),
+            app.manage(link_preview::LinkPreviewCache(Mutex::new(
+                HashMap::new(),
             )));
             window::create_main_window(app.handle())?;
             Ok(())
@@ -58,6 +60,7 @@ pub fn run() {
             db::create_note,
             db::update_note,
             db::delete_note,
+            db::duplicate_note,
             db::toggle_pin,
             groups::list_groups,
             groups::create_group,

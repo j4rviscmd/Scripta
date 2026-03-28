@@ -9,6 +9,7 @@ export type { Note } from './api/notes'
 export {
   createNote,
   deleteNote,
+  duplicateNote,
   getNote,
   listNotes,
   readTextFile,
