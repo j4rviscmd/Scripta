@@ -1,4 +1,4 @@
-import { AlertCircle, Check } from 'lucide-react'
+import { AlertCircle, Check, Lock } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { SaveStatus } from '@/features/editor'
 import { cn } from '@/lib/utils'
@@ -10,23 +10,30 @@ const SAVED_DISPLAY_MS = 3000
  * Compact save-status indicator for the editor header.
  *
  * Shows a subtle dot-based indicator reflecting the auto-save state:
+ * - `locked` – lock icon (suppresses all other states)
  * - `saving` – pulsing dot
  * - `saved`  – check icon only (fades out after 3 s)
  * - `error`  – warning icon + "Save failed"
  * - `idle`   – hidden
  */
-export function SaveStatusIndicator({ status }: { status: SaveStatus }) {
+export function SaveStatusIndicator({
+  status,
+  locked = false,
+}: {
+  status: SaveStatus
+  /** When `true`, a lock icon is displayed and save status is suppressed. */
+  locked?: boolean
+}) {
   const [display, setDisplay] = useState<SaveStatus | null>(null)
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined
   )
-  const isTimerActiveRef = useRef(false)
 
   useEffect(() => {
     clearTimeout(savedTimerRef.current)
 
     if (status === 'idle') {
-      if (!isTimerActiveRef.current) {
+      if (!savedTimerRef.current) {
         setDisplay(null)
       }
       return
@@ -35,13 +42,20 @@ export function SaveStatusIndicator({ status }: { status: SaveStatus }) {
     setDisplay(status)
 
     if (status === 'saved') {
-      isTimerActiveRef.current = true
       savedTimerRef.current = setTimeout(() => {
+        savedTimerRef.current = undefined
         setDisplay(null)
-        isTimerActiveRef.current = false
       }, SAVED_DISPLAY_MS)
     }
   }, [status])
+
+  if (locked) {
+    return (
+      <span className="inline-flex h-4 items-center text-muted-foreground text-xs">
+        <Lock className="h-3.5 w-3.5" />
+      </span>
+    )
+  }
 
   return (
     <span

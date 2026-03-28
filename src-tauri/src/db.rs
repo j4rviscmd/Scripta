@@ -3,6 +3,12 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::Manager;
 
+/// Column projection used by every SELECT on the `notes` table.
+///
+/// Order must match the indices expected by [`note_from_row`].
+const NOTE_COLUMNS: &str =
+    "id, title, content, created_at, updated_at, is_pinned, group_id, is_locked";
+
 /// Application-level wrapper around a mutex-guarded SQLite connection.
 ///
 /// Registered as Tauri managed state via [`init_db`] so that every
@@ -35,12 +41,14 @@ pub struct Note {
     pub is_pinned: bool,
     /// The UUID of the group this note belongs to, or `None` for uncategorized.
     pub group_id: Option<String>,
+    /// Whether the note is locked (read-only).
+    pub is_locked: bool,
 }
 
 /// Maps a single result row from the `notes` table to a [`Note`] struct.
 ///
 /// Column order must match the projection used in every SELECT that calls
-/// this function: `id, title, content, created_at, updated_at, is_pinned`.
+/// this function: `id, title, content, created_at, updated_at, is_pinned, group_id, is_locked`.
 pub(crate) fn note_from_row(row: &rusqlite::Row) -> Result<Note, rusqlite::Error> {
     Ok(Note {
         id: row.get(0)?,
@@ -50,6 +58,7 @@ pub(crate) fn note_from_row(row: &rusqlite::Row) -> Result<Note, rusqlite::Error
         updated_at: row.get(4)?,
         is_pinned: row.get(5)?,
         group_id: row.get(6)?,
+        is_locked: row.get(7)?,
     })
 }
 
@@ -123,6 +132,12 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
         [],
     );
 
+    // Migration: add is_locked column if it does not exist.
+    let _ = conn.execute(
+        "ALTER TABLE notes ADD COLUMN is_locked INTEGER NOT NULL DEFAULT 0",
+        [],
+    );
+
     app.manage(DbState(Mutex::new(conn)));
     Ok(())
 }
@@ -145,9 +160,7 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
 pub fn get_note(state: tauri::State<DbState>, id: String) -> Result<Option<Note>, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare(
-            "SELECT id, title, content, created_at, updated_at, is_pinned, group_id FROM notes WHERE id = ?1",
-        )
+        .prepare(&format!("SELECT {NOTE_COLUMNS} FROM notes WHERE id = ?1"))
         .map_err(|e| e.to_string())?;
 
     let note = stmt.query_row([&id], note_from_row).ok();
@@ -175,9 +188,9 @@ pub fn get_note(state: tauri::State<DbState>, id: String) -> Result<Option<Note>
 pub fn list_notes(state: tauri::State<DbState>) -> Result<Vec<Note>, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare(
-            "SELECT id, title, content, created_at, updated_at, is_pinned, group_id FROM notes ORDER BY is_pinned DESC, updated_at DESC",
-        )
+        .prepare(&format!(
+            "SELECT {NOTE_COLUMNS} FROM notes ORDER BY is_pinned DESC, updated_at DESC"
+        ))
         .map_err(|e| e.to_string())?;
 
     let notes = stmt
@@ -216,7 +229,7 @@ pub fn create_note(
     let now = chrono::Utc::now().to_rfc3339();
 
     conn.execute(
-        "INSERT INTO notes (id, title, content, created_at, updated_at, is_pinned, group_id) VALUES (?1, ?2, ?3, ?4, ?5, 0, NULL)",
+        "INSERT INTO notes (id, title, content, created_at, updated_at, is_pinned, group_id, is_locked) VALUES (?1, ?2, ?3, ?4, ?5, 0, NULL, 0)",
         rusqlite::params![id, title, content, now, now],
     )
     .map_err(|e| e.to_string())?;
@@ -229,6 +242,7 @@ pub fn create_note(
         updated_at: now,
         is_pinned: false,
         group_id: None,
+        is_locked: false,
     })
 }
 
@@ -270,7 +284,7 @@ pub fn update_note(
 
     let note = conn
         .query_row(
-            "SELECT id, title, content, created_at, updated_at, is_pinned, group_id FROM notes WHERE id = ?1",
+            &format!("SELECT {NOTE_COLUMNS} FROM notes WHERE id = ?1"),
             rusqlite::params![id],
             note_from_row,
         )
@@ -307,7 +321,7 @@ pub fn toggle_pin(state: tauri::State<DbState>, id: String, pinned: bool) -> Res
 
     let note = conn
         .query_row(
-            "SELECT id, title, content, created_at, updated_at, is_pinned, group_id FROM notes WHERE id = ?1",
+            &format!("SELECT {NOTE_COLUMNS} FROM notes WHERE id = ?1"),
             rusqlite::params![id],
             note_from_row,
         )
@@ -359,7 +373,7 @@ pub fn duplicate_note(state: tauri::State<DbState>, id: String) -> Result<Note, 
 
     let source = conn
         .query_row(
-            "SELECT id, title, content, created_at, updated_at, is_pinned, group_id FROM notes WHERE id = ?1",
+            &format!("SELECT {NOTE_COLUMNS} FROM notes WHERE id = ?1"),
             rusqlite::params![id],
             note_from_row,
         )
@@ -374,7 +388,7 @@ pub fn duplicate_note(state: tauri::State<DbState>, id: String) -> Result<Note, 
     let content = rewrite_first_heading(&source.content, &title);
 
     conn.execute(
-        "INSERT INTO notes (id, title, content, created_at, updated_at, is_pinned, group_id) VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6)",
+        "INSERT INTO notes (id, title, content, created_at, updated_at, is_pinned, group_id, is_locked) VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, 0)",
         rusqlite::params![new_id, title, content, now, now, source.group_id],
     )
     .map_err(|e| e.to_string())?;
@@ -387,7 +401,47 @@ pub fn duplicate_note(state: tauri::State<DbState>, id: String) -> Result<Note, 
         updated_at: now,
         is_pinned: false,
         group_id: source.group_id,
+        is_locked: false,
     })
+}
+
+/// Toggles the locked (read-only) state of a note.
+///
+/// When a note is locked, the frontend disables editing and suppresses auto-save.
+///
+/// # Arguments
+///
+/// * `state` - Managed database state injected by Tauri.
+/// * `id` - The UUID of the note to lock or unlock.
+/// * `locked` - `true` to lock, `false` to unlock.
+///
+/// # Returns
+///
+/// The updated [`Note`] as it exists in the database after the write.
+///
+/// # Errors
+///
+/// Returns a `String` if the database lock is poisoned, the UPDATE fails,
+/// or the note is not found after the update.
+#[tauri::command]
+pub fn toggle_lock(state: tauri::State<DbState>, id: String, locked: bool) -> Result<Note, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+
+    conn.execute(
+        "UPDATE notes SET is_locked = ?1, updated_at = datetime('now') WHERE id = ?2",
+        rusqlite::params![locked, id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    let note = conn
+        .query_row(
+            &format!("SELECT {NOTE_COLUMNS} FROM notes WHERE id = ?1"),
+            rusqlite::params![id],
+            note_from_row,
+        )
+        .map_err(|e| e.to_string())?;
+
+    Ok(note)
 }
 
 /// Rewrites the text of the first heading block in a BlockNote content JSON.

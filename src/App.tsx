@@ -34,6 +34,7 @@ import {
   getNote,
   listNotes,
   readTextFile,
+  toggleLockNote,
   togglePinNote,
   useCommandPaletteScroll,
   useCursorAutoHideEffect,
@@ -78,6 +79,7 @@ function AppContent() {
   const [sidebarOpen, setSidebarOpen] = useState(configDefaults.sidebarOpen)
   const [refreshKey, setRefreshKey] = useState(0)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
+  const [isNoteLocked, setIsNoteLocked] = useState(false)
   const editorRef = useRef<EditorHandle>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const { isHidden: isHeaderHidden } = useScrollDirection(scrollContainerRef, {
@@ -230,6 +232,7 @@ function AppContent() {
         saveCursorPosition(selectedNoteId)
       }
       setSelectedNoteId(id)
+      setIsNoteLocked(false)
       persistLastNoteId(id)
     },
     [selectedNoteId, saveScrollPosition, saveCursorPosition, persistLastNoteId]
@@ -269,6 +272,15 @@ function AppContent() {
   const handleNoteSaved = useCallback((id: string) => {
     setSelectedNoteId((current) => (current === null ? id : current))
     setRefreshKey((v) => v + 1)
+  }, [])
+
+  /**
+   * Callback invoked when the lock state of the loaded note is determined.
+   *
+   * @param locked - `true` if the note is locked, `false` otherwise.
+   */
+  const handleLockStateChange = useCallback((locked: boolean) => {
+    setIsNoteLocked(locked)
   }, [])
 
   /**
@@ -330,6 +342,28 @@ function AppContent() {
       }
     },
     []
+  )
+
+  /**
+   * Toggles the locked state of the given note.
+   *
+   * @param noteId - The ID of the note whose lock state should be toggled.
+   * @param locked - The new locked state to apply.
+   * @throws Shows an error toast if the toggle operation fails.
+   */
+  const handleToggleLock = useCallback(
+    async (noteId: string, locked: boolean) => {
+      try {
+        await toggleLockNote(noteId, locked)
+        if (selectedNoteId === noteId) {
+          setIsNoteLocked(locked)
+        }
+        setRefreshKey((v) => v + 1)
+      } catch {
+        toast.error('Failed to toggle lock')
+      }
+    },
+    [selectedNoteId]
   )
 
   /**
@@ -429,6 +463,7 @@ function AppContent() {
           onNewNote={handleNewNote}
           onDeleteNote={handleDeleteNote}
           onTogglePin={handleTogglePin}
+          onToggleLock={handleToggleLock}
           onDuplicateNote={handleDuplicateNote}
           onExportNote={handleExportNote}
           onImportNote={handleImportNote}
@@ -453,16 +488,18 @@ function AppContent() {
             className="custom-scrollbar flex-1 overflow-y-auto overscroll-none"
           >
             <div className="pointer-events-none sticky top-5 z-10 flex justify-end pr-7">
-              <SaveStatusIndicator status={saveStatus} />
+              <SaveStatusIndicator status={saveStatus} locked={isNoteLocked} />
             </div>
             <Editor
               ref={editorRef}
               key={selectedNoteId ?? 'new'}
               noteId={selectedNoteId}
+              locked={isNoteLocked}
               onNoteSaved={handleNoteSaved}
               onStatusChange={setSaveStatus}
               onContentLoaded={handleContentLoaded}
               onSuggestionMenuOpen={scrollCursorToTop}
+              onLockStateChange={handleLockStateChange}
             />
             <div className="pointer-events-none sticky bottom-5 z-10 flex justify-end pr-7">
               <ScrollToTopButton
