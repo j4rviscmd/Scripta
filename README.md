@@ -1,4 +1,5 @@
 <div align="center">
+
 ![Scripta Screenshot](public/screenshot.png)
 
 # Scripta
