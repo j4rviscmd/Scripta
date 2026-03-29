@@ -598,11 +598,13 @@ span[data-style-type="backgroundColor"][data-value="highlight"] {
  * triggered UI (image resize handles, link toolbars, side menus, etc.) from
  * appearing while the cursor is invisible.
  *
- * `pointer-events: none` only affects pointer events — keyboard input and
- * wheel scrolling continue to work normally.  The `mousemove` listener on
- * `document` still fires (events bubble to the document even when child
- * elements have `pointer-events: none`), so moving the mouse immediately
- * restores both visibility and interactivity.
+ * `pointer-events: none` prevents hover-triggered UI from appearing.
+ * It also blocks scroll hit-testing, but the `wheel` listener on
+ * `document` in `useCursorAutoHideEffect` restores the cursor on the
+ * first scroll tick so that subsequent ticks scroll normally.  The
+ * `mousemove` listener similarly fires on `document` (events bubble even
+ * when child elements have `pointer-events: none`), so moving the mouse
+ * immediately restores both visibility and interactivity.
  */
 html.cursor-autohide-hidden,
 html.cursor-autohide-hidden * {

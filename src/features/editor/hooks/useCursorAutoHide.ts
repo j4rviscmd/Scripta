@@ -316,11 +316,27 @@ export function useCursorAutoHideEffect() {
     mouseHeldRef.current = false
   }, [])
 
+  /**
+   * `wheel` handler — restores cursor and pointer-events so scrolling
+   * works.
+   *
+   * `pointer-events: none` blocks scroll hit-testing, so the first wheel
+   * tick removes the hidden class (restoring pointer-events) and
+   * re-schedules the idle timer.  Subsequent ticks scroll normally.
+   */
+  const handleWheel = useCallback(() => {
+    if (!cursorAutoHideConfig.enabled) return
+    showCursor()
+    if (timerRef.current !== null) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(hideCursor, cursorAutoHideConfig.delay * 1000)
+  }, [showCursor, hideCursor])
+
   useEffect(() => {
     document.addEventListener('mousemove', resetTimer)
     document.addEventListener('mouseover', handleMouseOver)
     document.addEventListener('mousedown', handleMouseDown)
     document.addEventListener('mouseup', handleMouseUp)
+    document.addEventListener('wheel', handleWheel, { passive: true })
     window.addEventListener('blur', handleWindowBlur)
 
     return () => {
@@ -328,6 +344,7 @@ export function useCursorAutoHideEffect() {
       document.removeEventListener('mouseover', handleMouseOver)
       document.removeEventListener('mousedown', handleMouseDown)
       document.removeEventListener('mouseup', handleMouseUp)
+      document.removeEventListener('wheel', handleWheel)
       window.removeEventListener('blur', handleWindowBlur)
       showCursor()
       if (timerRef.current !== null) {
@@ -340,6 +357,7 @@ export function useCursorAutoHideEffect() {
     handleMouseOver,
     handleMouseDown,
     handleMouseUp,
+    handleWheel,
     handleWindowBlur,
     showCursor,
   ])
