@@ -164,9 +164,28 @@ export function useCursorAutoHide() {
  *   the mouse button is released outside the application window.
  */
 export function useCursorAutoHideEffect() {
+  const { config: configStore } = useAppStore()
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hiddenRef = useRef(false)
   const mouseHeldRef = useRef(false)
+
+  // Load persisted settings into the mutable config on mount so the
+  // feature is active immediately, even before the settings dialog opens.
+  useEffect(() => {
+    Promise.all([
+      configStore.get<boolean>(CURSOR_AUTO_HIDE_STORE_KEYS.enabled),
+      configStore.get<number>(CURSOR_AUTO_HIDE_STORE_KEYS.delay),
+    ])
+      .then(([storedEnabled, storedDelay]) => {
+        cursorAutoHideConfig.enabled =
+          storedEnabled ?? DEFAULT_CURSOR_AUTO_HIDE.enabled
+        cursorAutoHideConfig.delay =
+          storedDelay ?? DEFAULT_CURSOR_AUTO_HIDE.delay
+      })
+      .catch((err) => {
+        console.error('Failed to load cursor auto-hide settings:', err)
+      })
+  }, [configStore])
 
   /**
    * Removes {@link CURSOR_HIDDEN_CLASS} from `<html>` to restore the
