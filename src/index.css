@@ -593,13 +593,37 @@ span[data-style-type="backgroundColor"][data-value="highlight"] {
  * Cursor auto-hide
  *
  * When the `cursor-autohide-hidden` class is present on <html>, the mouse
- * cursor is hidden for all elements except interactive overlays (dialogs,
- * menus, dropdowns) which keep the default cursor so the user can still
- * interact with them intuitively.
+ * cursor is hidden and pointer events are suppressed for all elements except
+ * interactive overlays (dialogs, menus, dropdowns).  This prevents hover-
+ * triggered UI (image resize handles, link toolbars, side menus, etc.) from
+ * appearing while the cursor is invisible.
+ *
+ * `pointer-events: none` prevents hover-triggered UI from appearing.
+ * It also blocks scroll hit-testing, but the `wheel` listener on
+ * `document` in `useCursorAutoHideEffect` restores the cursor on the
+ * first scroll tick so that subsequent ticks scroll normally.  The
+ * `mousemove` listener similarly fires on `document` (events bubble even
+ * when child elements have `pointer-events: none`), so moving the mouse
+ * immediately restores both visibility and interactivity.
  */
 html.cursor-autohide-hidden,
 html.cursor-autohide-hidden * {
   cursor: none !important;
+  pointer-events: none !important;
+}
+
+/*
+ * Hide hover-triggered editor UI that may already be visible when the
+ * cursor auto-hide kicks in.  `pointer-events: none` prevents NEW hover
+ * interactions, but elements whose React `hovered` state was set before
+ * hiding remain rendered.  Explicitly hiding them ensures a clean screen.
+ *
+ * When the cursor reappears (mouse move), this class is removed and the
+ * elements re-evaluate based on the new mouse position.
+ */
+html.cursor-autohide-hidden .bn-resize-handle,
+html.cursor-autohide-hidden .bn-side-menu {
+  display: none !important;
 }
 
 /*
@@ -634,4 +658,5 @@ html.cursor-autohide-hidden :is(
   [data-slot="dropdown-menu-content"]
 ) * {
   cursor: auto !important;
+  pointer-events: auto !important;
 }
