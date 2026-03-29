@@ -31,6 +31,7 @@ import {
   checklistSplitFixExtension,
   cursorCenteringExtension,
   cursorVimKeysExtension,
+  getImageNameFallback,
   imeCompositionGuard,
   resolveImageUrl,
   searchExtension,
@@ -50,9 +51,6 @@ import { DEFAULT_BLOCKS } from '../lib/constants'
 import { rangeCheckToggleExtension } from '../lib/rangeCheckToggle'
 import { readOnlyGuardExtension, setReadOnly } from '../lib/readOnlyGuard'
 import { slashMenuEmacsKeysExtension } from '../lib/slashMenuEmacsKeys'
-import type { CaptionDialogState } from './CaptionButton'
-import { CaptionButton } from './CaptionButton'
-import { CaptionDialog } from './CaptionDialog'
 import { CustomColorStyleButton } from './CustomColorStyleButton'
 import { CustomLinkToolbar } from './CustomLinkToolbar'
 import { DownloadButton } from './DownloadButton'
@@ -74,28 +72,11 @@ import '@blocknote/core/fonts/inter.css'
 const BLOCKS = DEFAULT_BLOCKS as any
 
 /**
- * Returns a fallback caption for an image block whose caption is empty.
- *
- * Uses the block's `name` prop (e.g. alt text from `<img>` HTML) when
- * available, otherwise falls back to the literal string `"image"`.
- * Returns `null` if the block is not an image or already has a non-empty caption.
- */
-function getImageCaptionFallback(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  block: any
-): string | null {
-  if (block?.type !== 'image') return null
-  const props = block.props as Record<string, unknown> | undefined
-  if (!props || props.caption !== '') return null
-  return (typeof props.name === 'string' && props.name) || 'image'
-}
-
-/**
  * Temporarily patches `view.dispatch` so that every transaction dispatched
  * during `fn` carries `setMeta("addToHistory", false)`.
  *
  * This prevents prosemirror-history from recording programmatic content
- * loads (e.g. `replaceBlocks`, `backfillImageCaptions`) as undoable steps.
+ * loads (e.g. `replaceBlocks`, `backfillImageNames`) as undoable steps.
  */
 function withSuppressedHistory(
   view: { dispatch: (tr: Transaction) => void } | null,
@@ -234,10 +215,6 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
    * to the editor inside the content-loading `useEffect`.
    */
   const [contentReady, setContentReady] = useState(false)
-  /** Caption dialog state (null = closed, object = open for that block). */
-  const [captionState, setCaptionState] = useState<CaptionDialogState | null>(
-    null
-  )
   /** Rename dialog state (null = closed, object = open for that block). */
   const [renameState, setRenameState] = useState<RenameDialogState | null>(null)
   /** Resolved theme ("light" or "dark") passed to BlockNoteView. */
@@ -295,7 +272,6 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     return [
       ...leadingPassThrough,
       <RenameButton key="renameButton" onRequestOpen={setRenameState} />,
-      <CaptionButton key="captionButton" onRequestOpen={setCaptionState} />,
       <DownloadButton key="downloadButton" />,
       ...(fileDeleteButton ? [fileDeleteButton] : []),
       ...configuredItems,
@@ -352,27 +328,19 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 
   /**
    * After every file upload completes, ensure the uploaded image block has a
-   * non-empty caption so the bubble menu hover-target area remains accessible
-   * (see issue #40).
-   *
-   * When images are pasted via the OS clipboard (e.g. right-click → Copy Image
-   * in Chrome), they arrive as `text/html` containing an `<img>` tag.
-   * BlockNote's paste handler prioritises `text/html` over `Files`, so the
-   * image block is created directly from the HTML without going through
-   * `uploadFile` — meaning `onUploadEnd` never fires for this path.
-   *
-   * This hook still covers the `uploadFile` code-path (e.g. screenshots)
-   * where `onUploadEnd` *is* called but the returned caption may not have
-   * been applied.
+   * non-empty name so the bubble menu hover-target area remains accessible
+   * (see issue #40).  The `caption` prop is synced to match `name` so
+   * BlockNote renders the caption area.
    */
   useEffect(() => {
     const onUploadEnd = (blockId?: string) => {
       if (!blockId) return
       const block = editor.getBlock(blockId)
       if (!block) return
-      const caption = getImageCaptionFallback(block)
-      if (caption) {
-        editor.updateBlock(block, { props: { caption } } as any)
+      const name = getImageNameFallback(block)
+      if (name) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        editor.updateBlock(block, { props: { name, caption: name } } as any)
       }
     }
 
@@ -456,23 +424,21 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   const search = useSearchReplace(editor)
 
   /**
-   * Walks the editor document tree and sets `caption` to `"image"` on any
-   * image block whose caption is empty.  This ensures hover-target areas
-   * exist for the formatting toolbar (see issue #40).
-   *
-   * When a `name` prop is available on the image block (e.g. the alt text
-   * extracted from `<img>` HTML), it is used as the caption.  Otherwise
-   * falls back to the literal string `"image"`.
+   * Walks the editor document tree and ensures every image block has a
+   * non-empty `name` and that `caption` is synced to match `name`.
+   * This ensures hover-target areas exist for the formatting toolbar
+   * (see issue #40).
    *
    * Must be called while `loadingRef.current === true` so the auto-save
    * guard in `handleChange` prevents unnecessary writes during initial load.
    */
-  const backfillImageCaptions = useCallback(() => {
+  const backfillImageNames = useCallback(() => {
     const walk = (blocks: typeof editor.document) => {
       for (const block of blocks) {
-        const caption = getImageCaptionFallback(block)
-        if (caption) {
-          editor.updateBlock(block, { props: { caption } } as any)
+        const name = getImageNameFallback(block)
+        if (name) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          editor.updateBlock(block, { props: { name, caption: name } } as any)
         }
         if (block.children?.length) {
           walk(block.children)
@@ -507,7 +473,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     if (!noteId) {
       withSuppressedHistory(editor.prosemirrorView, () => {
         editor.replaceBlocks(editor.document, BLOCKS)
-        backfillImageCaptions()
+        backfillImageNames()
       })
       queueMicrotask(() => {
         if (!stale) {
@@ -534,7 +500,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
             } catch {
               editor.replaceBlocks(editor.document, BLOCKS)
             }
-            backfillImageCaptions()
+            backfillImageNames()
           })
         } else {
           toast.error('Note not found')
@@ -554,13 +520,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     return () => {
       stale = true
     }
-  }, [
-    noteId,
-    editor,
-    backfillImageCaptions,
-    onContentLoaded,
-    onLockStateChange,
-  ])
+  }, [noteId, editor, backfillImageNames, onContentLoaded, onLockStateChange])
 
   /**
    * Callback invoked by BlockNote on every document change.
@@ -569,20 +529,20 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
    * callback exits early to prevent auto-save from firing on the initial
    * content population.  Otherwise it:
    *
-   * 1. Calls {@link backfillImageCaptions} to ensure every image block has a
-   *    non-empty caption (covers the `text/html` paste path where
-   *    `onUploadEnd` is not fired, e.g. right-click "Copy Image" in Chrome).
+   * 1. Calls {@link backfillImageNames} to ensure every image block has a
+   *    non-empty `name` and `caption` is synced (covers the `text/html` paste
+   *    path where `onUploadEnd` is not fired, e.g. right-click "Copy Image").
    * 2. Schedules a debounced auto-save of the serialized document.
    *
-   * `backfillImageCaptions` only calls `updateBlock` when it finds an empty
-   * caption, so the subsequent re-trigger of `onChange` is a no-op and does
+   * `backfillImageNames` only calls `updateBlock` when it finds an empty
+   * name, so the subsequent re-trigger of `onChange` is a no-op and does
    * not cause an infinite loop.
    */
   const handleChange = useCallback(() => {
     if (loadingRef.current) return
-    backfillImageCaptions()
+    backfillImageNames()
     scheduleSave(JSON.stringify(editor.document))
-  }, [editor, scheduleSave, backfillImageCaptions])
+  }, [editor, scheduleSave, backfillImageNames])
 
   /**
    * Handles clicks on the editor wrapper's padding area.
@@ -655,10 +615,6 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
                 )}
               />
               <LinkToolbarController linkToolbar={CustomLinkToolbar} />
-              <CaptionDialog
-                state={captionState}
-                onDismiss={() => setCaptionState(null)}
-              />
               <RenameDialog
                 state={renameState}
                 onDismiss={() => setRenameState(null)}

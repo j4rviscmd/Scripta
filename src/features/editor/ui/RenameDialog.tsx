@@ -69,11 +69,13 @@ export const RenameDialog = ({ state, onDismiss }: RenameDialogProps) => {
     editor.focus()
   }, [editor, onDismiss])
 
-  /** Persists the updated name to the block and closes the dialog. */
+  /** Persists the updated name to the block and syncs caption to match. */
   const handleSave = useCallback(() => {
     if (state) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      editor.updateBlock(state.blockId, { props: { name } } as any)
+      editor.updateBlock(state.blockId, {
+        props: { name, caption: name },
+      } as any)
     }
     onDismiss()
     editor.focus()
