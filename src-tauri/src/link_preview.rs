@@ -31,10 +31,10 @@ const MAX_BODY_SIZE: usize = 256 * 1024;
 ///
 /// Returns a `String` describing the parse error when `url` is not a valid
 /// [`reqwest::Url`], or when the scheme is anything other than `http` or `https`.
-fn validate_url(url: &str) -> Result<(), String> {
+fn validate_url(url: &str) -> Result<reqwest::Url, String> {
     let parsed = reqwest::Url::parse(url).map_err(|e| format!("invalid URL: {e}"))?;
     match parsed.scheme() {
-        "http" | "https" => Ok(()),
+        "http" | "https" => Ok(parsed),
         other => Err(format!(
             "unsupported scheme '{other}', only http/https allowed"
         )),
@@ -88,6 +88,27 @@ fn check_ssrf(url: &reqwest::Url) -> Result<(), String> {
     Ok(())
 }
 
+/// Builds a reqwest client with SSRF-safe redirect policy and a timeout.
+///
+/// # Errors
+///
+/// Returns a `String` if the client builder fails.
+fn build_ssrf_safe_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .user_agent("Scripta/0.1.0")
+        .timeout(Duration::from_secs(FETCH_TIMEOUT_SECS))
+        .redirect(Policy::custom(|attempt| {
+            if let Err(e) = check_ssrf(attempt.url()) {
+                eprintln!("ssrf: redirect blocked: {e}");
+                attempt.stop()
+            } else {
+                attempt.follow()
+            }
+        }))
+        .build()
+        .map_err(|e| format!("failed to build HTTP client: {e}"))
+}
+
 /// Fetches the HTML body of `url` with a timeout, content-type check,
 /// and SSRF protection (blocks private/reserved IP addresses including
 /// redirect targets).
@@ -105,23 +126,10 @@ fn check_ssrf(url: &reqwest::Url) -> Result<(), String> {
 /// errors, non-2xx status codes, non-HTML content types, or non-UTF-8
 /// response bodies.
 async fn fetch_html(url: &str) -> Result<String, String> {
-    let parsed = reqwest::Url::parse(url).map_err(|e| format!("invalid URL: {e}"))?;
+    let parsed = validate_url(url)?;
     check_ssrf(&parsed)?;
 
-    let client = reqwest::Client::builder()
-        .user_agent("Scripta/0.1.0")
-        .timeout(Duration::from_secs(FETCH_TIMEOUT_SECS))
-        .redirect(Policy::custom(|attempt| {
-            if let Err(e) = check_ssrf(attempt.url()) {
-                eprintln!("ssrf: redirect blocked: {e}");
-                attempt.stop()
-            } else {
-                attempt.follow()
-            }
-        }))
-        .build()
-        .map_err(|e| format!("failed to build HTTP client: {e}"))?;
-
+    let client = build_ssrf_safe_client()?;
     let resp = client
         .get(parsed)
         .send()
@@ -197,7 +205,7 @@ pub async fn fetch_link_title(
     cache: tauri::State<'_, LinkPreviewCache>,
     url: String,
 ) -> Result<Option<String>, String> {
-    validate_url(&url)?;
+    validate_url(&url)?; // Validates scheme; parsed URL discarded (fetch_html re-parses).
 
     // Check cache.
     {
@@ -217,4 +225,53 @@ pub async fn fetch_link_title(
     }
 
     Ok(title)
+}
+
+/// Sends a HEAD request to `url` and returns the `Content-Type` header value.
+///
+/// Falls back to a GET request with `Range: bytes=0-0` when the server
+/// responds with `405 Method Not Allowed`.
+///
+/// Uses the same SSRF protection, timeout, and redirect policy as
+/// [`fetch_link_title`].
+///
+/// # Errors
+///
+/// Returns a `String` for invalid URLs, SSRF-blocked addresses, network
+/// failures, or non-2xx HTTP responses.
+#[tauri::command]
+pub async fn check_url_content_type(url: String) -> Result<Option<String>, String> {
+    let parsed = validate_url(&url)?;
+    check_ssrf(&parsed)?;
+
+    let client = build_ssrf_safe_client()?;
+
+    // Try HEAD first (lightweight).
+    let resp = client.head(&url).send().await;
+
+    let resp = match resp {
+        Ok(r) if r.status().as_u16() == 405 => {
+            // Server doesn't support HEAD; fall back to a minimal GET.
+            client
+                .get(&url)
+                .header("Range", "bytes=0-0")
+                .send()
+                .await
+                .map_err(|e| format!("fetch failed: {e}"))?
+        }
+        Ok(r) => r,
+        Err(e) => return Err(format!("fetch failed: {e}")),
+    };
+
+    if !resp.status().is_success() {
+        return Err(format!("HTTP {}", resp.status()));
+    }
+
+    let content_type = resp
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.to_string());
+
+    Ok(content_type)
 }

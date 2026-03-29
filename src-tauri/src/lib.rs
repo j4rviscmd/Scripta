@@ -72,6 +72,7 @@ pub fn run() {
             groups::reorder_groups,
             groups::set_note_group,
             link_preview::fetch_link_title,
+            link_preview::check_url_content_type,
             file_io::read_text_file,
             file_io::write_text_file,
             file_io::download_file,

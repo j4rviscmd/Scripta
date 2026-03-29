@@ -15,6 +15,7 @@ import { useCallback } from 'react'
 export interface RenameDialogState {
   blockId: string
   name: string
+  url: string
 }
 
 /**
@@ -60,8 +61,10 @@ export const RenameButton = ({ onRequestOpen }: RenameButtonProps) => {
    *  parent to open the rename dialog. */
   const handleClick = useCallback(() => {
     if (!block) return
-    const name = ((block.props as Record<string, unknown>).name as string) || ''
-    onRequestOpen({ blockId: block.id, name })
+    const props = block.props as Record<string, unknown>
+    const name = (props.name as string) || ''
+    const url = (props.url as string) || ''
+    onRequestOpen({ blockId: block.id, name, url })
   }, [block, onRequestOpen])
 
   if (block === undefined) return null
