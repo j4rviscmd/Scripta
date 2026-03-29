@@ -567,10 +567,10 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
    * 1. **Locked mode** – when the editor is read-only (`locked` is `true`),
    *    the callback is a no-op so that clicking the padding area does not
    *    steal focus or move the cursor.
-   * 2. **Inside `.bn-editor`** – if the click originated inside the
-   *    contenteditable region (including any descendant elements), the
-   *    callback returns early and lets the default browser behaviour handle
-   *    focus normally.
+   * 2. **Inside `.bn-container`** – if the click originated inside the
+   *    BlockNote container (including the editor, toolbars, menus, and other
+   *    UI overlays), the callback returns early and lets the default browser
+   *    behaviour handle focus normally.
    *
    * @param e - The React mouse event from the wrapper `<div>`.
    */
@@ -578,7 +578,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (locked) return
       const target = e.target as HTMLElement
-      if (target.closest('.bn-editor')) return
+      if (target.closest('.bn-container')) return
       if (target.closest('[role="dialog"]')) return
 
       const lastBlock = editor.document[editor.document.length - 1]
