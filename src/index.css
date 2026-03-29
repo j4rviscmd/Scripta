@@ -300,6 +300,24 @@ body {
 }
 
 /*
+ * Inline code inside a highlighted span.
+ *
+ * When both `code` and `backgroundColor` marks are applied to the same
+ * text, the `<code>` element sits inside the highlight `<span>`. The code
+ * retains its own opaque background — the surrounding highlighted text
+ * conveys highlight membership. A subtle ring distinguishes code from
+ * a bare highlight.
+ */
+[data-style-type="backgroundColor"] code {
+  background-color: oklch(0.964 0.021 56 / 88%);
+  box-shadow: 0 0 0 1px oklch(0 0 0 / 10%);
+}
+.dark [data-style-type="backgroundColor"] code {
+  background-color: oklch(0.18 0.01 56 / 88%);
+  box-shadow: 0 0 0 1px oklch(1 0 0 / 10%);
+}
+
+/*
  * Highlighter markers.
  *
  * "yellow" (colour-picker) and "highlight" (dedicated highlighter) share the
@@ -363,6 +381,9 @@ span[data-style-type="backgroundColor"][data-value="highlight"] {
  * slightly lighter shade on hover.
  */
 .bn-shadcn .bn-editor a {
+  cursor: text;
+}
+.bn-shadcn .bn-editor.link-modifier-held a {
   cursor: pointer;
 }
 .dark .bn-shadcn .bn-editor a {

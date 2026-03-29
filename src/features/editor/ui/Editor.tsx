@@ -2,7 +2,9 @@ import {
   type BlockNoteEditor,
   BlockNoteSchema,
   createCodeBlockSpec,
+  createStyleSpecFromTipTapMark,
   defaultBlockSpecs,
+  defaultStyleSpecs,
 } from '@blocknote/core'
 import {
   FormattingToolbar,
@@ -12,6 +14,7 @@ import {
   useCreateBlockNote,
 } from '@blocknote/react'
 import { BlockNoteView } from '@blocknote/shadcn'
+import { Code } from '@tiptap/extension-code'
 import type { Transaction } from 'prosemirror-state'
 import {
   forwardRef,
@@ -54,6 +57,9 @@ import { slashMenuEmacsKeysExtension } from '../lib/slashMenuEmacsKeys'
 import { CustomColorStyleButton } from './CustomColorStyleButton'
 import { CustomLinkToolbar } from './CustomLinkToolbar'
 import { DownloadButton } from './DownloadButton'
+import type { EditLinkDialogState } from './EditLinkButton'
+import { EditLinkRequestContext } from './EditLinkButton'
+import { EditLinkDialog } from './EditLinkDialog'
 import { HighlightButton } from './HighlightButton'
 import type { RenameDialogState } from './RenameButton'
 import { RenameButton } from './RenameButton'
@@ -102,19 +108,52 @@ function withSuppressedHistory(
 }
 
 /**
- * Custom BlockNote schema with Shiki-powered syntax highlighting for code blocks.
+ * Custom BlockNote schema with Shiki-powered syntax highlighting for code blocks
+ * and inline code + highlight mark coexistence.
  *
- * Replaces the default `codeBlock` spec with one configured via
- * {@link codeBlockOptions}, which provides a Shiki highlighter and the full
- * set of supported programming languages.
+ * **Block specs** – Replaces the default `codeBlock` spec with one configured
+ * via {@link codeBlockOptions}, which provides a Shiki highlighter and the full
+ * set of supported programming languages. All other block specs (paragraph,
+ * heading, bulletList, image, etc.) are inherited from
+ * {@link defaultBlockSpecs} unchanged.
  *
- * All other block specs (paragraph, heading, bulletList, image, etc.) are
- * inherited from {@link defaultBlockSpecs} unchanged.
+ * **Style specs** – Re-declares every default style spec in an explicit order
+ * so that the `code` mark is registered **last**. ProseMirror renders marks in
+ * registration order (outermost first), so placing `code` last ensures the
+ * `<code>` element nests *inside* all other mark spans (bold, italic,
+ * textColor, backgroundColor, etc.). This makes the `backgroundColor`
+ * `<span>` wrap the `<code>` element — not the other way around — so the
+ * highlight box matches normal text height.
+ *
+ * The `code` mark itself is overridden via {@link Code}.extend to set
+ * `excludes: ''` (exclude no marks), replacing TipTap's default
+ * `excludes: '_'` (exclude all). This allows inline code to coexist with
+ * highlight, textColor, bold, italic, underline, and strike — matching
+ * Notion's behaviour.
  */
 const schema = BlockNoteSchema.create({
   blockSpecs: {
     ...defaultBlockSpecs,
     codeBlock: createCodeBlockSpec(codeBlockOptions),
+  },
+  styleSpecs: {
+    // Explicit ordering: code is placed LAST so it nests inside all other
+    // marks (bold, italic, textColor, backgroundColor, etc.).  This ensures
+    // the backgroundColor <span> wraps the <code> element — not the other
+    // way around — so the highlight box matches normal text height.
+    bold: defaultStyleSpecs.bold,
+    italic: defaultStyleSpecs.italic,
+    underline: defaultStyleSpecs.underline,
+    strike: defaultStyleSpecs.strike,
+    textColor: defaultStyleSpecs.textColor,
+    backgroundColor: defaultStyleSpecs.backgroundColor,
+    // Override TipTap Code mark's `excludes: '_'` (exclude all marks) with
+    // `excludes: ''` (exclude none) so inline code can coexist with highlight,
+    // textColor, bold, italic, underline, and strike — matching Notion behavior.
+    code: createStyleSpecFromTipTapMark(
+      Code.extend({ excludes: '' }),
+      'boolean'
+    ),
   },
 })
 
@@ -221,6 +260,9 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   const [contentReady, setContentReady] = useState(false)
   /** Rename dialog state (null = closed, object = open for that block). */
   const [renameState, setRenameState] = useState<RenameDialogState | null>(null)
+  /** Edit-link dialog state (null = closed, object = open for that link). */
+  const [editLinkState, setEditLinkState] =
+    useState<EditLinkDialogState | null>(null)
   /** Resolved theme ("light" or "dark") passed to BlockNoteView. */
   const { resolvedTheme } = useTheme()
   /** User-configured editor font size in pixels. */
@@ -562,10 +604,10 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
    * 1. **Locked mode** – when the editor is read-only (`locked` is `true`),
    *    the callback is a no-op so that clicking the padding area does not
    *    steal focus or move the cursor.
-   * 2. **Inside `.bn-editor`** – if the click originated inside the
-   *    contenteditable region (including any descendant elements), the
-   *    callback returns early and lets the default browser behaviour handle
-   *    focus normally.
+   * 2. **Inside `.bn-container`** – if the click originated inside the
+   *    BlockNote container (including the editor, toolbars, menus, and other
+   *    UI overlays), the callback returns early and lets the default browser
+   *    behaviour handle focus normally.
    *
    * @param e - The React mouse event from the wrapper `<div>`.
    */
@@ -573,7 +615,8 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (locked) return
       const target = e.target as HTMLElement
-      if (target.closest('.bn-editor')) return
+      if (target.closest('.bn-container')) return
+      if (target.closest('[role="dialog"]')) return
 
       const lastBlock = editor.document[editor.document.length - 1]
       if (lastBlock) {
@@ -618,7 +661,13 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
                   </FormattingToolbar>
                 )}
               />
-              <LinkToolbarController linkToolbar={CustomLinkToolbar} />
+              <EditLinkRequestContext.Provider value={setEditLinkState}>
+                <LinkToolbarController linkToolbar={CustomLinkToolbar} />
+              </EditLinkRequestContext.Provider>
+              <EditLinkDialog
+                state={editLinkState}
+                onDismiss={() => setEditLinkState(null)}
+              />
             </>
           )}
         </BlockNoteView>

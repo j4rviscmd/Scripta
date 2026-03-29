@@ -1,10 +1,12 @@
 import type { LinkToolbarProps } from '@blocknote/react'
-import { DeleteLinkButton, EditLinkButton, LinkToolbar } from '@blocknote/react'
+import { DeleteLinkButton, LinkToolbar } from '@blocknote/react'
+import { EditLinkButton } from './EditLinkButton'
 import { OpenInBrowserButton } from './OpenInBrowserButton'
 
 /**
- * Custom link toolbar that replaces the default "Open in new tab" button
- * with an "Open in browser" button that uses the system browser.
+ * Custom link toolbar that replaces BlockNote's default EditLinkButton
+ * (nested Radix Popover) with a lifted dialog approach, and uses the
+ * system browser for "Open in browser".
  *
  * @param props - Standard BlockNote link toolbar props including `url`,
  *   `text`, `range`, and toolbar state setters.
