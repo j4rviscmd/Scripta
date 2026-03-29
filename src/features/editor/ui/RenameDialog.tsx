@@ -1,4 +1,5 @@
-import { useBlockNoteEditor } from '@blocknote/react'
+import type { BlockNoteEditor } from '@blocknote/core'
+import { Check, Copy } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,13 +13,69 @@ import { Input } from '@/components/ui/input'
 import type { RenameDialogState } from './RenameButton'
 
 /**
+ * Displays a read-only file path with a copy-to-clipboard button.
+ *
+ * Matches the copy-button pattern used in the export toast
+ * (3 s checkmark confirmation).  The path is visually truncated
+ * with an ellipsis when it overflows.
+ */
+function PathRow({ path }: { path: string }) {
+  const [copied, setCopied] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  const handleCopy = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation()
+      e.preventDefault()
+      try {
+        await navigator.clipboard.writeText(path)
+        setCopied(true)
+        clearTimeout(timer.current)
+        timer.current = setTimeout(() => setCopied(false), 3000)
+      } catch {
+        // clipboard access failed
+      }
+    },
+    [path]
+  )
+
+  useEffect(() => () => clearTimeout(timer.current), [])
+
+  return (
+    <div className="flex min-w-0 select-text items-center gap-1.5 overflow-hidden">
+      <button
+        type="button"
+        onClick={handleCopy}
+        onMouseDown={(e) => e.preventDefault()}
+        className="shrink-0 select-none"
+      >
+        {copied ? (
+          <Check className="size-3.5" />
+        ) : (
+          <Copy className="size-3.5" />
+        )}
+      </button>
+      <span
+        className="min-w-0 truncate text-muted-foreground text-xs select-text"
+        title={path}
+      >
+        {path}
+      </span>
+    </div>
+  )
+}
+
+/**
  * Props for the {@link RenameDialog} component.
  *
+ * @property editor - The BlockNote editor instance (passed as prop so the
+ *   dialog can live outside BlockNoteView's React context).
  * @property state - The rename dialog state. When non-null the dialog is open;
  *   when null it is closed.
  * @property onDismiss - Callback invoked when the dialog is dismissed (cancel or backdrop click).
  */
 interface RenameDialogProps {
+  editor: BlockNoteEditor
   state: RenameDialogState | null
   onDismiss: () => void
 }
@@ -26,11 +83,14 @@ interface RenameDialogProps {
 /**
  * Dialog for renaming image/file blocks.
  *
- * Rendered at the Editor component level (outside the FormattingToolbar)
- * so it survives toolbar unmount cycles.
+ * Rendered outside {@link BlockNoteView} to avoid ProseMirror focus management
+ * interfering with the dialog's focus trap.
  */
-export const RenameDialog = ({ state, onDismiss }: RenameDialogProps) => {
-  const editor = useBlockNoteEditor()
+export const RenameDialog = ({
+  editor,
+  state,
+  onDismiss,
+}: RenameDialogProps) => {
   /** Current name text bound to the input field. */
   const [name, setName] = useState('')
   /**
@@ -63,11 +123,10 @@ export const RenameDialog = ({ state, onDismiss }: RenameDialogProps) => {
     }, 50)
   }, [])
 
-  /** Closes the dialog without saving and returns focus to the editor. */
+  /** Closes the dialog without saving. */
   const handleDismiss = useCallback(() => {
     onDismiss()
-    editor.focus()
-  }, [editor, onDismiss])
+  }, [onDismiss])
 
   /** Persists the updated name to the block and syncs caption to match. */
   const handleSave = useCallback(() => {
@@ -78,7 +137,6 @@ export const RenameDialog = ({ state, onDismiss }: RenameDialogProps) => {
       } as any)
     }
     onDismiss()
-    editor.focus()
   }, [editor, state, name, onDismiss])
 
   const handleKeyDown = useCallback(
@@ -98,10 +156,11 @@ export const RenameDialog = ({ state, onDismiss }: RenameDialogProps) => {
         if (!open) void handleDismiss()
       }}
     >
-      <DialogContent>
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Rename</DialogTitle>
         </DialogHeader>
+        {state?.url && <PathRow path={state.url} />}
         <Input
           value={name}
           onChange={(e) => setName(e.target.value)}

@@ -12,7 +12,7 @@
   "app": {
     "windows": [],
     "security": {
-      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self'; img-src 'self' data: asset: https://asset.localhost",
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self'; img-src 'self' data: asset: https: http://asset.localhost",
       "assetProtocol": {
         "enable": true,
         "scope": ["$APPDATA/images/**"]

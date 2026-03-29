@@ -79,10 +79,9 @@ function getImageNameFallback(
 ): string | null {
   if (block?.type !== 'image') return null
   const props = block.props as Record<string, unknown> | undefined
-  if (!props) return 'image'
   const name =
-    typeof props.name === 'string' && props.name ? props.name : 'image'
-  if (props.caption === name) return null
+    typeof props?.name === 'string' && props.name ? props.name : 'image'
+  if (!props || props.caption === name) return props ? null : name
   return name
 }
 
@@ -124,7 +123,9 @@ export async function uploadImage(file: File): Promise<ImageUploadResult> {
   await writeFile(filePath, new Uint8Array(await file.arrayBuffer()))
 
   const url = convertFileSrc(filePath)
-  const name = file.name || 'image'
+  const raw = file.name || 'image'
+  const dotIndex = raw.lastIndexOf('.')
+  const name = dotIndex > 0 ? raw.substring(0, dotIndex) : raw
 
   return {
     props: {

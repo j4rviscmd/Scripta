@@ -84,8 +84,9 @@ const BLOCKS = DEFAULT_BLOCKS as any
  * This prevents prosemirror-history from recording programmatic content
  * loads (e.g. `replaceBlocks`, `backfillImageNames`) as undoable steps.
  *
- * @param view - The ProseMirror `EditorView` (or `null` if not yet mounted).
- * @param fn - The callback whose dispatched transactions should be non-undoable.
+ * @param view - The ProseMirror editor view whose `dispatch` to patch.
+ *   When `null`, `fn` is called without any patching.
+ * @param fn - The callback to execute with history suppression active.
  */
 function withSuppressedHistory(
   view: { dispatch: (tr: Transaction) => void } | null,
@@ -160,22 +161,22 @@ const schema = BlockNoteSchema.create({
  * Props for the {@link Editor} component.
  *
  * @property noteId - The ID of the note to load, or `null` for a new untitled note.
+ * @property locked - Whether the editor is in read-only mode. Defaults to `false`.
  * @property onNoteSaved - Optional callback invoked after the note content is auto-saved.
  * @property onStatusChange - Optional callback invoked whenever the save status changes.
  * @property onContentLoaded - Optional callback invoked once the note content has finished loading.
  * @property onSuggestionMenuOpen - Optional callback invoked with the cursor's `clientY`
  *   coordinate when the suggestion menu (slash command palette) opens.
+ * @property onLockStateChange - Optional callback invoked when the lock state of the
+ *   loaded note is determined.
  */
 interface EditorProps {
   noteId: string | null
-  /** Whether the editor is in read-only mode. Defaults to `false`. */
   locked?: boolean
   onNoteSaved?: (id: string) => void
   onStatusChange?: (status: SaveStatus) => void
   onContentLoaded?: () => void
-  /** Called with the cursor's clientY coordinate when the suggestion menu (slash command palette) opens. */
   onSuggestionMenuOpen?: (cursorClientY: number) => void
-  /** Called when the lock state of the loaded note is determined. */
   onLockStateChange?: (locked: boolean) => void
 }
 
@@ -663,10 +664,6 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
               <EditLinkRequestContext.Provider value={setEditLinkState}>
                 <LinkToolbarController linkToolbar={CustomLinkToolbar} />
               </EditLinkRequestContext.Provider>
-              <RenameDialog
-                state={renameState}
-                onDismiss={() => setRenameState(null)}
-              />
               <EditLinkDialog
                 state={editLinkState}
                 onDismiss={() => setEditLinkState(null)}
@@ -675,6 +672,11 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
           )}
         </BlockNoteView>
       </div>
+      <RenameDialog
+        editor={editor}
+        state={renameState}
+        onDismiss={() => setRenameState(null)}
+      />
       <SearchReplacePanel {...search} />
     </>
   )
