@@ -50,9 +50,16 @@ import { DEFAULT_BLOCKS } from '../lib/constants'
 import { rangeCheckToggleExtension } from '../lib/rangeCheckToggle'
 import { readOnlyGuardExtension, setReadOnly } from '../lib/readOnlyGuard'
 import { slashMenuEmacsKeysExtension } from '../lib/slashMenuEmacsKeys'
+import type { CaptionDialogState } from './CaptionButton'
+import { CaptionButton } from './CaptionButton'
+import { CaptionDialog } from './CaptionDialog'
 import { CustomColorStyleButton } from './CustomColorStyleButton'
 import { CustomLinkToolbar } from './CustomLinkToolbar'
+import { DownloadButton } from './DownloadButton'
 import { HighlightButton } from './HighlightButton'
+import type { RenameDialogState } from './RenameButton'
+import { RenameButton } from './RenameButton'
+import { RenameDialog } from './RenameDialog'
 import { SearchReplacePanel } from './SearchReplacePanel'
 import '@blocknote/shadcn/style.css'
 import '@blocknote/core/fonts/inter.css'
@@ -172,12 +179,7 @@ export interface EditorHandle {
 const PASS_THROUGH_KEYS = new Set([
   'blockTypeSelect',
   'tableCellMergeButton',
-  'fileCaptionButton',
-  'replaceFileButton',
-  'fileRenameButton',
   'fileDeleteButton',
-  'fileDownloadButton',
-  'filePreviewButton',
 ])
 
 /**
@@ -232,6 +234,12 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
    * to the editor inside the content-loading `useEffect`.
    */
   const [contentReady, setContentReady] = useState(false)
+  /** Caption dialog state (null = closed, object = open for that block). */
+  const [captionState, setCaptionState] = useState<CaptionDialogState | null>(
+    null
+  )
+  /** Rename dialog state (null = closed, object = open for that block). */
+  const [renameState, setRenameState] = useState<RenameDialogState | null>(null)
   /** Resolved theme ("light" or "dark") passed to BlockNoteView. */
   const { resolvedTheme } = useTheme()
   /** User-configured editor font size in pixels. */
@@ -255,14 +263,19 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   const formattingToolbarItems = useMemo(() => {
     const allItems = getFormattingToolbarItems()
     const itemMap = new Map<string, React.ReactElement>()
-    const passThroughItems: React.ReactElement[] = []
+    const leadingPassThrough: React.ReactElement[] = []
+    let fileDeleteButton: React.ReactElement | null = null
 
     for (const item of allItems) {
       const key = item.key as string
-      if (PASS_THROUGH_KEYS.has(key)) {
-        passThroughItems.push(item)
-      } else {
+      if (!PASS_THROUGH_KEYS.has(key)) {
         itemMap.set(key, item)
+        continue
+      }
+      if (key === 'fileDeleteButton') {
+        fileDeleteButton = item
+      } else {
+        leadingPassThrough.push(item)
       }
     }
 
@@ -279,7 +292,14 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       if (el) configuredItems.push(el)
     }
 
-    return [...passThroughItems, ...configuredItems]
+    return [
+      ...leadingPassThrough,
+      <RenameButton key="renameButton" onRequestOpen={setRenameState} />,
+      <CaptionButton key="captionButton" onRequestOpen={setCaptionState} />,
+      <DownloadButton key="downloadButton" />,
+      ...(fileDeleteButton ? [fileDeleteButton] : []),
+      ...configuredItems,
+    ]
   }, [toolbarItemConfigs])
 
   /** Debounced auto-save hook (500 ms delay). Only active when `noteId` is non-null. */
@@ -635,6 +655,14 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
                 )}
               />
               <LinkToolbarController linkToolbar={CustomLinkToolbar} />
+              <CaptionDialog
+                state={captionState}
+                onDismiss={() => setCaptionState(null)}
+              />
+              <RenameDialog
+                state={renameState}
+                onDismiss={() => setRenameState(null)}
+              />
             </>
           )}
         </BlockNoteView>
