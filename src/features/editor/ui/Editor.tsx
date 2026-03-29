@@ -54,6 +54,9 @@ import { slashMenuEmacsKeysExtension } from '../lib/slashMenuEmacsKeys'
 import { CustomColorStyleButton } from './CustomColorStyleButton'
 import { CustomLinkToolbar } from './CustomLinkToolbar'
 import { DownloadButton } from './DownloadButton'
+import type { EditLinkDialogState } from './EditLinkButton'
+import { EditLinkRequestContext } from './EditLinkButton'
+import { EditLinkDialog } from './EditLinkDialog'
 import { HighlightButton } from './HighlightButton'
 import type { RenameDialogState } from './RenameButton'
 import { RenameButton } from './RenameButton'
@@ -77,6 +80,9 @@ const BLOCKS = DEFAULT_BLOCKS as any
  *
  * This prevents prosemirror-history from recording programmatic content
  * loads (e.g. `replaceBlocks`, `backfillImageNames`) as undoable steps.
+ *
+ * @param view - The ProseMirror `EditorView` (or `null` if not yet mounted).
+ * @param fn - The callback whose dispatched transactions should be non-undoable.
  */
 function withSuppressedHistory(
   view: { dispatch: (tr: Transaction) => void } | null,
@@ -217,6 +223,9 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   const [contentReady, setContentReady] = useState(false)
   /** Rename dialog state (null = closed, object = open for that block). */
   const [renameState, setRenameState] = useState<RenameDialogState | null>(null)
+  /** Edit-link dialog state (null = closed, object = open for that link). */
+  const [editLinkState, setEditLinkState] =
+    useState<EditLinkDialogState | null>(null)
   /** Resolved theme ("light" or "dark") passed to BlockNoteView. */
   const { resolvedTheme } = useTheme()
   /** User-configured editor font size in pixels. */
@@ -570,6 +579,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       if (locked) return
       const target = e.target as HTMLElement
       if (target.closest('.bn-editor')) return
+      if (target.closest('[role="dialog"]')) return
 
       const lastBlock = editor.document[editor.document.length - 1]
       if (lastBlock) {
@@ -614,10 +624,16 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
                   </FormattingToolbar>
                 )}
               />
-              <LinkToolbarController linkToolbar={CustomLinkToolbar} />
+              <EditLinkRequestContext.Provider value={setEditLinkState}>
+                <LinkToolbarController linkToolbar={CustomLinkToolbar} />
+              </EditLinkRequestContext.Provider>
               <RenameDialog
                 state={renameState}
                 onDismiss={() => setRenameState(null)}
+              />
+              <EditLinkDialog
+                state={editLinkState}
+                onDismiss={() => setEditLinkState(null)}
               />
             </>
           )}

@@ -363,6 +363,9 @@ span[data-style-type="backgroundColor"][data-value="highlight"] {
  * slightly lighter shade on hover.
  */
 .bn-shadcn .bn-editor a {
+  cursor: text;
+}
+.bn-shadcn .bn-editor.link-modifier-held a {
   cursor: pointer;
 }
 .dark .bn-shadcn .bn-editor a {
