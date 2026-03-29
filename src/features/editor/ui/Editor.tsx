@@ -2,7 +2,9 @@ import {
   type BlockNoteEditor,
   BlockNoteSchema,
   createCodeBlockSpec,
+  createStyleSpecFromTipTapMark,
   defaultBlockSpecs,
+  defaultStyleSpecs,
 } from '@blocknote/core'
 import {
   FormattingToolbar,
@@ -12,6 +14,7 @@ import {
   useCreateBlockNote,
 } from '@blocknote/react'
 import { BlockNoteView } from '@blocknote/shadcn'
+import { Code } from '@tiptap/extension-code'
 import type { Transaction } from 'prosemirror-state'
 import {
   forwardRef,
@@ -104,19 +107,52 @@ function withSuppressedHistory(
 }
 
 /**
- * Custom BlockNote schema with Shiki-powered syntax highlighting for code blocks.
+ * Custom BlockNote schema with Shiki-powered syntax highlighting for code blocks
+ * and inline code + highlight mark coexistence.
  *
- * Replaces the default `codeBlock` spec with one configured via
- * {@link codeBlockOptions}, which provides a Shiki highlighter and the full
- * set of supported programming languages.
+ * **Block specs** – Replaces the default `codeBlock` spec with one configured
+ * via {@link codeBlockOptions}, which provides a Shiki highlighter and the full
+ * set of supported programming languages. All other block specs (paragraph,
+ * heading, bulletList, image, etc.) are inherited from
+ * {@link defaultBlockSpecs} unchanged.
  *
- * All other block specs (paragraph, heading, bulletList, image, etc.) are
- * inherited from {@link defaultBlockSpecs} unchanged.
+ * **Style specs** – Re-declares every default style spec in an explicit order
+ * so that the `code` mark is registered **last**. ProseMirror renders marks in
+ * registration order (outermost first), so placing `code` last ensures the
+ * `<code>` element nests *inside* all other mark spans (bold, italic,
+ * textColor, backgroundColor, etc.). This makes the `backgroundColor`
+ * `<span>` wrap the `<code>` element — not the other way around — so the
+ * highlight box matches normal text height.
+ *
+ * The `code` mark itself is overridden via {@link Code}.extend to set
+ * `excludes: ''` (exclude no marks), replacing TipTap's default
+ * `excludes: '_'` (exclude all). This allows inline code to coexist with
+ * highlight, textColor, bold, italic, underline, and strike — matching
+ * Notion's behaviour.
  */
 const schema = BlockNoteSchema.create({
   blockSpecs: {
     ...defaultBlockSpecs,
     codeBlock: createCodeBlockSpec(codeBlockOptions),
+  },
+  styleSpecs: {
+    // Explicit ordering: code is placed LAST so it nests inside all other
+    // marks (bold, italic, textColor, backgroundColor, etc.).  This ensures
+    // the backgroundColor <span> wraps the <code> element — not the other
+    // way around — so the highlight box matches normal text height.
+    bold: defaultStyleSpecs.bold,
+    italic: defaultStyleSpecs.italic,
+    underline: defaultStyleSpecs.underline,
+    strike: defaultStyleSpecs.strike,
+    textColor: defaultStyleSpecs.textColor,
+    backgroundColor: defaultStyleSpecs.backgroundColor,
+    // Override TipTap Code mark's `excludes: '_'` (exclude all marks) with
+    // `excludes: ''` (exclude none) so inline code can coexist with highlight,
+    // textColor, bold, italic, underline, and strike — matching Notion behavior.
+    code: createStyleSpecFromTipTapMark(
+      Code.extend({ excludes: '' }),
+      'boolean'
+    ),
   },
 })
 
