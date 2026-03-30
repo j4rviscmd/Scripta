@@ -84,6 +84,22 @@ export function NoteItem({
     ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
     : undefined
 
+  let noteIcon: React.ReactNode
+  if (note.isPinned) {
+    noteIcon = (
+      <Pin
+        className={cn(
+          'h-4 w-4 shrink-0 fill-primary/20 text-primary',
+          justPinnedId === note.id && 'animate-pin-bounce'
+        )}
+      />
+    )
+  } else if (note.isLocked) {
+    noteIcon = <FileLock className="h-4 w-4 shrink-0" />
+  } else {
+    noteIcon = <FileText className="h-4 w-4 shrink-0" />
+  }
+
   return (
     <SidebarMenuItem
       ref={setNodeRef}
@@ -102,23 +118,10 @@ export function NoteItem({
             onClick={() => onSelectNote(note.id)}
             className={cn(note.isPinned && 'hover:bg-primary/5')}
           >
-            {note.isPinned && (
-              <Pin
-                className={cn(
-                  'h-4 w-4 shrink-0 fill-primary/20 text-primary',
-                  justPinnedId === note.id && 'animate-pin-bounce'
-                )}
-              />
-            )}
-            {!note.isPinned && note.isLocked && (
-              <FileLock className="h-4 w-4 shrink-0" />
-            )}
-            {!note.isPinned && !note.isLocked && (
-              <FileText className="h-4 w-4 shrink-0" />
-            )}
+            {noteIcon}
             <div className="flex flex-col overflow-hidden">
               <span className="truncate text-sm">{note.title}</span>
-              <span className="text-muted-foreground text-xs">
+              <span className="text-[0.65rem] text-muted-foreground/60">
                 {formatRelativeDate(note.updatedAt)}
               </span>
             </div>
