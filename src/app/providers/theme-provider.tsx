@@ -1,3 +1,4 @@
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import {
   createContext,
   useCallback,
@@ -5,7 +6,6 @@ import {
   useEffect,
   useState,
 } from 'react'
-import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useAppStore } from '@/app/providers/store-provider'
 import { splashFadingPromise } from '@/features/splash'
 
