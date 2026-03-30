@@ -1,3 +1,4 @@
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import {
   createContext,
   useCallback,
@@ -44,6 +45,11 @@ const ThemeProviderContext = createContext<ThemeProviderState | undefined>(
  * document root element and persists the user's preference in
  * tauri-plugin-store.  Listens for OS-level `prefers-color-scheme` changes
  * so the resolved theme stays in sync when `"system"` is selected.
+ *
+ * Also synchronises the Tauri native window decoration (title bar) via
+ * `getCurrentWindow().setTheme()`.  When the user selects `"system"`, `null`
+ * is passed so the OS controls the window chrome directly; explicit
+ * `"light"` or `"dark"` selections override the OS for the window as well.
  *
  * @param props - Component props.
  * @param props.children - The component subtree that needs theme context.
@@ -101,7 +107,16 @@ export function ThemeProvider({
     const root = window.document.documentElement
     root.classList.remove('light', 'dark')
     root.classList.add(resolvedTheme)
-  }, [resolvedTheme, canApplyTheme])
+
+    // Sync the Tauri native window decoration (title bar) to match.
+    // Pass null for "system" so the OS controls the window chrome directly;
+    // explicit light/dark selections override it.
+    getCurrentWindow()
+      .setTheme(theme === 'system' ? null : resolvedTheme)
+      .catch((err) => {
+        console.error('Failed to set window theme:', err)
+      })
+  }, [theme, resolvedTheme, canApplyTheme])
 
   const handleSetTheme = useCallback(
     (t: Theme) => {
