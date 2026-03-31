@@ -67,6 +67,27 @@ export interface ImageUploadResult {
 }
 
 /**
+ * Returns the fallback display name for an image block that needs syncing.
+ *
+ * Returns `null` when the block is not an image or when `caption` already
+ * equals `name` (i.e. already in sync).  Otherwise returns the `name` value
+ * (or `"image"` as a fallback) so the caller can sync `caption` to match.
+ */
+function getImageNameFallback(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  block: any
+): string | null {
+  if (block?.type !== 'image') return null
+  const props = block.props as Record<string, unknown> | undefined
+  const name =
+    typeof props?.name === 'string' && props.name ? props.name : 'image'
+  if (!props || props.caption === name) return props ? null : name
+  return name
+}
+
+export { getImageNameFallback }
+
+/**
  * Uploads an image file to the app's local data directory (`$APPDATA/images/`).
  *
  * Processing pipeline:
@@ -75,12 +96,8 @@ export interface ImageUploadResult {
  * 3. Ensures the target directory exists (created recursively if needed).
  * 4. Writes the file as raw bytes to disk.
  * 5. Returns a BlockNote-compatible update object containing the asset URL,
- *    original filename, and a caption (falls back to `"image"` when the
- *    filename is unavailable).
- *
- * Returning an object (instead of a plain URL string) causes BlockNote to set
- * the `caption` prop on the image block, which keeps the caption area visible
- * so the bubble menu toolbar remains accessible (fixes issue #40).
+ *    original filename.  `caption` is always synced to `name` so BlockNote
+ *    renders the caption area and the bubble menu toolbar remains accessible.
  *
  * @param file - The image File from the browser's File API.
  * @returns A BlockNote block-update object with `url`, `name`, and `caption`.
@@ -106,13 +123,15 @@ export async function uploadImage(file: File): Promise<ImageUploadResult> {
   await writeFile(filePath, new Uint8Array(await file.arrayBuffer()))
 
   const url = convertFileSrc(filePath)
-  const caption = file.name || 'image'
+  const raw = file.name || 'image'
+  const dotIndex = raw.lastIndexOf('.')
+  const name = dotIndex > 0 ? raw.substring(0, dotIndex) : raw
 
   return {
     props: {
       url,
-      name: file.name,
-      caption,
+      name,
+      caption: name,
     },
   }
 }

@@ -199,9 +199,56 @@ body {
   body {
     @apply bg-background text-foreground;
   }
-  [data-editor-root] {
-    @apply select-text;
-  }
+}
+
+/*
+ * Editor text-selection overrides – placed OUTSIDE @layer base.
+ *
+ * BlockNote's stylesheets live outside any @layer, so rules declared
+ * inside Tailwind's @layer base lose the cascade battle.  The same
+ * pattern already used for the dark-mode editor background override
+ * (see below) is applied here so that user-select: text wins over
+ * both the global select-none and any library defaults.
+ *
+ * When the editor is read-only (editable={false}), ProseMirror sets
+ * contentEditable="false" on the .ProseMirror element.  On WebKit
+ * (Tauri's WKWebView) this implicitly forces user-select: none on
+ * the subtree.  An un-layered rule with a specific selector is
+ * required to override this behaviour.
+ */
+[data-editor-root] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+[data-editor-root] .ProseMirror {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/*
+ * Hide editing UI elements (drag handles, side menu, suggestion menu)
+ * when the editor is locked.  The editor stays editable={true} so text
+ * selection works in WebKit, but all editing transactions are blocked by
+ * the readOnlyGuard ProseMirror plugin.
+ */
+[data-editor-root][data-locked] .bn-drag-handle,
+[data-editor-root][data-locked] .bn-side-menu,
+[data-editor-root][data-locked] .bn-add-block-button,
+[data-editor-root][data-locked] .bn-suggestion-menu {
+  display: none !important;
+}
+
+/*
+ * Locked-editor cursor override.
+ *
+ * While the editor remains editable={true} for text selection, the default
+ * text cursor (I-beam) is replaced with the standard pointer so it is clear
+ * the document cannot be edited.
+ */
+[data-editor-root][data-locked] .ProseMirror,
+[data-editor-root][data-locked] .ProseMirror * {
+  cursor: default;
+  caret-color: transparent;
 }
 
 /*
@@ -250,6 +297,24 @@ body {
 .dark .bn-inline-content code {
   background-color: oklch(0.752 0.17 54 / 12%);
   color: oklch(0.828 0.111 54);
+}
+
+/*
+ * Inline code inside a highlighted span.
+ *
+ * When both `code` and `backgroundColor` marks are applied to the same
+ * text, the `<code>` element sits inside the highlight `<span>`. The code
+ * retains its own opaque background — the surrounding highlighted text
+ * conveys highlight membership. A subtle ring distinguishes code from
+ * a bare highlight.
+ */
+[data-style-type="backgroundColor"] code {
+  background-color: oklch(0.964 0.021 56 / 88%);
+  box-shadow: 0 0 0 1px oklch(0 0 0 / 10%);
+}
+.dark [data-style-type="backgroundColor"] code {
+  background-color: oklch(0.18 0.01 56 / 88%);
+  box-shadow: 0 0 0 1px oklch(1 0 0 / 10%);
 }
 
 /*
@@ -316,6 +381,9 @@ span[data-style-type="backgroundColor"][data-value="highlight"] {
  * slightly lighter shade on hover.
  */
 .bn-shadcn .bn-editor a {
+  cursor: text;
+}
+.bn-shadcn .bn-editor.link-modifier-held a {
   cursor: pointer;
 }
 .dark .bn-shadcn .bn-editor a {
@@ -546,13 +614,37 @@ span[data-style-type="backgroundColor"][data-value="highlight"] {
  * Cursor auto-hide
  *
  * When the `cursor-autohide-hidden` class is present on <html>, the mouse
- * cursor is hidden for all elements except interactive overlays (dialogs,
- * menus, dropdowns) which keep the default cursor so the user can still
- * interact with them intuitively.
+ * cursor is hidden and pointer events are suppressed for all elements except
+ * interactive overlays (dialogs, menus, dropdowns).  This prevents hover-
+ * triggered UI (image resize handles, link toolbars, side menus, etc.) from
+ * appearing while the cursor is invisible.
+ *
+ * `pointer-events: none` prevents hover-triggered UI from appearing.
+ * It also blocks scroll hit-testing, but the `wheel` listener on
+ * `document` in `useCursorAutoHideEffect` restores the cursor on the
+ * first scroll tick so that subsequent ticks scroll normally.  The
+ * `mousemove` listener similarly fires on `document` (events bubble even
+ * when child elements have `pointer-events: none`), so moving the mouse
+ * immediately restores both visibility and interactivity.
  */
 html.cursor-autohide-hidden,
 html.cursor-autohide-hidden * {
   cursor: none !important;
+  pointer-events: none !important;
+}
+
+/*
+ * Hide hover-triggered editor UI that may already be visible when the
+ * cursor auto-hide kicks in.  `pointer-events: none` prevents NEW hover
+ * interactions, but elements whose React `hovered` state was set before
+ * hiding remain rendered.  Explicitly hiding them ensures a clean screen.
+ *
+ * When the cursor reappears (mouse move), this class is removed and the
+ * elements re-evaluate based on the new mouse position.
+ */
+html.cursor-autohide-hidden .bn-resize-handle,
+html.cursor-autohide-hidden .bn-side-menu {
+  display: none !important;
 }
 
 /*
@@ -587,6 +679,7 @@ html.cursor-autohide-hidden :is(
   [data-slot="dropdown-menu-content"]
 ) * {
   cursor: auto !important;
+  pointer-events: auto !important;
 }
 
 /*

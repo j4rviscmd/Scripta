@@ -9,10 +9,12 @@
     "core:window:allow-set-title",
     "core:window:allow-set-resizable",
     "core:window:allow-set-maximizable",
+    "core:window:allow-set-theme",
     "store:default",
     "dialog:default",
     "fs:default",
     "updater:default",
+    "process:allow-restart",
     {
       "identifier": "fs:allow-write-file",
       "allow": [{ "path": "$APPDATA/images" }, { "path": "$APPDATA/images/**" }]

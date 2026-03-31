@@ -2,7 +2,9 @@ import {
   type BlockNoteEditor,
   BlockNoteSchema,
   createCodeBlockSpec,
+  createStyleSpecFromTipTapMark,
   defaultBlockSpecs,
+  defaultStyleSpecs,
 } from '@blocknote/core'
 import {
   FormattingToolbar,
@@ -14,6 +16,7 @@ import {
   useCreateBlockNote,
 } from '@blocknote/react'
 import { BlockNoteView } from '@blocknote/shadcn'
+import { Code } from '@tiptap/extension-code'
 import type { Transaction } from 'prosemirror-state'
 import {
   forwardRef,
@@ -34,6 +37,7 @@ import {
   checklistSplitFixExtension,
   cursorCenteringExtension,
   cursorVimKeysExtension,
+  getImageNameFallback,
   imeCompositionGuard,
   resolveImageUrl,
   searchExtension,
@@ -51,10 +55,18 @@ import { useSearchReplace } from '../hooks/useSearchReplace'
 import { codeBlockOptions } from '../lib/codeBlockConfig'
 import { DEFAULT_BLOCKS } from '../lib/constants'
 import { rangeCheckToggleExtension } from '../lib/rangeCheckToggle'
+import { readOnlyGuardExtension, setReadOnly } from '../lib/readOnlyGuard'
 import { slashMenuEmacsKeysExtension } from '../lib/slashMenuEmacsKeys'
 import { CustomColorStyleButton } from './CustomColorStyleButton'
 import { CustomLinkToolbar } from './CustomLinkToolbar'
+import { DownloadButton } from './DownloadButton'
+import type { EditLinkDialogState } from './EditLinkButton'
+import { EditLinkRequestContext } from './EditLinkButton'
+import { EditLinkDialog } from './EditLinkDialog'
 import { HighlightButton } from './HighlightButton'
+import type { RenameDialogState } from './RenameButton'
+import { RenameButton } from './RenameButton'
+import { RenameDialog } from './RenameDialog'
 import { SearchReplacePanel } from './SearchReplacePanel'
 import '@blocknote/shadcn/style.css'
 import '@blocknote/core/fonts/inter.css'
@@ -69,28 +81,15 @@ import '@blocknote/core/fonts/inter.css'
 const BLOCKS = DEFAULT_BLOCKS as any
 
 /**
- * Returns a fallback caption for an image block whose caption is empty.
- *
- * Uses the block's `name` prop (e.g. alt text from `<img>` HTML) when
- * available, otherwise falls back to the literal string `"image"`.
- * Returns `null` if the block is not an image or already has a non-empty caption.
- */
-function getImageCaptionFallback(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  block: any
-): string | null {
-  if (block?.type !== 'image') return null
-  const props = block.props as Record<string, unknown> | undefined
-  if (!props || props.caption !== '') return null
-  return (typeof props.name === 'string' && props.name) || 'image'
-}
-
-/**
  * Temporarily patches `view.dispatch` so that every transaction dispatched
  * during `fn` carries `setMeta("addToHistory", false)`.
  *
  * This prevents prosemirror-history from recording programmatic content
- * loads (e.g. `replaceBlocks`, `backfillImageCaptions`) as undoable steps.
+ * loads (e.g. `replaceBlocks`, `backfillImageNames`) as undoable steps.
+ *
+ * @param view - The ProseMirror editor view whose `dispatch` to patch.
+ *   When `null`, `fn` is called without any patching.
+ * @param fn - The callback to execute with history suppression active.
  */
 function withSuppressedHistory(
   view: { dispatch: (tr: Transaction) => void } | null,
@@ -112,19 +111,52 @@ function withSuppressedHistory(
 }
 
 /**
- * Custom BlockNote schema with Shiki-powered syntax highlighting for code blocks.
+ * Custom BlockNote schema with Shiki-powered syntax highlighting for code blocks
+ * and inline code + highlight mark coexistence.
  *
- * Replaces the default `codeBlock` spec with one configured via
- * {@link codeBlockOptions}, which provides a Shiki highlighter and the full
- * set of supported programming languages.
+ * **Block specs** – Replaces the default `codeBlock` spec with one configured
+ * via {@link codeBlockOptions}, which provides a Shiki highlighter and the full
+ * set of supported programming languages. All other block specs (paragraph,
+ * heading, bulletList, image, etc.) are inherited from
+ * {@link defaultBlockSpecs} unchanged.
  *
- * All other block specs (paragraph, heading, bulletList, image, etc.) are
- * inherited from {@link defaultBlockSpecs} unchanged.
+ * **Style specs** – Re-declares every default style spec in an explicit order
+ * so that the `code` mark is registered **last**. ProseMirror renders marks in
+ * registration order (outermost first), so placing `code` last ensures the
+ * `<code>` element nests *inside* all other mark spans (bold, italic,
+ * textColor, backgroundColor, etc.). This makes the `backgroundColor`
+ * `<span>` wrap the `<code>` element — not the other way around — so the
+ * highlight box matches normal text height.
+ *
+ * The `code` mark itself is overridden via {@link Code}.extend to set
+ * `excludes: ''` (exclude no marks), replacing TipTap's default
+ * `excludes: '_'` (exclude all). This allows inline code to coexist with
+ * highlight, textColor, bold, italic, underline, and strike — matching
+ * Notion's behaviour.
  */
 const schema = BlockNoteSchema.create({
   blockSpecs: {
     ...defaultBlockSpecs,
     codeBlock: createCodeBlockSpec(codeBlockOptions),
+  },
+  styleSpecs: {
+    // Explicit ordering: code is placed LAST so it nests inside all other
+    // marks (bold, italic, textColor, backgroundColor, etc.).  This ensures
+    // the backgroundColor <span> wraps the <code> element — not the other
+    // way around — so the highlight box matches normal text height.
+    bold: defaultStyleSpecs.bold,
+    italic: defaultStyleSpecs.italic,
+    underline: defaultStyleSpecs.underline,
+    strike: defaultStyleSpecs.strike,
+    textColor: defaultStyleSpecs.textColor,
+    backgroundColor: defaultStyleSpecs.backgroundColor,
+    // Override TipTap Code mark's `excludes: '_'` (exclude all marks) with
+    // `excludes: ''` (exclude none) so inline code can coexist with highlight,
+    // textColor, bold, italic, underline, and strike — matching Notion behavior.
+    code: createStyleSpecFromTipTapMark(
+      Code.extend({ excludes: '' }),
+      'boolean'
+    ),
   },
 })
 
@@ -132,21 +164,25 @@ const schema = BlockNoteSchema.create({
  * Props for the {@link Editor} component.
  *
  * @property noteId - The ID of the note to load, or `null` for a new untitled note.
+ * @property locked - Whether the editor is in read-only mode. Defaults to `false`.
  * @property onNoteSaved - Optional callback invoked after the note content is auto-saved.
  * @property onStatusChange - Optional callback invoked whenever the save status changes.
  * @property onContentLoaded - Optional callback invoked once the note content has finished loading.
  * @property onSuggestionMenuOpen - Optional callback invoked with the cursor's `clientY`
  *   coordinate when the suggestion menu (slash command palette) opens.
+ * @property onLockStateChange - Optional callback invoked when the lock state of the
+ *   loaded note is determined.
  */
 interface EditorProps {
   noteId: string | null
+  locked?: boolean
   onNoteSaved?: (id: string) => void
   onStatusChange?: (status: SaveStatus) => void
   onContentLoaded?: () => void
-  /** Called with the cursor's clientY coordinate when the suggestion menu (slash command palette) opens. */
   onSuggestionMenuOpen?: (cursorClientY: number) => void
   /** Called when the user triggers translation via the slash menu. */
   onTranslate?: () => void
+  onLockStateChange?: (locked: boolean) => void
 }
 
 /**
@@ -172,13 +208,7 @@ export interface EditorHandle {
 const PASS_THROUGH_KEYS = new Set([
   'blockTypeSelect',
   'tableCellMergeButton',
-  'fileCaptionButton',
-  'replaceFileButton',
-  'fileRenameButton',
   'fileDeleteButton',
-  'fileDownloadButton',
-  'filePreviewButton',
-  'addTiptapCommentButton',
 ])
 
 /**
@@ -207,14 +237,23 @@ const PASS_THROUGH_KEYS = new Set([
 export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   {
     noteId,
+    locked = false,
     onNoteSaved,
     onStatusChange,
     onContentLoaded,
     onSuggestionMenuOpen,
     onTranslate,
+    onLockStateChange,
   },
   ref
 ) {
+  /**
+   * Tracks whether the editor is still loading initial content.
+   *
+   * While `true`, `handleChange` exits early to prevent auto-save from
+   * firing on programmatic content population (e.g. `replaceBlocks`).
+   * Set to `false` once the note content has been fully applied.
+   */
   const loadingRef = useRef(true)
   /**
    * Whether the editor content has finished loading and is safe to display.
@@ -225,11 +264,21 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
    * to the editor inside the content-loading `useEffect`.
    */
   const [contentReady, setContentReady] = useState(false)
+  /** Rename dialog state (null = closed, object = open for that block). */
+  const [renameState, setRenameState] = useState<RenameDialogState | null>(null)
+  /** Edit-link dialog state (null = closed, object = open for that link). */
+  const [editLinkState, setEditLinkState] =
+    useState<EditLinkDialogState | null>(null)
+  /** Resolved theme ("light" or "dark") passed to BlockNoteView. */
   const { resolvedTheme } = useTheme()
+  /** User-configured editor font size in pixels. */
   const { fontSize } = useEditorFontSize()
+  /** User-configured editor font family string. */
   const { fontFamily } = useEditorFont()
+  /** User-configured toolbar item order and visibility from the persistent store. */
   const { items: toolbarItemConfigs } = useToolbarConfig()
 
+  /** Keeps the cursor vertically centered in the viewport during navigation. */
   useCursorCentering()
 
   /**
@@ -243,14 +292,19 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   const formattingToolbarItems = useMemo(() => {
     const allItems = getFormattingToolbarItems()
     const itemMap = new Map<string, React.ReactElement>()
-    const passThroughItems: React.ReactElement[] = []
+    const leadingPassThrough: React.ReactElement[] = []
+    let fileDeleteButton: React.ReactElement | null = null
 
     for (const item of allItems) {
       const key = item.key as string
-      if (PASS_THROUGH_KEYS.has(key)) {
-        passThroughItems.push(item)
-      } else {
+      if (!PASS_THROUGH_KEYS.has(key)) {
         itemMap.set(key, item)
+        continue
+      }
+      if (key === 'fileDeleteButton') {
+        fileDeleteButton = item
+      } else {
+        leadingPassThrough.push(item)
       }
     }
 
@@ -267,20 +321,30 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       if (el) configuredItems.push(el)
     }
 
-    return [...passThroughItems, ...configuredItems]
+    return [
+      ...leadingPassThrough,
+      <RenameButton key="renameButton" onRequestOpen={setRenameState} />,
+      <DownloadButton key="downloadButton" />,
+      ...(fileDeleteButton ? [fileDeleteButton] : []),
+      ...configuredItems,
+    ]
   }, [toolbarItemConfigs])
 
+  /** Debounced auto-save hook (500 ms delay). Only active when `noteId` is non-null. */
   const { scheduleSave, saveStatus } = useAutoSave(
     500,
     noteId ?? undefined,
     onNoteSaved
   )
+  /** Intercepts pasted content to extract and handle embedded links. */
   const pasteHandler = useLinkPreview()
 
+  /** Propagates the current save status to the parent component. */
   useEffect(() => {
     onStatusChange?.(saveStatus)
   }, [saveStatus, onStatusChange])
 
+  /** BlockNote editor instance with custom schema, extensions, and image handling. */
   const editor = useCreateBlockNote({
     schema,
     initialContent: DEFAULT_BLOCKS,
@@ -291,6 +355,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       searchExtension,
       checklistSplitFixExtension(),
       rangeCheckToggleExtension(),
+      readOnlyGuardExtension,
       slashMenuEmacsKeysExtension(),
       cursorVimKeysExtension(),
     ],
@@ -298,6 +363,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     resolveFileUrl: resolveImageUrl,
   })
 
+  /** Exposes the editor instance to parent components via the forwarded ref. */
   useImperativeHandle(ref, () => ({ editor }), [editor])
 
   const getSlashMenuItems = useCallback(
@@ -324,34 +390,33 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     [editor, onTranslate],
   )
 
+  // Sync the locked prop to the module-level flag read by the ProseMirror plugin.
+  useEffect(() => {
+    setReadOnly(locked)
+  }, [locked])
+
+  /** Intercepts Cmd/Ctrl+Click on links inside the editor to open them in the browser. */
   useLinkClickHandler(editor)
+  /** Shows a toast notification when the user copies content from the editor. */
   useCopyToast(editor)
   // Rewrite clipboard text/plain so Markdown lists are tight (no blank lines between items).
   useClipboardTightenList(editor)
 
   /**
    * After every file upload completes, ensure the uploaded image block has a
-   * non-empty caption so the bubble menu hover-target area remains accessible
-   * (see issue #40).
-   *
-   * When images are pasted via the OS clipboard (e.g. right-click → Copy Image
-   * in Chrome), they arrive as `text/html` containing an `<img>` tag.
-   * BlockNote's paste handler prioritises `text/html` over `Files`, so the
-   * image block is created directly from the HTML without going through
-   * `uploadFile` — meaning `onUploadEnd` never fires for this path.
-   *
-   * This hook still covers the `uploadFile` code-path (e.g. screenshots)
-   * where `onUploadEnd` *is* called but the returned caption may not have
-   * been applied.
+   * non-empty name so the bubble menu hover-target area remains accessible
+   * (see issue #40).  The `caption` prop is synced to match `name` so
+   * BlockNote renders the caption area.
    */
   useEffect(() => {
     const onUploadEnd = (blockId?: string) => {
       if (!blockId) return
       const block = editor.getBlock(blockId)
       if (!block) return
-      const caption = getImageCaptionFallback(block)
-      if (caption) {
-        editor.updateBlock(block, { props: { caption } } as any)
+      const name = getImageNameFallback(block)
+      if (name) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        editor.updateBlock(block, { props: { name, caption: name } } as any)
       }
     }
 
@@ -431,26 +496,25 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     }
   }, [editor, onSuggestionMenuOpen])
 
+  /** Search & replace state for the {@link SearchReplacePanel}. */
   const search = useSearchReplace(editor)
 
   /**
-   * Walks the editor document tree and sets `caption` to `"image"` on any
-   * image block whose caption is empty.  This ensures hover-target areas
-   * exist for the formatting toolbar (see issue #40).
-   *
-   * When a `name` prop is available on the image block (e.g. the alt text
-   * extracted from `<img>` HTML), it is used as the caption.  Otherwise
-   * falls back to the literal string `"image"`.
+   * Walks the editor document tree and ensures every image block has a
+   * non-empty `name` and that `caption` is synced to match `name`.
+   * This ensures hover-target areas exist for the formatting toolbar
+   * (see issue #40).
    *
    * Must be called while `loadingRef.current === true` so the auto-save
    * guard in `handleChange` prevents unnecessary writes during initial load.
    */
-  const backfillImageCaptions = useCallback(() => {
+  const backfillImageNames = useCallback(() => {
     const walk = (blocks: typeof editor.document) => {
       for (const block of blocks) {
-        const caption = getImageCaptionFallback(block)
-        if (caption) {
-          editor.updateBlock(block, { props: { caption } } as any)
+        const name = getImageNameFallback(block)
+        if (name) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          editor.updateBlock(block, { props: { name, caption: name } } as any)
         }
         if (block.children?.length) {
           walk(block.children)
@@ -485,13 +549,14 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     if (!noteId) {
       withSuppressedHistory(editor.prosemirrorView, () => {
         editor.replaceBlocks(editor.document, BLOCKS)
-        backfillImageCaptions()
+        backfillImageNames()
       })
       queueMicrotask(() => {
         if (!stale) {
           loadingRef.current = false
           setContentReady(true)
           onContentLoaded?.()
+          onLockStateChange?.(false)
         }
       })
       return
@@ -501,6 +566,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       .then((note) => {
         if (stale) return
         if (note) {
+          onLockStateChange?.(note.isLocked)
           withSuppressedHistory(editor.prosemirrorView, () => {
             try {
               editor.replaceBlocks(
@@ -510,7 +576,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
             } catch {
               editor.replaceBlocks(editor.document, BLOCKS)
             }
-            backfillImageCaptions()
+            backfillImageNames()
           })
         } else {
           toast.error('Note not found')
@@ -530,7 +596,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     return () => {
       stale = true
     }
-  }, [noteId, editor, backfillImageCaptions, onContentLoaded])
+  }, [noteId, editor, backfillImageNames, onContentLoaded, onLockStateChange])
 
   /**
    * Callback invoked by BlockNote on every document change.
@@ -539,20 +605,57 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
    * callback exits early to prevent auto-save from firing on the initial
    * content population.  Otherwise it:
    *
-   * 1. Calls {@link backfillImageCaptions} to ensure every image block has a
-   *    non-empty caption (covers the `text/html` paste path where
-   *    `onUploadEnd` is not fired, e.g. right-click "Copy Image" in Chrome).
+   * 1. Calls {@link backfillImageNames} to ensure every image block has a
+   *    non-empty `name` and `caption` is synced (covers the `text/html` paste
+   *    path where `onUploadEnd` is not fired, e.g. right-click "Copy Image").
    * 2. Schedules a debounced auto-save of the serialized document.
    *
-   * `backfillImageCaptions` only calls `updateBlock` when it finds an empty
-   * caption, so the subsequent re-trigger of `onChange` is a no-op and does
+   * `backfillImageNames` only calls `updateBlock` when it finds an empty
+   * name, so the subsequent re-trigger of `onChange` is a no-op and does
    * not cause an infinite loop.
    */
   const handleChange = useCallback(() => {
     if (loadingRef.current) return
-    backfillImageCaptions()
+    backfillImageNames()
     scheduleSave(JSON.stringify(editor.document))
-  }, [editor, scheduleSave, backfillImageCaptions])
+  }, [editor, scheduleSave, backfillImageNames])
+
+  /**
+   * Handles clicks on the editor wrapper's padding area.
+   *
+   * The editor wrapper has generous bottom padding (`pb-[60vh]`) so that
+   * users can scroll content above the fold. Clicking in this padding zone
+   * does not naturally focus the editor because the click target is outside
+   * the `.bn-editor` contenteditable region. This callback detects such
+   * clicks and programmatically focuses the editor with the cursor placed
+   * at the end of the last block.
+   *
+   * Early-return guards:
+   * 1. **Locked mode** – when the editor is read-only (`locked` is `true`),
+   *    the callback is a no-op so that clicking the padding area does not
+   *    steal focus or move the cursor.
+   * 2. **Inside `.bn-container`** – if the click originated inside the
+   *    BlockNote container (including the editor, toolbars, menus, and other
+   *    UI overlays), the callback returns early and lets the default browser
+   *    behaviour handle focus normally.
+   *
+   * @param e - The React mouse event from the wrapper `<div>`.
+   */
+  const handleWrapperClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (locked) return
+      const target = e.target as HTMLElement
+      if (target.closest('.bn-container')) return
+      if (target.closest('[role="dialog"]')) return
+
+      const lastBlock = editor.document[editor.document.length - 1]
+      if (lastBlock) {
+        editor.setTextCursorPosition(lastBlock, 'end')
+      }
+      editor.focus()
+    },
+    [editor, locked]
+  )
 
   return (
     <>
@@ -562,6 +665,8 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       <div
         className={`w-full min-h-screen px-8 pb-[60vh] ${contentReady ? 'opacity-100' : 'opacity-0'}`}
         data-editor-root
+        data-locked={locked || undefined}
+        onClick={handleWrapperClick}
         style={
           {
             '--editor-font-size': `${fontSize}px`,
@@ -571,6 +676,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       >
         <BlockNoteView
           editor={editor}
+          editable={true}
           theme={resolvedTheme}
           onChange={handleChange}
           formattingToolbar={false}
@@ -581,16 +687,31 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
             triggerCharacter="/"
             getItems={getSlashMenuItems}
           />
-          <FormattingToolbarController
-            formattingToolbar={() => (
-              <FormattingToolbar blockTypeSelectItems={[]}>
-                {formattingToolbarItems}
-              </FormattingToolbar>
-            )}
-          />
-          <LinkToolbarController linkToolbar={CustomLinkToolbar} />
+          {!locked && (
+            <>
+              <FormattingToolbarController
+                formattingToolbar={() => (
+                  <FormattingToolbar blockTypeSelectItems={[]}>
+                    {formattingToolbarItems}
+                  </FormattingToolbar>
+                )}
+              />
+              <EditLinkRequestContext.Provider value={setEditLinkState}>
+                <LinkToolbarController linkToolbar={CustomLinkToolbar} />
+              </EditLinkRequestContext.Provider>
+              <EditLinkDialog
+                state={editLinkState}
+                onDismiss={() => setEditLinkState(null)}
+              />
+            </>
+          )}
         </BlockNoteView>
       </div>
+      <RenameDialog
+        editor={editor}
+        state={renameState}
+        onDismiss={() => setRenameState(null)}
+      />
       <SearchReplacePanel {...search} />
     </>
   )

@@ -4,7 +4,11 @@
  */
 
 export type { ImageUploadResult } from './api/imageUpload'
-export { resolveImageUrl, uploadImage } from './api/imageUpload'
+export {
+  getImageNameFallback,
+  resolveImageUrl,
+  uploadImage,
+} from './api/imageUpload'
 export type { Note } from './api/notes'
 export {
   createNote,
@@ -13,6 +17,7 @@ export {
   getNote,
   listNotes,
   readTextFile,
+  toggleLockNote,
   togglePinNote,
   updateNote,
   writeTextFile,

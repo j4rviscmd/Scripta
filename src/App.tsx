@@ -10,6 +10,7 @@ import {
 import { configDefaults, useAppStore } from '@/app/providers/store-provider'
 import { ThemeProvider } from '@/app/providers/theme-provider'
 import { ToolbarConfigProvider } from '@/app/providers/toolbar-config-provider'
+import { UpdateProvider } from '@/app/providers/update-provider'
 import {
   useWindowTitlePrefix,
   WindowTitlePrefixProvider,
@@ -22,6 +23,7 @@ import {
 import { Toaster } from '@/components/ui/sonner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Languages } from 'lucide-react'
+import { UpdateDialog, useUpdateCheckOnLaunch } from '@/features/app-update'
 import type { EditorHandle, SaveStatus } from '@/features/editor'
 import {
   createNote,
@@ -35,6 +37,7 @@ import {
   getNote,
   listNotes,
   readTextFile,
+  toggleLockNote,
   togglePinNote,
   useCommandPaletteScroll,
   useCursorAutoHideEffect,
@@ -88,6 +91,7 @@ function AppContent() {
   useEffect(() => {
     isTranslationAvailable().then(setTranslationAvailable).catch(() => setTranslationAvailable(false))
   }, [])
+  useUpdateCheckOnLaunch()
   const { enabled: titlePrefixEnabled } = useWindowTitlePrefix()
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
   // True once the persisted lastNoteId has been loaded from the store.
@@ -107,6 +111,7 @@ function AppContent() {
   }>({ visible: false, originalBlocks: null, sourceLang: DEFAULT_SOURCE_LANG, targetLang: DEFAULT_TARGET_LANG, detectedLang: '', progress: null })
   const [pendingTranslationId, setPendingTranslationId] = useState<string | null>(null)
   const translateNoteHandlerRef = useRef<((noteId: string) => Promise<void>) | undefined>(undefined)
+  const [isNoteLocked, setIsNoteLocked] = useState(false)
   const editorRef = useRef<EditorHandle>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const { isHidden: isHeaderHidden } = useScrollDirection(scrollContainerRef, {
@@ -272,6 +277,7 @@ function AppContent() {
         saveCursorPosition(selectedNoteId)
       }
       setSelectedNoteId(id)
+      setIsNoteLocked(false)
       persistLastNoteId(id)
       setTranslationState({ visible: false, originalBlocks: null, sourceLang: DEFAULT_SOURCE_LANG, targetLang: DEFAULT_TARGET_LANG, detectedLang: '', progress: null })
     },
@@ -312,6 +318,15 @@ function AppContent() {
   const handleNoteSaved = useCallback((id: string) => {
     setSelectedNoteId((current) => (current === null ? id : current))
     setRefreshKey((v) => v + 1)
+  }, [])
+
+  /**
+   * Callback invoked when the lock state of the loaded note is determined.
+   *
+   * @param locked - `true` if the note is locked, `false` otherwise.
+   */
+  const handleLockStateChange = useCallback((locked: boolean) => {
+    setIsNoteLocked(locked)
   }, [])
 
   /**
@@ -373,6 +388,28 @@ function AppContent() {
       }
     },
     []
+  )
+
+  /**
+   * Toggles the locked state of the given note.
+   *
+   * @param noteId - The ID of the note whose lock state should be toggled.
+   * @param locked - The new locked state to apply.
+   * @throws Shows an error toast if the toggle operation fails.
+   */
+  const handleToggleLock = useCallback(
+    async (noteId: string, locked: boolean) => {
+      try {
+        await toggleLockNote(noteId, locked)
+        if (selectedNoteId === noteId) {
+          setIsNoteLocked(locked)
+        }
+        setRefreshKey((v) => v + 1)
+      } catch {
+        toast.error('Failed to toggle lock')
+      }
+    },
+    [selectedNoteId]
   )
 
   /**
@@ -699,6 +736,7 @@ function AppContent() {
           onNewNote={handleNewNote}
           onDeleteNote={handleDeleteNote}
           onTogglePin={handleTogglePin}
+          onToggleLock={handleToggleLock}
           onDuplicateNote={handleDuplicateNote}
           onTranslate={handleTranslateNote}
           onExportNote={handleExportNote}
@@ -749,7 +787,7 @@ function AppContent() {
             className="custom-scrollbar relative flex-1 overflow-y-auto overscroll-none"
           >
             <div className="pointer-events-none absolute top-5 right-0 z-10 flex flex-col items-end gap-1 pr-7">
-              <SaveStatusIndicator status={saveStatus} />
+              <SaveStatusIndicator status={saveStatus} locked={isNoteLocked} />
               {translationState.visible && (
                 <div className="pointer-events-auto">
                   <TranslationIndicator
@@ -767,11 +805,13 @@ function AppContent() {
               ref={editorRef}
               key={selectedNoteId ?? 'new'}
               noteId={selectedNoteId}
+              locked={isNoteLocked}
               onNoteSaved={handleNoteSaved}
               onStatusChange={setSaveStatus}
               onContentLoaded={handleContentLoaded}
               onSuggestionMenuOpen={scrollCursorToTop}
               onTranslate={selectedNoteId ? () => handleTranslateNote(selectedNoteId) : undefined}
+              onLockStateChange={handleLockStateChange}
             />
             <div className="pointer-events-none sticky bottom-5 z-10 flex justify-end pr-7">
               <ScrollToTopButton
@@ -783,6 +823,7 @@ function AppContent() {
         </SidebarInset>
       </SidebarProvider>
       <Toaster position="bottom-right" />
+      <UpdateDialog />
     </TooltipProvider>
   )
 }
@@ -798,13 +839,17 @@ function AppContent() {
  * @returns The rendered application tree.
  */
 function App() {
+  const { config: configStore } = useAppStore()
+
   return (
     <ThemeProvider defaultTheme={configDefaults.theme}>
       <FontSizeProvider>
         <EditorFontProvider>
           <ToolbarConfigProvider>
             <WindowTitlePrefixProvider>
-              <AppContent />
+              <UpdateProvider configStore={configStore}>
+                <AppContent />
+              </UpdateProvider>
             </WindowTitlePrefixProvider>
           </ToolbarConfigProvider>
         </EditorFontProvider>

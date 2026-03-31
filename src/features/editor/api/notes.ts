@@ -14,6 +14,7 @@ export interface Note {
   updatedAt: string
   isPinned: boolean
   groupId: string | null
+  isLocked: boolean
 }
 
 /**
@@ -87,6 +88,20 @@ export async function togglePinNote(
   pinned: boolean
 ): Promise<Note> {
   return invoke<Note>('toggle_pin', { id, pinned })
+}
+
+/**
+ * Toggles the locked (read-only) state of a note.
+ *
+ * @param id - The UUID of the note to lock or unlock.
+ * @param locked - `true` to lock, `false` to unlock.
+ * @returns The updated note as it exists in the database after the write.
+ */
+export async function toggleLockNote(
+  id: string,
+  locked: boolean
+): Promise<Note> {
+  return invoke<Note>('toggle_lock', { id, locked })
 }
 
 /**

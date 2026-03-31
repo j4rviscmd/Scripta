@@ -17,6 +17,8 @@ use tauri::Manager;
 /// - **store** — Persistent key-value config storage.
 /// - **dialog** — Native file/message dialogs.
 /// - **fs** — Scoped filesystem access.
+/// - **updater** — In-app update checking and installation.
+/// - **process** — Application process management (relaunch after update).
 ///
 /// During setup the SQLite database is initialized, a
 /// [`LinkPreviewCache`](link_preview::LinkPreviewCache) is registered as
@@ -43,6 +45,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_updater::Builder::default().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             db::init_db(app.handle())?;
             app.manage(link_preview::LinkPreviewCache(Mutex::new(HashMap::new())));
@@ -63,6 +66,7 @@ pub fn run() {
             db::delete_note,
             db::duplicate_note,
             db::toggle_pin,
+            db::toggle_lock,
             groups::list_groups,
             groups::create_group,
             groups::rename_group,
@@ -70,6 +74,7 @@ pub fn run() {
             groups::reorder_groups,
             groups::set_note_group,
             link_preview::fetch_link_title,
+            link_preview::check_url_content_type,
             file_io::read_text_file,
             file_io::write_text_file,
             translation::is_translation_available,
@@ -80,6 +85,7 @@ pub fn run() {
             translation::get_supported_languages,
             translation::detect_language,
             translation::check_language_pair_status,
+            file_io::download_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

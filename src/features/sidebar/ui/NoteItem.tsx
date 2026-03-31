@@ -3,9 +3,11 @@ import {
   Check,
   Copy,
   Download,
+  FileLock,
   FileText,
   FolderInput,
   Languages,
+  LockOpen,
   Pin,
   PinOff,
   Trash2,
@@ -38,6 +40,7 @@ import { cn } from '@/lib/utils'
  * @property selectedNoteId - The ID of the currently selected note, or `null`.
  * @property onSelectNote - Callback invoked when the user clicks this note.
  * @property onTogglePin - Callback to pin or unpin the note.
+ * @property onToggleLock - Callback to lock or unlock the note.
  * @property onDeleteNote - Callback invoked when the user confirms deletion.
  * @property onDuplicateNote - Callback invoked to duplicate the note.
  * @property onExportNote - Callback invoked to export the note as Markdown.
@@ -51,6 +54,7 @@ interface NoteItemProps {
   selectedNoteId: string | null
   onSelectNote: (id: string) => void
   onTogglePin: (id: string, pinned: boolean) => void
+  onToggleLock: (id: string, locked: boolean) => void
   onDeleteNote: () => void
   onDuplicateNote: (noteId: string) => void
   onExportNote: (noteId: string) => void
@@ -71,6 +75,7 @@ export function NoteItem({
   selectedNoteId,
   onSelectNote,
   onTogglePin,
+  onToggleLock,
   onDeleteNote,
   onDuplicateNote,
   onExportNote,
@@ -90,6 +95,22 @@ export function NoteItem({
     ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
     : undefined
 
+  let noteIcon: React.ReactNode
+  if (note.isPinned) {
+    noteIcon = (
+      <Pin
+        className={cn(
+          'h-4 w-4 shrink-0 fill-primary/20 text-primary',
+          justPinnedId === note.id && 'animate-pin-bounce'
+        )}
+      />
+    )
+  } else if (note.isLocked) {
+    noteIcon = <FileLock className="h-4 w-4 shrink-0" />
+  } else {
+    noteIcon = <FileText className="h-4 w-4 shrink-0" />
+  }
+
   return (
     <SidebarMenuItem
       ref={setNodeRef}
@@ -108,19 +129,10 @@ export function NoteItem({
             onClick={() => onSelectNote(note.id)}
             className={cn(note.isPinned && 'hover:bg-primary/5')}
           >
-            {note.isPinned ? (
-              <Pin
-                className={cn(
-                  'h-4 w-4 shrink-0 fill-primary/20 text-primary',
-                  justPinnedId === note.id && 'animate-pin-bounce'
-                )}
-              />
-            ) : (
-              <FileText className="h-4 w-4 shrink-0" />
-            )}
+            {noteIcon}
             <div className="flex flex-col overflow-hidden">
               <span className="truncate text-sm">{note.title}</span>
-              <span className="text-muted-foreground text-xs">
+              <span className="text-[0.65rem] text-muted-foreground/60">
                 {formatRelativeDate(note.updatedAt)}
               </span>
             </div>
@@ -134,6 +146,16 @@ export function NoteItem({
               <Pin className="h-4 w-4" />
             )}
             {note.isPinned ? 'Unpin' : 'Pin to top'}
+          </ContextMenuItem>
+          <ContextMenuItem
+            onClick={() => onToggleLock(note.id, !note.isLocked)}
+          >
+            {note.isLocked ? (
+              <LockOpen className="h-4 w-4" />
+            ) : (
+              <FileLock className="h-4 w-4" />
+            )}
+            {note.isLocked ? 'Unlock' : 'Lock'}
           </ContextMenuItem>
           <ContextMenuSub>
             <ContextMenuSubTrigger>
