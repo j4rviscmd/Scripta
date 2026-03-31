@@ -14,6 +14,7 @@ import { useCallback } from 'react'
  * image uses a local `asset://` URL (uploaded file) rather than HTTP(S).
  */
 export const ConvertToLinkButton = () => {
+  // biome-ignore lint/style/noNonNullAssertion: consistent with existing toolbar buttons (RenameButton, DownloadButton, etc.)
   const Components = useComponentsContext()!
   const editor = useBlockNoteEditor()
 
@@ -49,6 +50,7 @@ export const ConvertToLinkButton = () => {
       block,
       'after'
     )
+    // biome-ignore lint/style/noNonNullAssertion: inserted[0] is guaranteed by length check
     const newBlockId = inserted.length > 0 ? inserted[0]!.id : undefined
 
     editor.removeBlocks([block])

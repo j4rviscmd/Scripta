@@ -173,7 +173,6 @@ export function useLinkPreview() {
       // TODO: Shift+Paste で「リンクとして貼り付け」を強制する機能（将来対応）
       // event.shiftKey のとき画像検出をスキップしてリンクとして挿入する
 
-
       const clipboardText = event.clipboardData?.getData('text/plain') ?? ''
 
       // Round-trip import: restore column layout from exported Markdown.
