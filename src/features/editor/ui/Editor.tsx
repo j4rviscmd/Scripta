@@ -65,6 +65,7 @@ import { DEFAULT_BLOCKS } from '../lib/constants'
 import { rangeCheckToggleExtension } from '../lib/rangeCheckToggle'
 import { readOnlyGuardExtension, setReadOnly } from '../lib/readOnlyGuard'
 import { slashMenuEmacsKeysExtension } from '../lib/slashMenuEmacsKeys'
+import { ConvertToLinkButton } from './ConvertToLinkButton'
 import { CustomColorStyleButton } from './CustomColorStyleButton'
 import { CustomLinkToolbar } from './CustomLinkToolbar'
 import { DownloadButton } from './DownloadButton'
@@ -332,6 +333,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       ...leadingPassThrough,
       <RenameButton key="renameButton" onRequestOpen={setRenameState} />,
       <DownloadButton key="downloadButton" />,
+      <ConvertToLinkButton key="convertToLinkButton" />,
       ...(fileDeleteButton ? [fileDeleteButton] : []),
       ...configuredItems,
     ]
