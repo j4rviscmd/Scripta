@@ -53,6 +53,7 @@ export {
   exportToMarkdown,
   fixBlockNoteTableExport,
 } from './lib/markdown-export'
+export { parseMarkdownWithColumns } from './lib/multiColumnMarkdown'
 export { rangeCheckToggleExtension } from './lib/rangeCheckToggle'
 export { searchExtension } from './lib/searchExtension'
 export { slashMenuEmacsKeysExtension } from './lib/slashMenuEmacsKeys'
