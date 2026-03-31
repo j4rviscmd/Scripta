@@ -6,6 +6,7 @@ import {
 } from '../api/imageUrlDetection'
 import { fetchLinkTitle } from '../api/linkPreview'
 import { ImageDetectionCache, isImageUrlQuick } from '../lib/imageUrlDetection'
+import { parseMarkdownWithColumns } from '../lib/multiColumnMarkdown'
 
 /** Matches a standalone HTTP or HTTPS URL at the start of a string. */
 const URL_REGEX = /^https?:\/\/\S+/i
@@ -217,8 +218,22 @@ export function useLinkPreview() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handler = useCallback<any>(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ({ event, editor, defaultPasteHandler }: any) => {
+    async ({ event, editor, defaultPasteHandler }: any) => {
       const clipboardText = event.clipboardData?.getData('text/plain') ?? ''
+
+      // Round-trip import: restore column layout from exported Markdown.
+      if (clipboardText.includes('<div data-bn-cols>')) {
+        event.preventDefault()
+        const blocks = await parseMarkdownWithColumns(clipboardText, editor)
+        if (blocks.length > 0) {
+          editor.focus()
+          const cursorBlock = editor.getTextCursorPosition().block
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          editor.insertBlocks(blocks as any, cursorBlock, 'after')
+          return true
+        }
+      }
+
       const url = clipboardText.trim()
 
       if (!URL_REGEX.test(url)) {

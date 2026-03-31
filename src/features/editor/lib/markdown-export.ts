@@ -1,5 +1,11 @@
 import type { BlockNoteEditor, PartialBlock } from '@blocknote/core'
 
+/** Attribute written on the outer wrapper div for column-list blocks. */
+const COL_LIST_ATTR = 'data-bn-cols'
+
+/** Attribute written on each column div. */
+const COL_ATTR = 'data-bn-col'
+
 /** Matches a Markdown table separator row: `| --- | --- |` */
 const TABLE_SEPARATOR_RE = /^\|[\s\-:|]+\|$/
 
@@ -27,6 +33,34 @@ function tightenList(md: string): string {
 /** Checks whether a block is a list item (bullet, numbered, or checklist). */
 function isListBlock(block: PartialBlock): boolean {
   return LIST_BLOCK_TYPES.has(block.type as string)
+}
+
+/** Checks whether a block is a `columnList` block added by `@blocknote/xl-multi-column`. */
+function isColumnListBlock(block: PartialBlock): boolean {
+  return (block.type as string) === 'columnList'
+}
+
+/**
+ * Converts a `columnList` block to a Markdown string using HTML `<div>` wrappers
+ * with `data-bn-cols` / `data-bn-col` attributes, enabling round-trip import
+ * via {@link parseMarkdownWithColumns}.
+ *
+ * Each column's children are recursively converted to Markdown so that the
+ * output is still human-readable while preserving enough metadata to restore
+ * the column structure on re-import.
+ */
+function columnListToMd(block: PartialBlock, editor: BlockNoteEditor): string {
+  const columns = block.children ?? []
+  const colDivs = columns
+    .map((col) => {
+      const width = (col.props as { width?: number })?.width ?? 1
+      const innerMd = (col.children ?? [])
+        .map((child) => blockToMd(child, editor))
+        .join('\n\n')
+      return `<div ${COL_ATTR} data-width="${width}">\n\n${innerMd}\n\n</div>`
+    })
+    .join('\n')
+  return `<div ${COL_LIST_ATTR}>\n${colDivs}\n</div>`
 }
 
 /** Checks whether a block is a toggle block (`toggleListItem` or a toggleable heading). */
@@ -85,6 +119,10 @@ function inlineContentToMd(content: PartialBlock['content']): string {
  * @returns Markdown string for the given block
  */
 function blockToMd(block: PartialBlock, editor: BlockNoteEditor): string {
+  if (isColumnListBlock(block)) {
+    return columnListToMd(block, editor)
+  }
+
   if (isToggleBlock(block)) {
     const title = inlineContentToMd(block.content)
     let body = ''
@@ -118,6 +156,12 @@ export function exportToMarkdown(editor: BlockNoteEditor): string {
     const block = blocks[i]
 
     if (isToggleBlock(block)) {
+      segments.push(blockToMd(block, editor))
+      i++
+      continue
+    }
+
+    if (isColumnListBlock(block)) {
       segments.push(blockToMd(block, editor))
       i++
       continue
