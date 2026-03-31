@@ -21,8 +21,8 @@ import {
 import { BlockNoteView } from '@blocknote/shadcn'
 import {
   getMultiColumnSlashMenuItems,
-  locales as multiColumnLocales,
   multiColumnDropCursor,
+  locales as multiColumnLocales,
   withMultiColumn,
 } from '@blocknote/xl-multi-column'
 import { Code } from '@tiptap/extension-code'
