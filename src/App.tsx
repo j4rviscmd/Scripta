@@ -35,6 +35,7 @@ import {
   fixBlockNoteTableExport,
   getNote,
   listNotes,
+  parseMarkdownWithColumns,
   readTextFile,
   toggleLockNote,
   togglePinNote,
@@ -440,7 +441,7 @@ function AppContent() {
       if (!filePath || typeof filePath !== 'string') return
 
       const markdown = await readTextFile(filePath)
-      const blocks = editor.tryParseMarkdownToBlocks(markdown)
+      const blocks = await parseMarkdownWithColumns(markdown, editor)
       const content = JSON.stringify(blocks)
       const title = extractTitle(content)
 
