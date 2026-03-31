@@ -1,19 +1,30 @@
 import {
   type BlockNoteEditor,
   BlockNoteSchema,
+  combineByGroup,
   createCodeBlockSpec,
   createStyleSpecFromTipTapMark,
   defaultBlockSpecs,
   defaultStyleSpecs,
 } from '@blocknote/core'
+import { filterSuggestionItems } from '@blocknote/core/extensions'
+import * as locales from '@blocknote/core/locales'
 import {
   FormattingToolbar,
   FormattingToolbarController,
+  getDefaultReactSlashMenuItems,
   getFormattingToolbarItems,
   LinkToolbarController,
+  SuggestionMenuController,
   useCreateBlockNote,
 } from '@blocknote/react'
 import { BlockNoteView } from '@blocknote/shadcn'
+import {
+  getMultiColumnSlashMenuItems,
+  multiColumnDropCursor,
+  locales as multiColumnLocales,
+  withMultiColumn,
+} from '@blocknote/xl-multi-column'
 import { Code } from '@tiptap/extension-code'
 import type { Transaction } from 'prosemirror-state'
 import {
@@ -132,31 +143,33 @@ function withSuppressedHistory(
  * highlight, textColor, bold, italic, underline, and strike — matching
  * Notion's behaviour.
  */
-const schema = BlockNoteSchema.create({
-  blockSpecs: {
-    ...defaultBlockSpecs,
-    codeBlock: createCodeBlockSpec(codeBlockOptions),
-  },
-  styleSpecs: {
-    // Explicit ordering: code is placed LAST so it nests inside all other
-    // marks (bold, italic, textColor, backgroundColor, etc.).  This ensures
-    // the backgroundColor <span> wraps the <code> element — not the other
-    // way around — so the highlight box matches normal text height.
-    bold: defaultStyleSpecs.bold,
-    italic: defaultStyleSpecs.italic,
-    underline: defaultStyleSpecs.underline,
-    strike: defaultStyleSpecs.strike,
-    textColor: defaultStyleSpecs.textColor,
-    backgroundColor: defaultStyleSpecs.backgroundColor,
-    // Override TipTap Code mark's `excludes: '_'` (exclude all marks) with
-    // `excludes: ''` (exclude none) so inline code can coexist with highlight,
-    // textColor, bold, italic, underline, and strike — matching Notion behavior.
-    code: createStyleSpecFromTipTapMark(
-      Code.extend({ excludes: '' }),
-      'boolean'
-    ),
-  },
-})
+const schema = withMultiColumn(
+  BlockNoteSchema.create({
+    blockSpecs: {
+      ...defaultBlockSpecs,
+      codeBlock: createCodeBlockSpec(codeBlockOptions),
+    },
+    styleSpecs: {
+      // Explicit ordering: code is placed LAST so it nests inside all other
+      // marks (bold, italic, textColor, backgroundColor, etc.).  This ensures
+      // the backgroundColor <span> wraps the <code> element — not the other
+      // way around — so the highlight box matches normal text height.
+      bold: defaultStyleSpecs.bold,
+      italic: defaultStyleSpecs.italic,
+      underline: defaultStyleSpecs.underline,
+      strike: defaultStyleSpecs.strike,
+      textColor: defaultStyleSpecs.textColor,
+      backgroundColor: defaultStyleSpecs.backgroundColor,
+      // Override TipTap Code mark's `excludes: '_'` (exclude all marks) with
+      // `excludes: ''` (exclude none) so inline code can coexist with highlight,
+      // textColor, bold, italic, underline, and strike — matching Notion behavior.
+      code: createStyleSpecFromTipTapMark(
+        Code.extend({ excludes: '' }),
+        'boolean'
+      ),
+    },
+  })
+)
 
 /**
  * Props for the {@link Editor} component.
@@ -345,6 +358,11 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     schema,
     initialContent: DEFAULT_BLOCKS,
     pasteHandler,
+    dropCursor: multiColumnDropCursor,
+    dictionary: {
+      ...locales.en,
+      multi_column: multiColumnLocales.en,
+    },
     extensions: [
       imeCompositionGuard,
       cursorCenteringExtension,
@@ -359,8 +377,16 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     resolveFileUrl: resolveImageUrl,
   })
 
+  /**
+   * Type-erased alias used by hooks and components that accept the default
+   * BlockNote schema. The extended schema (with column blocks) is additive, so
+   * all default-schema operations remain valid at runtime.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const editorAny = editor as unknown as BlockNoteEditor
+
   /** Exposes the editor instance to parent components via the forwarded ref. */
-  useImperativeHandle(ref, () => ({ editor }), [editor])
+  useImperativeHandle(ref, () => ({ editor: editorAny }), [editorAny])
 
   // Sync the locked prop to the module-level flag read by the ProseMirror plugin.
   useEffect(() => {
@@ -368,11 +394,11 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   }, [locked])
 
   /** Intercepts Cmd/Ctrl+Click on links inside the editor to open them in the browser. */
-  useLinkClickHandler(editor)
+  useLinkClickHandler(editorAny)
   /** Shows a toast notification when the user copies content from the editor. */
-  useCopyToast(editor)
+  useCopyToast(editorAny)
   // Rewrite clipboard text/plain so Markdown lists are tight (no blank lines between items).
-  useClipboardTightenList(editor)
+  useClipboardTightenList(editorAny)
 
   /**
    * After every file upload completes, ensure the uploaded image block has a
@@ -469,7 +495,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   }, [editor, onSuggestionMenuOpen])
 
   /** Search & replace state for the {@link SearchReplacePanel}. */
-  const search = useSearchReplace(editor)
+  const search = useSearchReplace(editorAny)
 
   /**
    * Walks the editor document tree and ensures every image block has a
@@ -653,7 +679,21 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
           onChange={handleChange}
           formattingToolbar={false}
           linkToolbar={false}
+          slashMenu={false}
         >
+          {/* Custom slash menu that includes the default items plus multi-column ones. */}
+          <SuggestionMenuController
+            triggerCharacter="/"
+            getItems={async (query) =>
+              filterSuggestionItems(
+                combineByGroup(
+                  getDefaultReactSlashMenuItems(editor),
+                  getMultiColumnSlashMenuItems(editor)
+                ),
+                query
+              )
+            }
+          />
           {!locked && (
             <>
               <FormattingToolbarController
@@ -675,7 +715,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
         </BlockNoteView>
       </div>
       <RenameDialog
-        editor={editor}
+        editor={editorAny}
         state={renameState}
         onDismiss={() => setRenameState(null)}
       />
