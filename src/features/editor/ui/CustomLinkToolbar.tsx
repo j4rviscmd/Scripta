@@ -1,5 +1,6 @@
 import type { LinkToolbarProps } from '@blocknote/react'
 import { DeleteLinkButton, LinkToolbar } from '@blocknote/react'
+import { ConvertToImageButton } from './ConvertToImageButton'
 import { EditLinkButton } from './EditLinkButton'
 import { OpenInBrowserButton } from './OpenInBrowserButton'
 
@@ -22,6 +23,13 @@ export function CustomLinkToolbar(props: LinkToolbarProps) {
         setToolbarPositionFrozen={props.setToolbarPositionFrozen}
       />
       <OpenInBrowserButton url={props.url} />
+      {props.range && props.setToolbarOpen && (
+        <ConvertToImageButton
+          url={props.url}
+          range={props.range}
+          setToolbarOpen={props.setToolbarOpen}
+        />
+      )}
       <DeleteLinkButton
         range={props.range}
         setToolbarOpen={props.setToolbarOpen}

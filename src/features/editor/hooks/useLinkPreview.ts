@@ -5,35 +5,11 @@ import {
   isImageContentType,
 } from '../api/imageUrlDetection'
 import { fetchLinkTitle } from '../api/linkPreview'
+import { findBlockRecursive, urlToImageName } from '../lib/imageBlockUtils'
 import { ImageDetectionCache, isImageUrlQuick } from '../lib/imageUrlDetection'
 
 /** Matches a standalone HTTP or HTTPS URL at the start of a string. */
 const URL_REGEX = /^https?:\/\/\S+/i
-
-/**
- * Extracts the display name from a URL's last path segment, stripping the extension.
- *
- * Falls back to `"image"` when the URL cannot be parsed or the path is empty.
- *
- * @param url - The absolute URL to extract the name from.
- * @returns The filename without its extension, or `"image"` as a fallback.
- *
- * @example
- * ```ts
- * urlToImageName('https://example.com/photos/cat.png') // 'cat'
- * urlToImageName('https://example.com/')               // 'image'
- * ```
- */
-function urlToImageName(url: string): string {
-  try {
-    const filename = new URL(url).pathname.split('/').pop() ?? ''
-    if (!filename) return 'image'
-    const dotIndex = filename.lastIndexOf('.')
-    return dotIndex > 0 ? filename.substring(0, dotIndex) : filename
-  } catch {
-    return 'image'
-  }
-}
 
 /** Session-scoped LRU cache for asynchronous image-URL detection results. */
 const imageDetectionCache = new ImageDetectionCache()
@@ -82,31 +58,6 @@ function replaceLinkText(
       }
     }
   )
-}
-
-/**
- * Recursively walks `blocks` and returns the first block for which
- * `predicate` returns `true`.
- *
- * @param blocks - The array of BlockNote blocks to search (may include nested children).
- * @param predicate - A function that tests each block. Short-circuits on the first match.
- * @returns The first matching block, or `undefined` when no block satisfies the predicate.
- */
-function findBlockRecursive(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  blocks: any[],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  predicate: (block: any) => boolean
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): any | undefined {
-  for (const block of blocks) {
-    if (predicate(block)) return block
-    if (block.children?.length) {
-      const found = findBlockRecursive(block.children, predicate)
-      if (found) return found
-    }
-  }
-  return undefined
 }
 
 /**
@@ -218,6 +169,9 @@ export function useLinkPreview() {
   const handler = useCallback<any>(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ({ event, editor, defaultPasteHandler }: any) => {
+      // TODO: Shift+Paste で「リンクとして貼り付け」を強制する機能（将来対応）
+      // event.shiftKey のとき画像検出をスキップしてリンクとして挿入する
+
       const clipboardText = event.clipboardData?.getData('text/plain') ?? ''
       const url = clipboardText.trim()
 
