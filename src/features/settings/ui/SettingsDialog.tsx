@@ -15,6 +15,7 @@ import { EditorFontOption } from './EditorFontOption'
 import { FontSizeOption } from './FontSizeOption'
 import { ThemeOption } from './ThemeOption'
 import { ToolbarOption } from './ToolbarOption'
+import { TranslationLangOption } from './TranslationLangOption'
 import { WindowStateOption } from './WindowStateOption'
 
 /**
@@ -89,6 +90,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         <ToolbarOption />
         <Separator />
         <WindowStateOption />
+        <Separator />
+        <TranslationLangOption />
       </DialogContent>
     </Dialog>
   )

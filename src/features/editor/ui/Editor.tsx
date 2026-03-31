@@ -7,8 +7,10 @@ import {
 import {
   FormattingToolbar,
   FormattingToolbarController,
+  getDefaultReactSlashMenuItems,
   getFormattingToolbarItems,
   LinkToolbarController,
+  SuggestionMenuController,
   useCreateBlockNote,
 } from '@blocknote/react'
 import { BlockNoteView } from '@blocknote/shadcn'
@@ -22,6 +24,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { Languages } from 'lucide-react'
 import { toast } from 'sonner'
 import { useEditorFont } from '@/app/providers/editor-font-provider'
 import { useTheme } from '@/app/providers/theme-provider'
@@ -142,6 +145,8 @@ interface EditorProps {
   onContentLoaded?: () => void
   /** Called with the cursor's clientY coordinate when the suggestion menu (slash command palette) opens. */
   onSuggestionMenuOpen?: (cursorClientY: number) => void
+  /** Called when the user triggers translation via the slash menu. */
+  onTranslate?: () => void
 }
 
 /**
@@ -206,6 +211,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     onStatusChange,
     onContentLoaded,
     onSuggestionMenuOpen,
+    onTranslate,
   },
   ref
 ) {
@@ -293,6 +299,30 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   })
 
   useImperativeHandle(ref, () => ({ editor }), [editor])
+
+  const getSlashMenuItems = useCallback(
+    async (query: string) => {
+      const defaults = getDefaultReactSlashMenuItems(editor)
+      if (!onTranslate) return defaults
+      const translateItem = {
+        title: 'Translate',
+        onItemClick: () => onTranslate(),
+        subtext: 'Translate this note with Apple Intelligence',
+        aliases: ['translation', 'translate', 'honyaku', '翻訳'],
+        group: 'Actions' as const,
+        icon: <Languages size={18} />,
+      }
+      const all = [...defaults, translateItem]
+      if (!query) return all
+      const q = query.toLowerCase()
+      return all.filter(
+        (item) =>
+          item.title.toLowerCase().includes(q) ||
+          (item.aliases?.some((a: string) => a.toLowerCase().includes(q)) ?? false),
+      )
+    },
+    [editor, onTranslate],
+  )
 
   useLinkClickHandler(editor)
   useCopyToast(editor)
@@ -545,7 +575,12 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
           onChange={handleChange}
           formattingToolbar={false}
           linkToolbar={false}
+          slashMenu={false}
         >
+          <SuggestionMenuController
+            triggerCharacter="/"
+            getItems={getSlashMenuItems}
+          />
           <FormattingToolbarController
             formattingToolbar={() => (
               <FormattingToolbar blockTypeSelectItems={[]}>

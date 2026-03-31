@@ -13,7 +13,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { FolderCog, Search, Settings, Upload } from 'lucide-react'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -25,6 +25,7 @@ import {
 import type { Note } from '@/features/editor'
 import { bucketByDate, useGroupCollapse, useGroups } from '@/features/groups'
 import { SettingsDialog } from '@/features/settings'
+import { isTranslationAvailable } from '@/features/translation'
 import { useSidebarNotes } from '../hooks/useSidebarNotes'
 import { DateGroup } from './DateGroup'
 import { DeleteNoteDialog } from './DeleteNoteDialog'
@@ -57,6 +58,7 @@ interface NoteSidebarProps {
   onTogglePin: (noteId: string, pinned: boolean) => void
   onExportNote: (noteId: string) => void
   onDuplicateNote: (noteId: string) => void
+  onTranslate: (noteId: string) => void
   onImportNote: () => void
   refreshKey: number
   onRefresh: () => void
@@ -77,6 +79,7 @@ export function NoteSidebar({
   onTogglePin,
   onExportNote,
   onDuplicateNote,
+  onTranslate,
   onImportNote,
   refreshKey,
   onRefresh,
@@ -103,6 +106,11 @@ export function NoteSidebar({
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [groupManageOpen, setGroupManageOpen] = useState(false)
   const [activeDragNoteId, setActiveDragNoteId] = useState<string | null>(null)
+  const [translationAvailable, setTranslationAvailable] = useState(false)
+
+  useEffect(() => {
+    isTranslationAvailable().then(setTranslationAvailable).catch(() => setTranslationAvailable(false))
+  }, [])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -235,6 +243,8 @@ export function NoteSidebar({
         onExportNote={onExportNote}
         onDuplicateNote={onDuplicateNote}
         onMoveToGroup={handleMoveToGroup}
+        onTranslate={onTranslate}
+        translationAvailable={translationAvailable}
         groups={groups}
         justPinnedId={justPinnedId}
       />
@@ -245,6 +255,8 @@ export function NoteSidebar({
       handleTogglePin,
       onDuplicateNote,
       onExportNote,
+      onTranslate,
+      translationAvailable,
       handleMoveToGroup,
       groups,
       justPinnedId,

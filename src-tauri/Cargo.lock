@@ -3580,6 +3580,7 @@ dependencies = [
  "scraper",
  "serde",
  "serde_json",
+ "swift-rs",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
@@ -3587,6 +3588,7 @@ dependencies = [
  "tauri-plugin-opener",
  "tauri-plugin-store",
  "tauri-plugin-updater",
+ "tokio",
  "uuid",
 ]
 

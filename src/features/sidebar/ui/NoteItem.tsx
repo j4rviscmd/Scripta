@@ -5,6 +5,7 @@ import {
   Download,
   FileText,
   FolderInput,
+  Languages,
   Pin,
   PinOff,
   Trash2,
@@ -19,6 +20,11 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
 import type { Note } from '@/features/editor'
 import type { Group } from '@/features/groups'
@@ -36,6 +42,7 @@ import { cn } from '@/lib/utils'
  * @property onDuplicateNote - Callback invoked to duplicate the note.
  * @property onExportNote - Callback invoked to export the note as Markdown.
  * @property onMoveToGroup - Callback invoked to move the note to a different group.
+ * @property onTranslate - Callback invoked to translate the note to a different language.
  * @property groups - The full list of groups available for the "Move to group" submenu.
  * @property justPinnedId - The ID of the note that was just pinned (for bounce animation), or `null`.
  */
@@ -48,6 +55,8 @@ interface NoteItemProps {
   onDuplicateNote: (noteId: string) => void
   onExportNote: (noteId: string) => void
   onMoveToGroup: (noteId: string, groupId: string | null) => void
+  onTranslate: (noteId: string) => void
+  translationAvailable: boolean
   groups: Group[]
   justPinnedId: string | null
 }
@@ -66,6 +75,8 @@ export function NoteItem({
   onDuplicateNote,
   onExportNote,
   onMoveToGroup,
+  onTranslate,
+  translationAvailable,
   groups,
   justPinnedId,
 }: NoteItemProps) {
@@ -156,6 +167,24 @@ export function NoteItem({
             <Copy className="h-4 w-4" />
             Duplicate
           </ContextMenuItem>
+          {translationAvailable ? (
+            <ContextMenuItem onClick={() => onTranslate(note.id)}>
+              <Languages className="h-4 w-4" />
+              Translate
+            </ContextMenuItem>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger render={<span className="block" />}>
+                <ContextMenuItem disabled>
+                  <Languages className="h-4 w-4" />
+                  Translate
+                </ContextMenuItem>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Translation requires macOS 26 or later</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
           <ContextMenuSeparator />
           <ContextMenuItem variant="destructive" onClick={onDeleteNote}>
             <Trash2 />

@@ -588,3 +588,15 @@ html.cursor-autohide-hidden :is(
 ) * {
   cursor: auto !important;
 }
+
+/*
+ * Error toast text selection.
+ *
+ * Error toast descriptions often contain diagnostic messages that users
+ * copy for bug reports. This rule overrides the global `select-none`
+ * only for error-type toast descriptions.
+ */
+[data-sonner-toast][data-type="error"] [data-description] {
+  -webkit-user-select: text;
+  user-select: text;
+}
