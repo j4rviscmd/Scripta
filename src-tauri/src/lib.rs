@@ -86,6 +86,9 @@ pub fn run() {
             translation::detect_language,
             translation::check_language_pair_status,
             file_io::download_file,
+            file_io::fetch_image_bytes_base64,
+            #[cfg(target_os = "macos")]
+            file_io::copy_image_to_clipboard_native,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

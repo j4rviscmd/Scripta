@@ -94,9 +94,9 @@ fn collect_texts_from_blocks(blocks: &[Value], texts: &mut Vec<String>) {
 //   {{I:text}}            italic
 //   {{S:text}}            strikethrough
 //   {{U:text}}            underline
-//   {{TC:#hexcolor|text}}  textColor
-//   {{BC:#hexcolor|text}}  backgroundColor
-//   {{L:href|text}}       link (text is recursively encoded)
+//   {{TC:#hexcolor~text}}  textColor
+//   {{BC:#hexcolor~text}}  backgroundColor
+//   {{L:href~text}}       link (text is recursively encoded)
 //
 // Multiple styles are nested: {{B:{{I:bold italic}}}}
 
@@ -116,7 +116,7 @@ fn encode_inline_content(inline: &[Value]) -> String {
                     .unwrap_or_default();
                 out.push_str("{{L:");
                 out.push_str(href);
-                out.push('|');
+                out.push('~');
                 out.push_str(&inner);
                 out.push_str("}}");
             }
@@ -172,7 +172,7 @@ fn style_token(key: &str, text: &str) -> String {
 }
 
 fn style_token_param(key: &str, param: &str, text: &str) -> String {
-    format!("{{{{{key}:{param}|{text}}}}}")
+    format!("{{{{{key}:{param}~{text}}}}}")
 }
 
 /// Decodes a style-encoded string back into a BlockNote inline content
@@ -218,9 +218,9 @@ fn tokenize(s: &str) -> Vec<Tok> {
             flush_text(&mut text_buf, &mut tokens);
             i += 2;
 
-            // Scan the key up to `:` or `|`
+            // Scan the key up to `:` or `~`
             let mut key = String::new();
-            while i < chars.len() && chars[i] != ':' && chars[i] != '|' && chars[i] != '}' {
+            while i < chars.len() && chars[i] != ':' && chars[i] != '~' && chars[i] != '}' {
                 key.push(chars[i]);
                 i += 1;
             }
@@ -241,11 +241,11 @@ fn tokenize(s: &str) -> Vec<Tok> {
             let param = if matches!(key.as_str(), "TC" | "BC" | "L") {
                 // Scan until `|`
                 let mut p = String::new();
-                while i < chars.len() && chars[i] != '|' {
+                while i < chars.len() && chars[i] != '~' {
                     p.push(chars[i]);
                     i += 1;
                 }
-                if i < chars.len() && chars[i] == '|' {
+                if i < chars.len() && chars[i] == '~' {
                     i += 1;
                 }
                 Some(p)
@@ -433,30 +433,40 @@ fn translate_texts(texts: &[String], source_lang: &str, target_lang: &str) -> Re
     #[cfg(target_os = "macos")]
     {
         let joined = texts.join("\0");
-        let result = unsafe {
-            scripta_translate_batch(
-                &SRString::from(joined.as_str()),
-                &SRString::from(source_lang),
-                &SRString::from(target_lang),
-            )
-        };
-        let result_str = result.as_str();
-        if let Some(err) = result_str.strip_prefix("ERROR:") {
-            return Err(err.to_owned());
+        let mut last_err = String::new();
+        for attempt in 0..3 {
+            let result = unsafe {
+                scripta_translate_batch(
+                    &SRString::from(joined.as_str()),
+                    &SRString::from(source_lang),
+                    &SRString::from(target_lang),
+                )
+            };
+            let result_str = result.as_str();
+            if let Some(err) = result_str.strip_prefix("ERROR:") {
+                last_err = err.to_owned();
+                // Retry on transient cold-start failures from TranslationSession.
+                if attempt < 2 {
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                    continue;
+                }
+                return Err(last_err);
+            }
+            let translated: Vec<String> = if result_str.is_empty() {
+                return Err("Translation returned empty result".to_owned());
+            } else {
+                result_str.split('\0').map(String::from).collect()
+            };
+            if translated.len() != texts.len() {
+                return Err(format!(
+                    "Translation count mismatch: expected {}, got {}",
+                    texts.len(),
+                    translated.len()
+                ));
+            }
+            return Ok(translated);
         }
-        let translated: Vec<String> = if result_str.is_empty() {
-            return Err("Translation returned empty result".to_owned());
-        } else {
-            result_str.split('\0').map(String::from).collect()
-        };
-        if translated.len() != texts.len() {
-            return Err(format!(
-                "Translation count mismatch: expected {}, got {}",
-                texts.len(),
-                translated.len()
-            ));
-        }
-        Ok(translated)
+        Err(last_err)
     }
 
     #[cfg(not(target_os = "macos"))]
@@ -826,13 +836,13 @@ mod tests {
     #[test]
     fn test_encode_text_color() {
         let inline = vec![text_node("red text", json!({"textColor": "#ff0000"}))];
-        assert_eq!(encode_inline_content(&inline), "{{TC:#ff0000|red text}}");
+        assert_eq!(encode_inline_content(&inline), "{{TC:#ff0000~red text}}");
     }
 
     #[test]
     fn test_encode_bg_color() {
         let inline = vec![text_node("highlighted", json!({"backgroundColor": "#ffff00"}))];
-        assert_eq!(encode_inline_content(&inline), "{{BC:#ffff00|highlighted}}");
+        assert_eq!(encode_inline_content(&inline), "{{BC:#ffff00~highlighted}}");
     }
 
     #[test]
@@ -841,7 +851,7 @@ mod tests {
             plain("click "),
             json!({"type": "link", "href": "https://example.com", "content": [plain("here")]}),
         ];
-        assert_eq!(encode_inline_content(&inline), "click {{L:https://example.com|here}}");
+        assert_eq!(encode_inline_content(&inline), "click {{L:https://example.com~here}}");
     }
 
     #[test]
@@ -853,7 +863,7 @@ mod tests {
         })];
         assert_eq!(
             encode_inline_content(&inline),
-            "{{L:https://example.com|{{B:{{I:styled link}}}}}}"
+            "{{L:https://example.com~{{B:{{I:styled link}}}}}}"
         );
     }
 
@@ -880,7 +890,7 @@ mod tests {
 
     #[test]
     fn test_decode_link() {
-        let result = decode_inline_content("{{L:https://example.com|click here}}");
+        let result = decode_inline_content("{{L:https://example.com~click here}}");
         assert_eq!(result.len(), 1);
         assert_eq!(result[0]["type"], "link");
         assert_eq!(result[0]["href"], "https://example.com");
@@ -888,7 +898,7 @@ mod tests {
 
     #[test]
     fn test_decode_link_with_styles() {
-        let result = decode_inline_content("{{L:https://x.com|{{B:link}}}}");
+        let result = decode_inline_content("{{L:https://x.com~{{B:link}}}}");
         assert_eq!(result.len(), 1);
         let content = result[0]["content"].as_array().unwrap();
         assert_eq!(content.len(), 1);
@@ -897,7 +907,7 @@ mod tests {
 
     #[test]
     fn test_decode_text_color() {
-        let result = decode_inline_content("{{TC:#ff0000|red text}}");
+        let result = decode_inline_content("{{TC:#ff0000~red text}}");
         assert_eq!(result.len(), 1);
         assert_eq!(result[0], text_node("red text", json!({"textColor": "#ff0000"})));
     }

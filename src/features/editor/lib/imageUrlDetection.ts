@@ -114,3 +114,6 @@ export class ImageDetectionCache {
     return this.cache.size
   }
 }
+
+/** Session-scoped LRU cache shared across the editor feature. */
+export const imageDetectionCache = new ImageDetectionCache()

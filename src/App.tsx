@@ -787,7 +787,7 @@ function AppContent() {
             ref={scrollContainerRef}
             className="custom-scrollbar relative flex-1 overflow-y-auto overscroll-none"
           >
-            <div className="pointer-events-none absolute top-5 right-0 z-10 flex flex-col items-end gap-1 pr-7">
+            <div className="pointer-events-none sticky top-5 z-10 flex flex-col items-end gap-1 pr-7">
               <SaveStatusIndicator status={saveStatus} locked={isNoteLocked} />
               {translationState.visible && (
                 <div className="pointer-events-auto">

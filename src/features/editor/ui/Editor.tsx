@@ -25,7 +25,10 @@ import {
   locales as multiColumnLocales,
   withMultiColumn,
 } from '@blocknote/xl-multi-column'
+import { invoke } from '@tauri-apps/api/core'
+import { save } from '@tauri-apps/plugin-dialog'
 import { Code } from '@tiptap/extension-code'
+import { Copy, Download, Link, Trash2 } from 'lucide-react'
 import type { Transaction } from 'prosemirror-state'
 import {
   forwardRef,
@@ -41,6 +44,14 @@ import { toast } from 'sonner'
 import { useEditorFont } from '@/app/providers/editor-font-provider'
 import { useTheme } from '@/app/providers/theme-provider'
 import { useToolbarConfig } from '@/app/providers/toolbar-config-provider'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
+import { CopyablePath } from '@/shared/ui/CopyablePath'
 import type { SaveStatus } from '..'
 import {
   checklistSplitFixExtension,
@@ -91,10 +102,20 @@ import '@blocknote/core/fonts/inter.css'
 const BLOCKS = DEFAULT_BLOCKS as any
 
 /**
+ * Extracts the file extension from a filename or URL (lowercase, without dot).
+ * Returns `undefined` if the string has no recognisable extension.
+ */
+function getExtension(str: string): string | undefined {
+  const path = str.split('?')[0]!.split('#')[0]!
+  const lastDot = path.lastIndexOf('.')
+  if (lastDot === -1) return undefined
+  const ext = path.slice(lastDot + 1).toLowerCase()
+  return ext.length > 0 && ext.length <= 5 ? ext : undefined
+}
+
+/**
  * Temporarily patches `view.dispatch` so that every transaction dispatched
  * during `fn` carries `setMeta("addToHistory", false)`.
- *
- * This prevents prosemirror-history from recording programmatic content
  * loads (e.g. `replaceBlocks`, `backfillImageNames`) as undoable steps.
  *
  * @param view - The ProseMirror editor view whose `dispatch` to patch.
@@ -267,6 +288,10 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
    * Set to `false` once the note content has been fully applied.
    */
   const loadingRef = useRef(true)
+  /** Tracks the block ID of the image that was last right-clicked. */
+  const contextMenuBlockIdRef = useRef<string | null>(null)
+  /** Ref attached to the outer editor container used by the contextmenu capture listener. */
+  const editorContainerRef = useRef<HTMLDivElement>(null)
   /**
    * Whether the editor content has finished loading and is safe to display.
    *
@@ -680,55 +705,240 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     [editor, locked]
   )
 
+  /**
+   * Capture-phase contextmenu listener attached to the outer editor container.
+   *
+   * - For image right-clicks: stores the block ID and lets the event propagate
+   *   so base-ui's ContextMenu trigger can open at the cursor position.
+   * - For all other right-clicks: stops propagation so the ContextMenu never
+   *   opens, leaving the platform's native text menu intact.
+   */
+  useEffect(() => {
+    const container = editorContainerRef.current
+    if (!container) return
+
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      const isOnImage = Boolean(target.closest('.bn-visual-media-wrapper'))
+
+      if (!isOnImage || !editor.isEditable) {
+        e.stopImmediatePropagation()
+        return
+      }
+
+      const blockContainerEl = target.closest(
+        '[data-node-type="blockContainer"]'
+      ) as HTMLElement | null
+      contextMenuBlockIdRef.current = blockContainerEl?.dataset.id ?? null
+      // Suppress the native OS/WebView context menu for images.
+      e.preventDefault()
+    }
+
+    container.addEventListener('contextmenu', handler, { capture: true })
+    return () =>
+      container.removeEventListener('contextmenu', handler, { capture: true })
+  }, [editor])
+
+  /**
+   * Downloads the image block that was last right-clicked via the context menu.
+   *
+   * Opens a native save-file dialog pre-populated with the image filename,
+   * then delegates the actual file transfer to the Rust `download_file` command,
+   * which handles both remote HTTP/HTTPS URLs (via `reqwest`) and local
+   * `asset://` URLs (via direct file copy).
+   *
+   * Extension resolution order: block `name` prop → URL path → fallback `"png"`.
+   * On success a toast displays the saved path via {@link CopyablePath}.
+   * On failure the error message is surfaced as an error toast notification.
+   */
+  const handleImageDownload = useCallback(async () => {
+    const blockId = contextMenuBlockIdRef.current
+    if (!blockId) return
+
+    const block = editor.getBlock(blockId)
+    if (!block) return
+
+    const props = block.props as Record<string, unknown>
+    const url = props.url as string
+    if (!url) return
+
+    const name = (props.name as string) || 'image'
+    const ext = getExtension(name) ?? getExtension(url) ?? 'png'
+    const baseName = name.includes('.') ? name : `${name}.${ext}`
+
+    try {
+      const path = await save({
+        defaultPath: baseName,
+        filters: [{ name: 'Image', extensions: [ext] }],
+      })
+      if (!path) return
+      await invoke('download_file', { url, destPath: path })
+      toast.success('Downloaded', {
+        description: <CopyablePath path={path} />,
+      })
+    } catch (e) {
+      if (e instanceof Error) {
+        toast.error(`Download failed: ${e.message}`)
+      } else if (typeof e === 'string') {
+        toast.error(`Download failed: ${e}`)
+      } else {
+        toast.error('Download failed')
+      }
+    }
+  }, [editor])
+
+  /**
+   * Removes the image block that was last right-clicked via the context menu.
+   *
+   * Retrieves the block ID stored by the capture-phase `contextmenu` handler
+   * and delegates removal to BlockNote's `removeBlocks` API. No-ops when no
+   * block ID has been recorded (e.g. when the context menu was not triggered
+   * from an image block).
+   */
+  const handleImageDelete = useCallback(() => {
+    const blockId = contextMenuBlockIdRef.current
+    if (!blockId) return
+    editor.removeBlocks([blockId])
+  }, [editor])
+
+  /**
+   * Copies the source URL of the image block that was last right-clicked.
+   *
+   * Reads the `url` prop from the block identified by `contextMenuBlockIdRef`
+   * and writes it to the system clipboard via the Web Clipboard API
+   * (`navigator.clipboard.writeText`). Surfaces a success or error toast
+   * notification depending on the outcome.
+   */
+  const handleImageCopyUrl = useCallback(async () => {
+    const blockId = contextMenuBlockIdRef.current
+    if (!blockId) return
+
+    const block = editor.getBlock(blockId)
+    if (!block) return
+
+    const props = block.props as Record<string, unknown>
+    const url = props.url as string
+    if (!url) return
+
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.success('URL copied')
+    } catch {
+      toast.error('Failed to copy URL')
+    }
+  }, [editor])
+
+  /** Copies the image data of the block that was last right-clicked to the native clipboard.
+   *
+   * Delegates fetching and clipboard writing to the Rust backend via
+   * `copy_image_to_clipboard_native`, which uses `NSPasteboard` via `osascript` to
+   * bypass WKWebView's Clipboard API permission restrictions.
+   */
+  const handleImageCopyImage = useCallback(async () => {
+    const blockId = contextMenuBlockIdRef.current
+    if (!blockId) return
+
+    const block = editor.getBlock(blockId)
+    if (!block) return
+
+    const props = block.props as Record<string, unknown>
+    const url = props.url as string
+    if (!url) return
+
+    try {
+      await invoke('copy_image_to_clipboard_native', { url })
+      toast.success('Image copied')
+    } catch (e) {
+      if (e instanceof Error) {
+        toast.error(`Failed to copy image: ${e.message}`)
+      } else if (typeof e === 'string') {
+        toast.error(`Failed to copy image: ${e}`)
+      }
+    }
+  }, [editor])
+
   return (
     <>
       {/* Editor wrapper — starts invisible (`opacity-0`) and transitions to
           `opacity-100` once `contentReady` is true, preventing a flash of
           stale/default content while the real note loads. */}
-      <div
-        className={`w-full min-h-screen px-8 pb-[60vh] ${contentReady ? 'opacity-100' : 'opacity-0'}`}
-        data-editor-root
-        data-locked={locked || undefined}
-        onClick={handleWrapperClick}
-        style={
-          {
-            '--editor-font-size': `${fontSize}px`,
-            '--editor-font-family': fontFamily,
-          } as React.CSSProperties
-        }
-      >
-        <BlockNoteView
-          editor={editor}
-          editable={true}
-          theme={resolvedTheme}
-          onChange={handleChange}
-          formattingToolbar={false}
-          linkToolbar={false}
-          slashMenu={false}
-        >
-          <SuggestionMenuController
-            triggerCharacter="/"
-            getItems={getSlashMenuItems}
-          />
-          {!locked && (
-            <>
-              <FormattingToolbarController
-                formattingToolbar={() => (
-                  <FormattingToolbar blockTypeSelectItems={[]}>
-                    {formattingToolbarItems}
-                  </FormattingToolbar>
+      {/* Outer container holds the capture-phase contextmenu listener that
+          selectively opens the ContextMenu only for image right-clicks. */}
+      <div ref={editorContainerRef}>
+        <ContextMenu>
+          <ContextMenuTrigger className="select-text">
+            <div
+              className={`w-full min-h-screen px-8 pb-[60vh] ${contentReady ? 'opacity-100' : 'opacity-0'}`}
+              data-editor-root
+              data-locked={locked || undefined}
+              onClick={handleWrapperClick}
+              style={
+                {
+                  '--editor-font-size': `${fontSize}px`,
+                  '--editor-font-family': fontFamily,
+                } as React.CSSProperties
+              }
+            >
+              <BlockNoteView
+                editor={editor}
+                editable={true}
+                theme={resolvedTheme}
+                onChange={handleChange}
+                formattingToolbar={false}
+                linkToolbar={false}
+                slashMenu={false}
+              >
+                <SuggestionMenuController
+                  triggerCharacter="/"
+                  getItems={getSlashMenuItems}
+                />
+                {!locked && (
+                  <>
+                    <FormattingToolbarController
+                      formattingToolbar={() => (
+                        <FormattingToolbar blockTypeSelectItems={[]}>
+                          {formattingToolbarItems}
+                        </FormattingToolbar>
+                      )}
+                    />
+                    <EditLinkRequestContext.Provider value={setEditLinkState}>
+                      <LinkToolbarController linkToolbar={CustomLinkToolbar} />
+                    </EditLinkRequestContext.Provider>
+                    <EditLinkDialog
+                      state={editLinkState}
+                      onDismiss={() => setEditLinkState(null)}
+                    />
+                  </>
                 )}
-              />
-              <EditLinkRequestContext.Provider value={setEditLinkState}>
-                <LinkToolbarController linkToolbar={CustomLinkToolbar} />
-              </EditLinkRequestContext.Provider>
-              <EditLinkDialog
-                state={editLinkState}
-                onDismiss={() => setEditLinkState(null)}
-              />
-            </>
+              </BlockNoteView>
+            </div>
+          </ContextMenuTrigger>
+          {!locked && (
+            <ContextMenuContent>
+              <ContextMenuItem onClick={handleImageCopyUrl}>
+                <Link />
+                Copy URL
+              </ContextMenuItem>
+              <ContextMenuItem onClick={handleImageCopyImage}>
+                <Copy />
+                Copy Image
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem onClick={handleImageDownload}>
+                <Download />
+                Download
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                variant="destructive"
+                onClick={handleImageDelete}
+              >
+                <Trash2 />
+                Delete
+              </ContextMenuItem>
+            </ContextMenuContent>
           )}
-        </BlockNoteView>
+        </ContextMenu>
       </div>
       <RenameDialog
         editor={editorAny}

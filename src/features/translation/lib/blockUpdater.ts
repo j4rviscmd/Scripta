@@ -51,7 +51,7 @@ function tokenize(s: string): Tok[] {
       i += 2
 
       let key = ''
-      while (i < s.length && s[i] !== ':' && s[i] !== '|' && s[i] !== '}') {
+      while (i < s.length && s[i] !== ':' && s[i] !== '~' && s[i] !== '}') {
         key += s[i]
         i++
       }
@@ -70,11 +70,11 @@ function tokenize(s: string): Tok[] {
       let param: string | undefined
       if (PARAM_KEYS.has(key)) {
         let p = ''
-        while (i < s.length && s[i] !== '|') {
+        while (i < s.length && s[i] !== '~') {
           p += s[i]
           i++
         }
-        if (i < s.length && s[i] === '|') i++
+        if (i < s.length && s[i] === '~') i++
         param = p
       }
 
