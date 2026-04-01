@@ -76,6 +76,9 @@ pub fn run() {
             file_io::read_text_file,
             file_io::write_text_file,
             file_io::download_file,
+            file_io::fetch_image_bytes_base64,
+            #[cfg(target_os = "macos")]
+            file_io::copy_image_to_clipboard_native,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

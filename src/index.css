@@ -681,3 +681,32 @@ html.cursor-autohide-hidden :is(
   cursor: auto !important;
   pointer-events: auto !important;
 }
+
+/*
+ * Sonner toast text-selection override.
+ *
+ * Sonner renders its toasts outside the React root and the global
+ * `select-none` from `@layer base` propagates into the portal.  Placed
+ * outside any @layer so that it wins the cascade.
+ */
+[data-sonner-toaster] * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/*
+ * Multi-column block focus-outline clipping fix.
+ *
+ * BlockNote sets `overflow-x: auto` on `.bn-block-column` and removes the
+ * left padding of the first child (`padding-left: 0`).  When a block is
+ * selected its focus indicator is rendered as `outline: 4px solid …` which
+ * extends outside the element's box.  `overflow-x: auto` clips that outline
+ * on the left edge of the first column, making it appear cut off.
+ *
+ * Overriding to `overflow-x: visible` (placed outside any @layer so it wins
+ * over BlockNote's stylesheet) lets the outline render fully.  Columns in a
+ * note editor do not need horizontal scroll — content should wrap instead.
+ */
+.bn-block-column {
+  overflow-x: visible;
+}
