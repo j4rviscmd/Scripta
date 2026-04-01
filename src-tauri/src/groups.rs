@@ -35,6 +35,14 @@ fn group_from_row(row: &rusqlite::Row) -> Result<Group, rusqlite::Error> {
 
 /// Returns all groups sorted by their display order.
 ///
+/// # Arguments
+///
+/// * `state` - Managed database state injected by Tauri.
+///
+/// # Returns
+///
+/// A vector of [`Group`] entries ordered by `sort_order ASC`.
+///
 /// # Errors
 ///
 /// Returns a `String` if the database lock is poisoned or the query fails.
@@ -56,9 +64,20 @@ pub fn list_groups(state: tauri::State<DbState>) -> Result<Vec<Group>, String> {
 
 /// Creates a new group with a generated UUID and the next sort order.
 ///
+/// The `sort_order` is derived by querying the current maximum `sort_order`
+/// across all groups and incrementing it by one, placing the new group last
+/// in the sidebar.
+///
 /// # Arguments
 ///
+/// * `state` - Managed database state injected by Tauri.
 /// * `name` - The display name for the new group.
+///
+/// # Returns
+///
+/// The newly created [`Group`] with all fields populated, including the
+/// generated `id`, assigned `sort_order`, and `created_at` / `updated_at`
+/// timestamps.
 ///
 /// # Errors
 ///
@@ -95,6 +114,16 @@ pub fn create_group(state: tauri::State<DbState>, name: String) -> Result<Group,
 }
 
 /// Renames an existing group.
+///
+/// # Arguments
+///
+/// * `state` - Managed database state injected by Tauri.
+/// * `id` - The UUID of the group to rename.
+/// * `name` - The new display name for the group.
+///
+/// # Returns
+///
+/// The updated [`Group`] as it exists in the database after the write.
 ///
 /// # Errors
 ///
@@ -193,7 +222,10 @@ pub fn set_note_group(
 
     let note = conn
         .query_row(
-            "SELECT id, title, content, created_at, updated_at, is_pinned, group_id FROM notes WHERE id = ?1",
+            &format!(
+                "SELECT {} FROM notes WHERE id = ?1",
+                crate::db::NOTE_COLUMNS
+            ),
             rusqlite::params![note_id],
             crate::db::note_from_row,
         )
