@@ -6,14 +6,11 @@ import {
 } from '../api/imageUrlDetection'
 import { fetchLinkTitle } from '../api/linkPreview'
 import { findBlockRecursive, urlToImageName } from '../lib/imageBlockUtils'
-import { ImageDetectionCache, isImageUrlQuick } from '../lib/imageUrlDetection'
+import { imageDetectionCache, isImageUrlQuick } from '../lib/imageUrlDetection'
 import { parseMarkdownWithColumns } from '../lib/multiColumnMarkdown'
 
 /** Matches a standalone HTTP or HTTPS URL at the start of a string. */
 const URL_REGEX = /^https?:\/\/\S+/i
-
-/** Session-scoped LRU cache for asynchronous image-URL detection results. */
-const imageDetectionCache = new ImageDetectionCache()
 
 /**
  * Replaces the text content of a link in the BlockNote editor.
@@ -163,7 +160,6 @@ function replaceLinkWithImage(editor: BlockNoteEditor, url: string): void {
  * @returns A paste handler callback for the BlockNote editor's `pasteHandler` option.
  */
 export function useLinkPreview() {
-  // Deduplication: track URLs already being processed.
   const pendingRef = useRef<Set<string>>(new Set())
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -194,14 +190,12 @@ export function useLinkPreview() {
         return defaultPasteHandler()
       }
 
-      // Fast path: extension or known domain → insert image block immediately.
       if (isImageUrlQuick(url)) {
         editor.focus()
         insertImageBlock(editor, url, editor.getTextCursorPosition().block)
         return true
       }
 
-      // Check async cache
       const cached = imageDetectionCache.get(url)
       if (cached === true) {
         editor.focus()
