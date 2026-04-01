@@ -1,20 +1,19 @@
 import { createExtension } from '@blocknote/core'
 
 /**
- * BlockNote extension that fixes the checked state when splitting a
- * checkListItem block by pressing Enter at the text start.
+ * BlockNote extension that fixes cursor behaviour when pressing Enter at the
+ * very start of a checkListItem block.
  *
- * BlockNote's `splitBlockTr` passes `keepProps=undefined` (falsy) to
- * `tr.split()`, which gives the new (lower) node `attrs: {}` and resets
- * its `checked` to `false`.  The original (upper) node retains its
- * `checked: true`.  After a line-start split the result is:
+ * **Problem**: BlockNote's default Enter handler (splitBlock) inserts a new
+ * block *above* the current one and moves the cursor into that new block.
+ * When the cursor is at the line head, the expected behaviour is:
  *
- *   Upper: checked=true  (wrong — should be false)
- *   Lower: checked=false (wrong — should be true)
+ *   - A new empty checkListItem is inserted *above* the current block.
+ *   - The cursor stays on the *original* (now lower) block.
  *
- * This extension intercepts Enter on checked checkListItem blocks via
- * `runsBefore: ['check-list-item-shortcuts']` and performs the split
- * with corrected checked states using `editor.transact()`.
+ * This extension intercepts Enter on checkListItem blocks via
+ * `runsBefore: ['check-list-item-shortcuts']` and performs the split with
+ * the cursor left on the original (lower) block.
  */
 export const checklistSplitFixExtension = createExtension(({ editor }) => ({
   key: 'checklistSplitFix',
@@ -41,17 +40,16 @@ export const checklistSplitFixExtension = createExtension(({ editor }) => ({
       // handled by BlockNote's own handler).
       if (block.content?.length === 0) return false
 
-      // checked=true, non-empty, cursor at content start: perform split
-      // with corrected checked states.
+      // Non-empty, cursor at content start: insert a new empty checkListItem
+      // above and keep the cursor on the original (lower) block.
       editor.transact(() => {
-        const inserted = editor.insertBlocks(
+        editor.insertBlocks(
           [{ type: 'checkListItem', props: { checked: false } }],
           pos.block.id,
           'before'
         )
-        if (inserted.length > 0) {
-          editor.setTextCursorPosition(inserted[0].id, 'start')
-        }
+        // Cursor stays on the original block (pos.block.id).
+        editor.setTextCursorPosition(pos.block.id, 'start')
       })
 
       return true
