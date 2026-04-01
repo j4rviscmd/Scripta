@@ -38,38 +38,37 @@ export const ConvertToLinkButton = () => {
     },
   })
 
+  /**
+   * Converts the currently selected image block into a paragraph containing
+   * a single inline link.
+   *
+   * Uses the image's `url` prop as the link href, and its `name` prop (falling
+   * back to the URL string itself) as the visible link text. The replacement is
+   * issued as a single BlockNote `updateBlock` call so that the entire
+   * conversion is reverted as one step when the user presses Cmd+Z / Ctrl+Z.
+   *
+   * No-ops when `block` is `undefined` (i.e. the button is hidden because the
+   * selection is not an eligible image block).
+   */
   const handleClick = useCallback(() => {
     if (!block) return
     const props = block.props as Record<string, unknown>
     const url = props.url as string
     const name = (props.name as string) || url
 
-    // Save the new block ID before mutating the document further.
-    const inserted = editor.insertBlocks(
-      [{ type: 'paragraph' }],
-      block,
-      'after'
-    )
-    // biome-ignore lint/style/noNonNullAssertion: inserted[0] is guaranteed by length check
-    const newBlockId = inserted.length > 0 ? inserted[0]!.id : undefined
-
-    editor.removeBlocks([block])
-
-    // Insert the link as inline content into the new paragraph.
-    if (newBlockId) {
-      const newBlock = editor.getBlock(newBlockId)
-      if (newBlock) {
-        editor.setTextCursorPosition(newBlock)
-        editor.insertInlineContent([
-          {
-            type: 'link',
-            href: url,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            content: [{ type: 'text', text: name || url, styles: {} }] as any,
-          },
-        ])
-      }
-    }
+    // Replace the image block with a paragraph+link in a single atomic update so
+    // that Cmd+Z reverts the whole conversion in one step.
+    editor.updateBlock(block, {
+      type: 'paragraph',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      content: [
+        {
+          type: 'link',
+          href: url,
+          content: [{ type: 'text', text: name || url, styles: {} }],
+        },
+      ] as any,
+    })
   }, [block, editor])
 
   if (block === undefined) return null

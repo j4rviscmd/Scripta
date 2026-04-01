@@ -8,6 +8,7 @@ import { save } from '@tauri-apps/plugin-dialog'
 import { Download } from 'lucide-react'
 import { useCallback } from 'react'
 import { toast } from 'sonner'
+import { CopyablePath } from '@/shared/ui/CopyablePath'
 
 /** Extracts the file extension from a filename or URL (without dot). */
 function getExtension(str: string): string | undefined {
@@ -80,9 +81,16 @@ export const DownloadButton = () => {
       if (!path) return
 
       await invoke('download_file', { url, destPath: path })
+      toast.success('Downloaded', {
+        description: <CopyablePath path={path} />,
+      })
     } catch (e) {
-      if (e instanceof Error && e.message) {
+      if (e instanceof Error) {
         toast.error(`Download failed: ${e.message}`)
+      } else if (typeof e === 'string') {
+        toast.error(`Download failed: ${e}`)
+      } else {
+        toast.error('Download failed')
       }
     }
   }, [block])

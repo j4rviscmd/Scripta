@@ -70,6 +70,116 @@ pub async fn download_file(url: String, dest_path: String) -> Result<(), String>
     std::fs::write(&dest_path, &data).map_err(|e| format!("failed to write file: {e}"))
 }
 
+/// Fetches a file from a URL and returns its contents as a Base64-encoded string.
+///
+/// Handles both remote URLs (via HTTP) and local asset-protocol URLs
+/// (by extracting the file path and reading it directly).
+/// This is intended for use cases where the file bytes are needed in the frontend
+/// without writing to disk (e.g., copying an image to the clipboard).
+///
+/// # Arguments
+///
+/// * `url` - The source URL (remote HTTP or local `asset://localhost/…`).
+///
+/// # Errors
+///
+/// Returns a `String` error if the file cannot be fetched or read.
+#[tauri::command]
+pub async fn fetch_image_bytes_base64(url: String) -> Result<String, String> {
+    use base64::Engine as _;
+    let data = if let Some(path) = strip_asset_prefix(&url) {
+        let decoded = urldecode(path)?;
+        std::fs::read(&decoded).map_err(|e| format!("failed to read local file: {e}"))?
+    } else {
+        let response = reqwest::get(&url)
+            .await
+            .map_err(|e| format!("failed to download: {e}"))?;
+        response
+            .bytes()
+            .await
+            .map_err(|e| format!("failed to read response: {e}"))?
+            .to_vec()
+    };
+    Ok(base64::engine::general_purpose::STANDARD.encode(&data))
+}
+
+/// Copies an image from a URL directly to the macOS clipboard using `NSPasteboard`.
+///
+/// Bypasses browser Clipboard API restrictions by fetching the image via Rust
+/// and writing it to a temporary file, then invoking `osascript` with the AppKit
+/// framework to load the image into `NSPasteboard`.
+///
+/// Supports all image formats that `NSImage` accepts (PNG, JPEG, GIF, WebP, TIFF).
+///
+/// # Arguments
+///
+/// * `url` - The source URL (remote HTTP or local `asset://localhost/…`).
+///
+/// # Errors
+///
+/// Returns a `String` error if the fetch, temp-file write, or osascript invocation fails.
+#[cfg(target_os = "macos")]
+#[tauri::command]
+pub async fn copy_image_to_clipboard_native(url: String) -> Result<(), String> {
+    let data = if let Some(path) = strip_asset_prefix(&url) {
+        let decoded = urldecode(path)?;
+        std::fs::read(&decoded).map_err(|e| format!("failed to read local file: {e}"))?
+    } else {
+        let response = reqwest::get(&url)
+            .await
+            .map_err(|e| format!("failed to download: {e}"))?;
+        response
+            .bytes()
+            .await
+            .map_err(|e| format!("failed to read response: {e}"))?
+            .to_vec()
+    };
+
+    // Detect format from magic bytes to give NSImage the right file extension.
+    let ext = if data.len() >= 8 && data[0..8] == [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A] {
+        "png"
+    } else if data.len() >= 2 && data[0] == 0xFF && data[1] == 0xD8 {
+        "jpg"
+    } else if data.len() >= 3 && &data[0..3] == b"GIF" {
+        "gif"
+    } else if data.len() >= 12 && &data[0..4] == b"RIFF" && &data[8..12] == b"WEBP" {
+        "webp"
+    } else {
+        "png"
+    };
+
+    let temp_path = std::env::temp_dir().join(format!("scripta_clipboard_img.{ext}"));
+    std::fs::write(&temp_path, &data).map_err(|e| format!("failed to write temp file: {e}"))?;
+
+    let temp_path_str = temp_path.to_string_lossy().to_string();
+
+    // Write to NSPasteboard via osascript (available on all macOS versions >= 10.10).
+    let status = std::process::Command::new("osascript")
+        .args(["-e", "use framework \"AppKit\""])
+        .args(["-e", "use scripting additions"])
+        .args([
+            "-e",
+            &format!(
+                "set theImage to current application's NSImage's alloc()'s initWithContentsOfFile_(\"{}\")",
+                temp_path_str
+            ),
+        ])
+        .args(["-e", "if theImage is missing value then error \"image load failed\""])
+        .args(["-e", "set pb to current application's NSPasteboard's generalPasteboard()"])
+        .args(["-e", "pb's clearContents()"])
+        .args(["-e", "pb's writeObjects_({theImage})"])
+        .status()
+        .map_err(|e| format!("failed to run osascript: {e}"))?;
+
+    let _ = std::fs::remove_file(&temp_path);
+
+    if !status.success() {
+        return Err("failed to write image to clipboard".to_string());
+    }
+
+    Ok(())
+}
+
 /// Strips a recognised asset-protocol prefix from `url`, returning the
 /// encoded path suffix (including the leading `/`), or `None` if the URL
 /// is not an asset-protocol URL.
