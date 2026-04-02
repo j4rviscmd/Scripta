@@ -10,11 +10,17 @@ import {
 import { filterSuggestionItems } from '@blocknote/core/extensions'
 import * as locales from '@blocknote/core/locales'
 import {
+  AddBlockButton,
+  BlockColorsItem,
+  DragHandleButton,
   FormattingToolbar,
   FormattingToolbarController,
   getDefaultReactSlashMenuItems,
   getFormattingToolbarItems,
   LinkToolbarController,
+  RemoveBlockItem,
+  SideMenu,
+  SideMenuController,
   SuggestionMenuController,
   useCreateBlockNote,
 } from '@blocknote/react'
@@ -81,9 +87,11 @@ import { rangeCheckToggleExtension } from '../lib/rangeCheckToggle'
 import { readOnlyGuardExtension, setReadOnly } from '../lib/readOnlyGuard'
 import { slashMenuEmacsKeysExtension } from '../lib/slashMenuEmacsKeys'
 import { ConvertToLinkButton } from './ConvertToLinkButton'
+import { CopyBlockItem } from './CopyBlockItem'
 import { CustomColorStyleButton } from './CustomColorStyleButton'
 import { CustomLinkToolbar } from './CustomLinkToolbar'
 import { DownloadButton } from './DownloadButton'
+import { DuplicateBlockItem } from './DuplicateBlockItem'
 import type { EditLinkDialogState } from './EditLinkButton'
 import { EditLinkRequestContext } from './EditLinkButton'
 import { EditLinkDialog } from './EditLinkDialog'
@@ -142,6 +150,15 @@ function withSuppressedHistory(
   } finally {
     view.dispatch = originalDispatch
   }
+}
+
+/**
+ * Extracts a human-readable error message from an unknown caught value.
+ */
+function getErrorMessage(e: unknown, prefix: string): string {
+  const detail =
+    e instanceof Error ? e.message : typeof e === 'string' ? e : undefined
+  return detail ? `${prefix}: ${detail}` : prefix
 }
 
 /**
@@ -767,13 +784,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
         description: <CopyablePath path={path} />,
       })
     } catch (e) {
-      if (e instanceof Error) {
-        toast.error(`Download failed: ${e.message}`)
-      } else if (typeof e === 'string') {
-        toast.error(`Download failed: ${e}`)
-      } else {
-        toast.error('Download failed')
-      }
+      toast.error(getErrorMessage(e, 'Download failed'))
     }
   }, [editor])
 
@@ -843,11 +854,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       await invoke('copy_image_to_clipboard_native', { url })
       toast.success('Image copied')
     } catch (e) {
-      if (e instanceof Error) {
-        toast.error(`Failed to copy image: ${e.message}`)
-      } else if (typeof e === 'string') {
-        toast.error(`Failed to copy image: ${e}`)
-      }
+      toast.error(getErrorMessage(e, 'Failed to copy image'))
     }
   }, [editor])
 
@@ -881,6 +888,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
                 formattingToolbar={false}
                 linkToolbar={false}
                 slashMenu={false}
+                sideMenu={false}
               >
                 {/* Custom slash menu that includes the default items plus multi-column ones. */}
                 <SuggestionMenuController
@@ -897,6 +905,21 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
                 />
                 {!locked && (
                   <>
+                    <SideMenuController
+                      sideMenu={(props) => (
+                        <SideMenu {...props}>
+                          <AddBlockButton />
+                          <DragHandleButton {...props}>
+                            <DuplicateBlockItem>
+                              Duplicate Block
+                            </DuplicateBlockItem>
+                            <CopyBlockItem>Copy Block</CopyBlockItem>
+                            <RemoveBlockItem>Delete</RemoveBlockItem>
+                            <BlockColorsItem>Colors</BlockColorsItem>
+                          </DragHandleButton>
+                        </SideMenu>
+                      )}
+                    />
                     <FormattingToolbarController
                       formattingToolbar={() => (
                         <FormattingToolbar blockTypeSelectItems={[]}>
