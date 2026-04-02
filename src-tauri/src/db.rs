@@ -6,7 +6,7 @@ use tauri::Manager;
 /// Column projection used by every SELECT on the `notes` table.
 ///
 /// Order must match the indices expected by [`note_from_row`].
-const NOTE_COLUMNS: &str =
+pub(crate) const NOTE_COLUMNS: &str =
     "id, title, content, created_at, updated_at, is_pinned, group_id, is_locked";
 
 /// Application-level wrapper around a mutex-guarded SQLite connection.
