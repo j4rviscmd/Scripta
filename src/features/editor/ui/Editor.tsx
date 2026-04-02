@@ -62,6 +62,7 @@ import {
   checklistSplitFixExtension,
   cursorCenteringExtension,
   cursorVimKeysExtension,
+  decodeAssetPath,
   getImageNameFallback,
   imeCompositionGuard,
   resolveImageUrl,
@@ -74,6 +75,9 @@ import { useAutoSave } from '../hooks/useAutoSave'
 import { useClipboardTightenList } from '../hooks/useClipboardTightenList'
 import { useCopyToast } from '../hooks/useCopyToast'
 import { useEditorFontSize } from '../hooks/useEditorFontSize'
+import { useImageAutoSave } from '../hooks/useImageAutoSave'
+import { useImageErrorFallback } from '../hooks/useImageErrorFallback'
+import { useImageLocalizationScanner } from '../hooks/useImageLocalizationScanner'
 import { useLinkClickHandler } from '../hooks/useLinkClickHandler'
 import { useLinkPreview } from '../hooks/useLinkPreview'
 import { useSearchReplace } from '../hooks/useSearchReplace'
@@ -442,6 +446,16 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   // Rewrite clipboard text/plain so Markdown lists are tight (no blank lines between items).
   useClipboardTightenList(editorAny)
 
+  /** Whether remote images should be downloaded and saved locally on insertion. */
+  const { enabled: imageAutoSaveEnabled } = useImageAutoSave()
+  /** Scans the document for remote image URLs and localizes them asynchronously. */
+  const { scanAndLocalize } = useImageLocalizationScanner(
+    editorAny,
+    imageAutoSaveEnabled
+  )
+  /** Replaces broken image elements (404 / deleted local file) with a placeholder. */
+  useImageErrorFallback(editorContainerRef)
+
   /**
    * After every file upload completes, ensure the uploaded image block has a
    * non-empty name so the bubble menu hover-target area remains accessible
@@ -657,8 +671,9 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   const handleChange = useCallback(() => {
     if (loadingRef.current) return
     backfillImageNames()
+    scanAndLocalize()
     scheduleSave(JSON.stringify(editor.document))
-  }, [editor, scheduleSave, backfillImageNames])
+  }, [editor, scheduleSave, backfillImageNames, scanAndLocalize])
 
   /**
    * Handles clicks on the editor wrapper's padding area.
@@ -806,8 +821,12 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     const url = props.url as string
     if (!url) return
 
+    // For locally saved images, copy the decoded OS path instead of the
+    // raw asset:// URL so the user gets a usable file-system path.
+    const copyText = decodeAssetPath(url)
+
     try {
-      await navigator.clipboard.writeText(url)
+      await navigator.clipboard.writeText(copyText)
       toast.success('URL copied')
     } catch {
       toast.error('Failed to copy URL')

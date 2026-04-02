@@ -710,3 +710,23 @@ html.cursor-autohide-hidden :is(
 .bn-block-column {
   overflow-x: visible;
 }
+
+/*
+ * "Image not found" placeholder shown when an image block's URL returns 404
+ * or the local asset:// file has been deleted.
+ * Injected via useImageErrorFallback (DOM manipulation on img onerror).
+ */
+.image-error-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 100px;
+  padding: 24px 16px;
+  border-radius: 8px;
+  border: 1px dashed hsl(var(--border));
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+}

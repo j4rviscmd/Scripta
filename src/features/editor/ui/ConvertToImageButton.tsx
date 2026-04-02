@@ -7,7 +7,11 @@ import {
   isImageContentType,
 } from '../api/imageUrlDetection'
 import { findBlockRecursive, urlToImageName } from '../lib/imageBlockUtils'
-import { imageDetectionCache, isImageUrlQuick } from '../lib/imageUrlDetection'
+import {
+  imageDetectionCache,
+  isImageUrlByExtension,
+  isImageUrlQuick,
+} from '../lib/imageUrlDetection'
 
 /**
  * Props for the {@link ConvertToImageButton} component.
@@ -49,10 +53,12 @@ type DetectionState =
  * Derives the initial {@link DetectionState} from synchronous signals.
  *
  * Checks, in order:
- * 1. Whether the URL scheme is HTTP(S) -- non-HTTP(S) URLs (e.g. `asset://`)
- *    immediately resolve to `{ status: 'idle' }`.
- * 2. The fast synchronous check via {@link isImageUrlQuick} (extension + domain).
- * 3. The session-level LRU cache ({@link imageDetectionCache}).
+ * 1. Whether the URL is a local `asset://localhost/` path with a known image
+ *    extension — resolves immediately to `{ status: 'confirmed' }` (Layer 4).
+ * 2. Whether the URL scheme is HTTP(S) -- non-HTTP(S) URLs that don't match
+ *    the above resolve to `{ status: 'idle' }` (button hidden).
+ * 3. The fast synchronous check via {@link isImageUrlQuick} (extension + domain).
+ * 4. The session-level LRU cache ({@link imageDetectionCache}).
  *
  * If none of the above produce a definitive answer the state falls back to
  * `{ status: 'checking' }`, signalling that an async HEAD request is needed.
@@ -61,6 +67,10 @@ type DetectionState =
  * @returns The initial detection state for the URL.
  */
 function computeInitialState(url: string): DetectionState {
+  // Layer 4: local asset:// files with a known image extension.
+  if (url.startsWith('asset://localhost/') && isImageUrlByExtension(url)) {
+    return { status: 'confirmed' }
+  }
   if (!url.startsWith('http://') && !url.startsWith('https://')) {
     return { status: 'idle' }
   }
