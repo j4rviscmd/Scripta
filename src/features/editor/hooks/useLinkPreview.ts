@@ -1,4 +1,5 @@
 import type { BlockNoteEditor } from '@blocknote/core'
+import { convertFileSrc } from '@tauri-apps/api/core'
 import { useCallback, useRef } from 'react'
 import {
   checkUrlContentType,
@@ -6,7 +7,11 @@ import {
 } from '../api/imageUrlDetection'
 import { fetchLinkTitle } from '../api/linkPreview'
 import { findBlockRecursive, urlToImageName } from '../lib/imageBlockUtils'
-import { imageDetectionCache, isImageUrlQuick } from '../lib/imageUrlDetection'
+import {
+  imageDetectionCache,
+  isImageUrlByExtension,
+  isImageUrlQuick,
+} from '../lib/imageUrlDetection'
 import { parseMarkdownWithColumns } from '../lib/multiColumnMarkdown'
 
 /** Matches a standalone HTTP or HTTPS URL at the start of a string. */
@@ -185,6 +190,48 @@ export function useLinkPreview() {
       }
 
       const url = clipboardText.trim()
+
+      // Layer 4: local asset:// URLs with an image extension.
+      // These are produced when the user copies the URL of an already-localised
+      // image block and pastes it into the editor.  A HEAD request confirms the
+      // file still exists; 404 / network error falls back to the default handler.
+      if (url.startsWith('asset://localhost/') && isImageUrlByExtension(url)) {
+        try {
+          const res = await fetch(url, { method: 'HEAD' })
+          if (res.ok) {
+            editor.focus()
+            insertImageBlock(editor, url, editor.getTextCursorPosition().block)
+            return true
+          }
+        } catch {
+          // File not accessible — fall through
+        }
+        return defaultPasteHandler()
+      }
+
+      // Layer 5: absolute OS file paths with image extensions.
+      // Produced when the user copies a path from the Rename dialog / Finder
+      // and pastes it into the editor.  The path is re-encoded as an
+      // `asset://localhost/` URL so Tauri's asset protocol can serve it.
+      // A HEAD request confirms the file still exists before insertion.
+      if (url.startsWith('/') && isImageUrlByExtension(`file://${url}`)) {
+        const assetUrl = convertFileSrc(url)
+        try {
+          const res = await fetch(assetUrl, { method: 'HEAD' })
+          if (res.ok) {
+            editor.focus()
+            insertImageBlock(
+              editor,
+              assetUrl,
+              editor.getTextCursorPosition().block
+            )
+            return true
+          }
+        } catch {
+          // Not accessible — fall through
+        }
+        return defaultPasteHandler()
+      }
 
       if (!URL_REGEX.test(url)) {
         return defaultPasteHandler()

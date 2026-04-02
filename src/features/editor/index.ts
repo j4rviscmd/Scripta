@@ -30,6 +30,7 @@ export {
 } from './hooks/useCursorAutoHide'
 export { useCursorCentering } from './hooks/useCursorCentering'
 export { useEditorFontSize } from './hooks/useEditorFontSize'
+export { useImageAutoSave } from './hooks/useImageAutoSave'
 export type { UseSearchReplaceReturn } from './hooks/useSearchReplace'
 export { useSearchReplace } from './hooks/useSearchReplace'
 export { checklistSplitFixExtension } from './lib/checklistSplitFix'
@@ -43,6 +44,7 @@ export {
   MAX_FONT_SIZE,
   MIN_FONT_SIZE,
 } from './lib/fontSizeConfig'
+export { decodeAssetPath } from './lib/imageBlockUtils'
 export {
   ALLOWED_IMAGE_TYPES,
   IMAGE_DIR,
