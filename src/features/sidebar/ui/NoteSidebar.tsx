@@ -12,7 +12,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import { FolderCog, Search, Settings, Upload } from 'lucide-react'
+import { Bug, FolderCog, Search, Settings, Upload } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -22,6 +22,7 @@ import {
   SidebarFooter,
   SidebarSeparator,
 } from '@/components/ui/sidebar'
+import { BugReportDialog } from '@/features/bug-report'
 import type { Note } from '@/features/editor'
 import { bucketByDate, useGroupCollapse, useGroups } from '@/features/groups'
 import { SettingsDialog } from '@/features/settings'
@@ -105,6 +106,7 @@ export function NoteSidebar({
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [groupManageOpen, setGroupManageOpen] = useState(false)
   const [activeDragNoteId, setActiveDragNoteId] = useState<string | null>(null)
+  const [bugReportOpen, setBugReportOpen] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -395,6 +397,15 @@ export function NoteSidebar({
             variant="ghost"
             size="sm"
             className="w-full justify-start gap-2 text-muted-foreground"
+            onClick={() => setBugReportOpen(true)}
+          >
+            <Bug className="h-4 w-4" />
+            Report a Bug
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start gap-2 text-muted-foreground"
             onClick={() => setSettingsOpen(true)}
           >
             <Settings className="h-4 w-4" />
@@ -410,6 +421,7 @@ export function NoteSidebar({
           onDelete={remove}
         />
         <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+        <BugReportDialog open={bugReportOpen} onOpenChange={setBugReportOpen} />
         <DeleteNoteDialog
           noteId={deleteTarget}
           onClose={() => setDeleteTarget(null)}
