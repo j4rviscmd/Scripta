@@ -16,6 +16,14 @@ const DEFAULT_WIDTH: f64 = 1200.0;
 /// Default window height in logical pixels when no saved geometry is restored.
 const DEFAULT_HEIGHT: f64 = 800.0;
 
+/// Minimum window width in logical pixels. Prevents the window from being
+/// resized to a width where the two-pane layout becomes unusable.
+const MIN_WIDTH: f64 = 800.0;
+
+/// Minimum window height in logical pixels. Prevents the window from being
+/// resized to a height where the editor area is too small to use.
+const MIN_HEIGHT: f64 = 600.0;
+
 /// Title displayed in the window title bar at creation time.
 const WINDOW_TITLE: &str = "Scripta";
 
@@ -49,6 +57,10 @@ struct WindowGeometry {
 /// opens at the saved coordinates. Otherwise it opens at the default
 /// 1200×800 size, centred by the OS.
 ///
+/// A minimum inner size of [`MIN_WIDTH`] × [`MIN_HEIGHT`] is enforced
+/// via [`WebviewWindowBuilder::min_inner_size`] so the OS prevents the
+/// user from shrinking the window below the usable threshold at runtime.
+///
 /// The window is created with `resizable(false)` and
 /// `maximizable(false)` so the splash screen cannot be resized.
 /// The frontend unlocks these constraints once the splash has faded
@@ -62,6 +74,7 @@ pub fn create_main_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Err
         .title(WINDOW_TITLE)
         .resizable(false)
         .maximizable(false)
+        .min_inner_size(MIN_WIDTH, MIN_HEIGHT)
         .disable_drag_drop_handler();
 
     builder = match geometry {
@@ -114,6 +127,12 @@ pub fn save_window_geometry(app: &AppHandle) {
 /// Reads the saved geometry from `config.json` if restoration is
 /// enabled and the saved position and size fit within a visible monitor.
 ///
+/// Before the monitor bounds check, the restored `width` and `height`
+/// are clamped to [`MIN_WIDTH`] and [`MIN_HEIGHT`] respectively. This
+/// ensures that geometry written by an older version of the application
+/// (before the minimum size was introduced) never produces a window
+/// smaller than the current OS-enforced constraint.
+///
 /// Returns `None` when:
 /// - The `windowStateRestoreEnabled` setting is `false`.
 /// - No saved geometry exists.
@@ -133,12 +152,16 @@ fn read_saved_geometry(app: &AppHandle) -> Option<WindowGeometry> {
     }
 
     let raw = store.get(GEOMETRY_STORE_KEY)?;
-    let geo: WindowGeometry = serde_json::from_value(raw).ok()?;
+    let mut geo: WindowGeometry = serde_json::from_value(raw).ok()?;
 
-    let is_valid = geo.width > 0.0
-        && geo.height > 0.0
-        && is_position_on_screen(app, geo.x, geo.y)
-        && fits_on_any_monitor(app, geo.width, geo.height);
+    // Clamp restored size to the enforced minimums so a geometry saved
+    // before the minimum was introduced (or on an older version) never
+    // produces a window smaller than the OS constraint.
+    geo.width = geo.width.max(MIN_WIDTH);
+    geo.height = geo.height.max(MIN_HEIGHT);
+
+    let is_valid =
+        is_position_on_screen(app, geo.x, geo.y) && fits_on_any_monitor(app, geo.width, geo.height);
 
     if is_valid {
         Some(geo)
