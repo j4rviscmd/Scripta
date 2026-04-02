@@ -1,6 +1,6 @@
 import type { BlockNoteEditor } from '@blocknote/core'
 import { Check, Copy } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { decodeAssetPath } from '../lib/imageBlockUtils'
 import type { RenameDialogState } from './RenameButton'
 
 /**
@@ -18,17 +19,24 @@ import type { RenameDialogState } from './RenameButton'
  * Matches the copy-button pattern used in the export toast
  * (3 s checkmark confirmation).  The path is visually truncated
  * with an ellipsis when it overflows.
+ *
+ * For `asset://localhost/` URLs (locally saved images) the display text is
+ * decoded to the OS file-system path (e.g. `/Users/.../images/uuid.jpg`)
+ * so the user can read it. The clipboard receives the decoded path so the
+ * user gets a usable file-system path when copying.
  */
 function PathRow({ path }: { path: string }) {
   const [copied, setCopied] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  const displayPath = useMemo(() => decodeAssetPath(path), [path])
 
   const handleCopy = useCallback(
     async (e: React.MouseEvent) => {
       e.stopPropagation()
       e.preventDefault()
       try {
-        await navigator.clipboard.writeText(path)
+        await navigator.clipboard.writeText(displayPath)
         setCopied(true)
         clearTimeout(timer.current)
         timer.current = setTimeout(() => setCopied(false), 3000)
@@ -36,7 +44,7 @@ function PathRow({ path }: { path: string }) {
         // clipboard access failed
       }
     },
-    [path]
+    [displayPath]
   )
 
   useEffect(() => () => clearTimeout(timer.current), [])
@@ -57,9 +65,9 @@ function PathRow({ path }: { path: string }) {
       </button>
       <span
         className="min-w-0 truncate text-muted-foreground text-xs select-text"
-        title={path}
+        title={displayPath}
       >
-        {path}
+        {displayPath}
       </span>
     </div>
   )

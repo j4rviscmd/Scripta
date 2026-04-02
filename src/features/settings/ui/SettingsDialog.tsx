@@ -14,6 +14,7 @@ import { CursorAutoHideOption } from './CursorAutoHideOption'
 import { CursorCenteringOption } from './CursorCenteringOption'
 import { EditorFontOption } from './EditorFontOption'
 import { FontSizeOption } from './FontSizeOption'
+import { ImageAutoSaveOption } from './ImageAutoSaveOption'
 import { ThemeOption } from './ThemeOption'
 import { ToolbarOption } from './ToolbarOption'
 import { TranslationLangOption } from './TranslationLangOption'
@@ -30,7 +31,14 @@ interface SettingsDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-/** Available theme choices displayed as selectable rows inside the dialog. */
+/**
+ * Available theme choices displayed as selectable rows inside the dialog.
+ *
+ * Each entry maps a {@link Theme} value to a human-readable label and a
+ * Lucide icon component for visual identification.
+ *
+ * @see ThemeOption - The component that renders each individual row.
+ */
 const themeOptions: Array<{ value: Theme; label: string; icon: LucideIcon }> = [
   { value: 'light', label: 'Light', icon: Sun },
   { value: 'dark', label: 'Dark', icon: Moon },
@@ -93,7 +101,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         <Separator />
         <WindowStateOption />
         <Separator />
+        <ImageAutoSaveOption />
+        <Separator />
         <TranslationLangOption />
+        <Separator />
         <CheckForUpdatesOption />
       </DialogContent>
     </Dialog>
