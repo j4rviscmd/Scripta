@@ -118,21 +118,21 @@ function inlineContentToMd(content: PartialBlock['content']): string {
  * @param editor - The BlockNoteEditor instance used for fallback conversion
  * @returns Markdown string for the given block
  */
-function blockToMd(block: PartialBlock, editor: BlockNoteEditor): string {
+export function blockToMd(
+  block: PartialBlock,
+  editor: BlockNoteEditor
+): string {
   if (isColumnListBlock(block)) {
     return columnListToMd(block, editor)
   }
 
   if (isToggleBlock(block)) {
     const title = inlineContentToMd(block.content)
-    let body = ''
-    if (block.children && block.children.length > 0) {
-      body =
-        '\n' +
-        block.children.map((child) => blockToMd(child, editor)).join('\n\n') +
-        '\n'
-    }
-    return `<details>\n<summary>${title}</summary>${body}</details>`
+    const body = (block.children ?? [])
+      .map((child) => blockToMd(child, editor))
+      .join('\n\n')
+    const bodyContent = body ? `\n${body}\n` : ''
+    return `<details>\n<summary>${title}</summary>${bodyContent}</details>`
   }
 
   return editor.blocksToMarkdownLossy([block]).trimEnd()
@@ -155,13 +155,7 @@ export function exportToMarkdown(editor: BlockNoteEditor): string {
   while (i < blocks.length) {
     const block = blocks[i]
 
-    if (isToggleBlock(block)) {
-      segments.push(blockToMd(block, editor))
-      i++
-      continue
-    }
-
-    if (isColumnListBlock(block)) {
+    if (isToggleBlock(block) || isColumnListBlock(block)) {
       segments.push(blockToMd(block, editor))
       i++
       continue
@@ -190,7 +184,7 @@ export function exportToMarkdown(editor: BlockNoteEditor): string {
     i++
   }
 
-  return segments.filter((s) => s.length > 0).join('\n\n')
+  return segments.filter(Boolean).join('\n\n')
 }
 
 /**
