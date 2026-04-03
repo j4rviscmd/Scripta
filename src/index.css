@@ -741,3 +741,40 @@ html.cursor-autohide-hidden :is(
   color: hsl(var(--muted-foreground));
   font-size: 13px;
 }
+
+/*
+ * Image loading skeleton.
+ *
+ * useImageLoadingIndicator sets `data-img-loading="true"` on the
+ * `.bn-visual-media-wrapper` parent while the child `<img>` has not yet fired
+ * its `load` or `error` event. The attribute is removed on completion, which
+ * triggers the opacity transition below for a smooth fade-in.
+ *
+ * --muted is a complete oklch() value — use var(--muted) directly, not hsl().
+ */
+@keyframes img-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.bn-visual-media-wrapper[data-img-loading="true"] {
+  min-height: 120px;
+  border-radius: 8px;
+  background: var(--muted);
+  animation: img-skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Keep the img invisible while loading to avoid a flash of broken layout. */
+.bn-visual-media-wrapper[data-img-loading="true"] img {
+  opacity: 0;
+}
+
+/* Fade the image in after the skeleton is removed. */
+.bn-visual-media-wrapper img {
+  transition: opacity 300ms ease;
+}

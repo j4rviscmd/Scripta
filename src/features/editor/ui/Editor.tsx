@@ -77,6 +77,7 @@ import { useCopyToast } from '../hooks/useCopyToast'
 import { useEditorFontSize } from '../hooks/useEditorFontSize'
 import { useImageAutoSave } from '../hooks/useImageAutoSave'
 import { useImageErrorFallback } from '../hooks/useImageErrorFallback'
+import { useImageLoadingIndicator } from '../hooks/useImageLoadingIndicator'
 import { useImageLocalizationScanner } from '../hooks/useImageLocalizationScanner'
 import { useLinkClickHandler } from '../hooks/useLinkClickHandler'
 import { useLinkPreview } from '../hooks/useLinkPreview'
@@ -455,6 +456,8 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   )
   /** Replaces broken image elements (404 / deleted local file) with a placeholder. */
   useImageErrorFallback(editorContainerRef)
+  /** Shows an animate-pulse skeleton while each image is loading. */
+  useImageLoadingIndicator(editorContainerRef)
 
   /**
    * After every file upload completes, ensure the uploaded image block has a
