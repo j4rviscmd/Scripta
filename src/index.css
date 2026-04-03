@@ -648,6 +648,17 @@ html.cursor-autohide-hidden .bn-side-menu {
 }
 
 /*
+ * Hide the side menu (drag handle) when the cursor is hovering the sidebar.
+ *
+ * The NoteSidebar component sets `data-sidebar-hover` on <html> via
+ * mouseenter/mouseleave handlers.  This prevents the drag handle from
+ * appearing behind the sidebar while the user is interacting with it.
+ */
+html[data-sidebar-hover] .bn-side-menu {
+  display: none !important;
+}
+
+/*
  * Interactive overlays that keep the cursor visible during auto-hide.
  *
  * The `:is()` pseudo-class avoids repeating the `html.cursor-autohide-hidden`
