@@ -67,6 +67,18 @@ interface NoteSidebarProps {
 }
 
 /**
+ * Sets or clears the `data-sidebar-hover` attribute on the root element,
+ * used by CSS to hide drag handles while the cursor is outside the sidebar.
+ */
+function setSidebarHoverState(hovering: boolean): void {
+  if (hovering) {
+    document.documentElement.dataset.sidebarHover = ''
+  } else {
+    delete document.documentElement.dataset.sidebarHover
+  }
+}
+
+/**
  * Sidebar component displaying notes organised by groups and date.
  *
  * Renders pinned notes at the top, followed by collapsible group
@@ -375,7 +387,10 @@ export function NoteSidebar({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <Sidebar>
+      <Sidebar
+        onMouseEnter={() => setSidebarHoverState(true)}
+        onMouseLeave={() => setSidebarHoverState(false)}
+      >
         <SidebarSearch
           query={searchQuery}
           onQueryChange={setSearchQuery}

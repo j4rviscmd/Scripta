@@ -1,0 +1,51 @@
+diff --git a/node_modules/@blocknote/xl-multi-column/dist/blocknote-xl-multi-column.js b/node_modules/@blocknote/xl-multi-column/dist/blocknote-xl-multi-column.js
+index 628c18f..fe75a37 100644
+--- a/node_modules/@blocknote/xl-multi-column/dist/blocknote-xl-multi-column.js
++++ b/node_modules/@blocknote/xl-multi-column/dist/blocknote-xl-multi-column.js
+@@ -344,26 +344,32 @@ function me(e) {
+             content: void 0,
+             id: Z.options.generateID()
+           });
+-          e.getBlock(i.id) && e.removeBlocks([i]), e.updateBlock(a, {
+-            children: b
++          e.transact(() => {
++            e.getBlock(i.id) && e.removeBlocks([i]);
++            e.updateBlock(a, {
++              children: b
++            });
+           });
+         } else {
+           const r = y(s.bnBlock.node, e.pmSchema);
+           if (r.id === i.id)
+             return !0;
+           const a = l.position === "left" ? [i, r] : [r, i];
+-          e.getBlock(i.id) && e.removeBlocks([i]), e.replaceBlocks(
+-            [r],
+-            [
+-              {
+-                type: "columnList",
+-                children: a.map((c) => ({
+-                  type: "column",
+-                  children: [c]
+-                }))
+-              }
+-            ]
+-          );
++          e.transact(() => {
++            e.getBlock(i.id) && e.removeBlocks([i]);
++            e.replaceBlocks(
++              [r],
++              [
++                {
++                  type: "columnList",
++                  children: a.map((c) => ({
++                    type: "column",
++                    children: [c]
++                  }))
++                }
++              ]
++            );
++          });
+         }
+         return !0;
+       }
