@@ -139,12 +139,17 @@ export function TranslationDialog({
         </DialogHeader>
         <div className="flex items-center gap-4 py-2">
           <div className="flex-1">
-            <label className="mb-1 block text-sm font-medium">From</label>
+            <label
+              htmlFor="dialog-source-lang"
+              className="mb-1 block text-sm font-medium"
+            >
+              From
+            </label>
             <Select
               value={sourceLang}
               onValueChange={(v) => v && setSourceLang(v)}
             >
-              <SelectTrigger>
+              <SelectTrigger id="dialog-source-lang">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -158,12 +163,17 @@ export function TranslationDialog({
             </Select>
           </div>
           <div className="flex-1">
-            <label className="mb-1 block text-sm font-medium">To</label>
+            <label
+              htmlFor="dialog-target-lang"
+              className="mb-1 block text-sm font-medium"
+            >
+              To
+            </label>
             <Select
               value={targetLang}
               onValueChange={(v) => v != null && setTargetLang(v)}
             >
-              <SelectTrigger>
+              <SelectTrigger id="dialog-target-lang">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

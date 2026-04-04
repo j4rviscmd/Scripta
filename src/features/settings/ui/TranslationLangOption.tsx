@@ -73,9 +73,14 @@ export function TranslationLangOption() {
       </p>
       <div className="flex items-center gap-4 px-3">
         <div className="flex-1">
-          <label className="mb-1 block text-sm font-medium">From</label>
+          <label
+            htmlFor="settings-source-lang"
+            className="mb-1 block text-sm font-medium"
+          >
+            From
+          </label>
           <Select value={sourceLang} onValueChange={handleSourceChange}>
-            <SelectTrigger className="w-full">
+            <SelectTrigger id="settings-source-lang" className="w-full">
               {langName(sourceLang)}
             </SelectTrigger>
             <SelectContent>
@@ -89,9 +94,14 @@ export function TranslationLangOption() {
           </Select>
         </div>
         <div className="flex-1">
-          <label className="mb-1 block text-sm font-medium">To</label>
+          <label
+            htmlFor="settings-target-lang"
+            className="mb-1 block text-sm font-medium"
+          >
+            To
+          </label>
           <Select value={targetLang} onValueChange={handleTargetChange}>
-            <SelectTrigger className="w-full">
+            <SelectTrigger id="settings-target-lang" className="w-full">
               {langName(targetLang)}
             </SelectTrigger>
             <SelectContent>
