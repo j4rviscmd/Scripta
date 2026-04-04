@@ -4,7 +4,7 @@ import SwiftRs
 @preconcurrency import Translation
 
 /// A thread-safe wrapper for sharing mutable state across concurrency boundaries.
-private final class ThreadSafeBox<T>: @unchecked Sendable {
+final class ThreadSafeBox<T>: @unchecked Sendable {
     private var _value: T
     private let lock = NSLock()
 

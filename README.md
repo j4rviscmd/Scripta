@@ -41,6 +41,18 @@ Write the way you want — with headings, lists, checklists, code blocks, tables
 - Highlight, bold, italic, strikethrough, and colored text
 - Find and replace with regex support
 
+### On-Device AI
+
+> [!NOTE]
+> Requires macOS 26 or later with Apple Intelligence enabled.
+
+<p align="center">
+  <img src="public/screenshot_summarization.png" alt="Summarization demo" width="600" />
+</p>
+
+- **Translation** — Translate your notes into another language with a single click, powered entirely on-device by Apple Intelligence.
+- **Summarization** — Get a concise summary of your notes, triggered manually or automatically after saving. Long notes are recursively chunked and condensed for accurate results.
+
 ### Organize Your Way
 
 Keep your notes tidy with **groups**, **pinned notes**, and **search**.

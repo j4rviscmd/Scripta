@@ -10,6 +10,7 @@ import {
   Palette,
   Shield,
   Heart,
+  Sparkles,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -58,6 +59,11 @@ const FEATURES = [
     icon: Globe,
     title: 'Markdown Import / Export',
     description: 'Your notes are plain Markdown files. Import and export anytime — zero lock-in.',
+  },
+  {
+    icon: Sparkles,
+    title: 'On-Device AI',
+    description: 'Translate and summarize your notes with Apple Intelligence — private, fast, and entirely on-device. Requires macOS 26+.',
   },
   {
     icon: Heart,
