@@ -104,6 +104,7 @@ impl EncoderState {
 /// `[0, code_count)` → code texts, `[code_count, code_count+tc_count)` →
 /// textColor values, `[code_count+tc_count, code_count+tc_count+bc_count)` →
 /// backgroundColor values, `[code_count+tc_count+bc_count, ..)` → link hrefs.
+#[allow(clippy::type_complexity)]
 fn extract_block_texts(
     content_json: &str,
 ) -> Result<(Vec<String>, Vec<String>, usize, usize, usize), String> {
@@ -625,6 +626,7 @@ fn extract_title_from_content(content_json: &str) -> String {
 // --- Shared translation logic -----------------------------------------------
 
 /// Known style keys used in open/close markers.
+#[cfg(target_os = "macos")]
 const KNOWN_KEYS_LIST: &[char] = &['0', '1', '2', '3', '4', '5', '7', '9'];
 
 /// Encode style markers before sending to Apple Translation.
@@ -638,6 +640,7 @@ const KNOWN_KEYS_LIST: &[char] = &['0', '1', '2', '3', '4', '5', '7', '9'];
 ///
 /// These are visible, standard Unicode symbols preserved verbatim by translation
 /// models.  We restore the originals after translation before returning.
+#[cfg(target_os = "macos")]
 fn encode_for_translation(text: &str) -> String {
     let mut s = text.to_owned();
     for &key in KNOWN_KEYS_LIST {
@@ -648,6 +651,7 @@ fn encode_for_translation(text: &str) -> String {
 }
 
 /// Restore encoded markers back to `[[N]]` / `[[/N]]` after translation.
+#[cfg(target_os = "macos")]
 fn decode_from_translation(text: &str) -> String {
     let mut s = text.to_owned();
     for &key in KNOWN_KEYS_LIST {
@@ -1045,7 +1049,7 @@ pub async fn translate_blocks_streaming(
                         .texts
                         .iter()
                         .map(|text| {
-                            translate_texts(&[text.clone()], &src, &tgt)
+                            translate_texts(std::slice::from_ref(text), &src, &tgt)
                                 .ok()
                                 .and_then(|mut v| v.pop())
                                 .unwrap_or_else(|| text.clone())
