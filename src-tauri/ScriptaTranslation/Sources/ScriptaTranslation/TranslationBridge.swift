@@ -3,6 +3,21 @@ import NaturalLanguage
 import SwiftRs
 @preconcurrency import Translation
 
+/// A thread-safe wrapper for sharing mutable state across concurrency boundaries.
+private final class ThreadSafeBox<T>: @unchecked Sendable {
+    private var _value: T
+    private let lock = NSLock()
+
+    init(_ value: T) {
+        self._value = value
+    }
+
+    var value: T {
+        get { lock.withLock { _value } }
+        set { lock.withLock { _value = newValue } }
+    }
+}
+
 /// Checks whether the Apple Translation framework is available.
 ///
 /// - Returns: `true` if the current system is macOS 26.0 or later,
@@ -58,7 +73,7 @@ public func scriptaGetSupportedLanguages() -> SRString {
         return SRString("[]")
     }
 
-    nonisolated(unsafe) var result = "[]"
+    let result = ThreadSafeBox("[]")
     let semaphore = DispatchSemaphore(value: 0)
 
     // Use a detached task to avoid @MainActor deadlock when called from main thread
@@ -81,7 +96,7 @@ public func scriptaGetSupportedLanguages() -> SRString {
 
             return "{\"code\":\"\(fullCode)\",\"name\":\"\(name.replacingOccurrences(of: "\"", with: "\\\""))\"}"
         }
-        result = "[\(entries.joined(separator: ","))]"
+        result.value = "[\(entries.joined(separator: ","))]"
         semaphore.signal()
     }
 
@@ -89,7 +104,7 @@ public func scriptaGetSupportedLanguages() -> SRString {
     if waitResult == .timedOut {
         return SRString("[]")
     }
-    return SRString(result)
+    return SRString(result.value)
 }
 
 /// Checks whether a language pair is installed, supported (not downloaded), or unsupported.
@@ -120,7 +135,7 @@ public func scriptaCheckLanguagePairStatus(
     let sourceLanguage = Locale.Language(identifier: sourceLang.toString())
     let targetLanguage = Locale.Language(identifier: targetLang.toString())
 
-    nonisolated(unsafe) var result = "unsupported"
+    let result = ThreadSafeBox("unsupported")
     let semaphore = DispatchSemaphore(value: 0)
 
     Task { @MainActor in
@@ -128,13 +143,13 @@ public func scriptaCheckLanguagePairStatus(
         let status = await availability.status(from: sourceLanguage, to: targetLanguage)
         switch status {
         case .installed:
-            result = "installed"
+            result.value = "installed"
         case .supported:
-            result = "supported"
+            result.value = "supported"
         case .unsupported:
-            result = "unsupported"
+            result.value = "unsupported"
         @unknown default:
-            result = "unsupported"
+            result.value = "unsupported"
         }
         semaphore.signal()
     }
@@ -143,7 +158,7 @@ public func scriptaCheckLanguagePairStatus(
     if waitResult == .timedOut {
         return SRString("unsupported")
     }
-    return SRString(result)
+    return SRString(result.value)
 }
 
 /// Batch translates texts joined by null bytes.
@@ -207,18 +222,14 @@ public func scriptaTranslateBatch(
         return SRString("ERROR:Source and target languages are the same (\(sourceBase)). Choose a different target language.")
     }
 
-    nonisolated(unsafe) var translatedTexts: [String] = []
-    nonisolated(unsafe) var errorMessage: String? = nil
+    let translatedTexts = ThreadSafeBox<[String]>([])
+    let errorMessage = ThreadSafeBox<String?>(nil)
     let semaphore = DispatchSemaphore(value: 0)
-
-    nonisolated(unsafe) let requests = inputTexts.map {
-        TranslationSession.Request(sourceText: $0)
-    }
 
     Task { @MainActor in
         do {
             guard #available(macOS 26.0, *) else {
-                errorMessage = "ERROR:macOS 26.0+ required for translation"
+                errorMessage.value = "ERROR:macOS 26.0+ required for translation"
                 semaphore.signal()
                 return
             }
@@ -230,7 +241,7 @@ public func scriptaTranslateBatch(
             let availability = LanguageAvailability()
             let status = await availability.status(from: sourceLanguage, to: targetLanguage)
             if case .unsupported = status {
-                errorMessage = "ERROR:Language pair (\(sourceLangCode) → \(targetLangCode)) is not supported."
+                errorMessage.value = "ERROR:Language pair (\(sourceLangCode) → \(targetLangCode)) is not supported."
                 semaphore.signal()
                 return
             }
@@ -239,10 +250,14 @@ public func scriptaTranslateBatch(
                 installedSource: sourceLanguage,
                 target: targetLanguage
             )
-            let responses = try await session.translations(from: requests)
-            translatedTexts = responses.map { $0.targetText }
+            var results: [String] = []
+            for text in inputTexts {
+                let response = try await session.translate(text)
+                results.append(response.targetText)
+            }
+            translatedTexts.value = results
         } catch {
-            errorMessage = "ERROR:\(error.localizedDescription)"
+            errorMessage.value = "ERROR:\(error.localizedDescription)"
         }
         semaphore.signal()
     }
@@ -251,11 +266,11 @@ public func scriptaTranslateBatch(
     if waitResult == .timedOut {
         return SRString("ERROR:Translation timed out")
     }
-    if let err = errorMessage {
+    if let err = errorMessage.value {
         return SRString(err)
     }
 
-    return SRString(translatedTexts.joined(separator: "\0"))
+    return SRString(translatedTexts.value.joined(separator: "\0"))
 }
 
 /// Translates a single text string.
@@ -313,14 +328,14 @@ public func scriptaTranslateSingle(
         return SRString("ERROR:Source and target languages are the same (\(sourceBase)). Choose a different target language.")
     }
 
-    nonisolated(unsafe) var translatedText: String = ""
-    nonisolated(unsafe) var errorMessage: String? = nil
+    let translatedText = ThreadSafeBox("")
+    let errorMessage = ThreadSafeBox<String?>(nil)
     let semaphore = DispatchSemaphore(value: 0)
 
     Task { @MainActor in
         do {
             guard #available(macOS 26.0, *) else {
-                errorMessage = "ERROR:macOS 26.0+ required for translation"
+                errorMessage.value = "ERROR:macOS 26.0+ required for translation"
                 semaphore.signal()
                 return
             }
@@ -330,7 +345,7 @@ public func scriptaTranslateSingle(
             let availability = LanguageAvailability()
             let status = await availability.status(from: sourceLanguage, to: targetLanguage)
             if case .unsupported = status {
-                errorMessage = "ERROR:Language pair (\(sourceLangCode) → \(targetLangCode)) is not supported."
+                errorMessage.value = "ERROR:Language pair (\(sourceLangCode) → \(targetLangCode)) is not supported."
                 semaphore.signal()
                 return
             }
@@ -339,14 +354,10 @@ public func scriptaTranslateSingle(
                 installedSource: sourceLanguage,
                 target: targetLanguage
             )
-            let responses = try await session.translations(
-                from: [TranslationSession.Request(sourceText: inputText)]
-            )
-            if let first = responses.first {
-                translatedText = first.targetText
-            }
+            let response = try await session.translate(inputText)
+            translatedText.value = response.targetText
         } catch {
-            errorMessage = "ERROR:\(error.localizedDescription)"
+            errorMessage.value = "ERROR:\(error.localizedDescription)"
         }
         semaphore.signal()
     }
@@ -355,9 +366,9 @@ public func scriptaTranslateSingle(
     if waitResult == .timedOut {
         return SRString("ERROR:Translation timed out")
     }
-    if let err = errorMessage {
+    if let err = errorMessage.value {
         return SRString(err)
     }
 
-    return SRString(translatedText)
+    return SRString(translatedText.value)
 }
