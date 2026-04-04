@@ -241,13 +241,7 @@ function AppContent() {
         translateNoteHandlerRef.current?.(id)
       })
     }
-  }, [
-    onCursorLoaded,
-    onScrollLoaded,
-    pendingTranslationId,
-    selectedNoteId,
-    editorRef,
-  ])
+  }, [onCursorLoaded, onScrollLoaded, pendingTranslationId, selectedNoteId])
   useScrollIsolation(scrollContainerRef, {
     selectors: [
       '.bn-suggestion-menu',
@@ -415,15 +409,12 @@ function AppContent() {
    *
    * @param id - The ID of the note that was saved.
    */
-  const handleNoteSaved = useCallback(
-    (id: string) => {
-      setSelectedNoteId((current) => (current === null ? id : current))
-      setRefreshKey((v) => v + 1)
-      setSaveCount((v) => v + 1)
-      setContentLength(computeEditorTextLength(editorRef))
-    },
-    [editorRef]
-  )
+  const handleNoteSaved = useCallback((id: string) => {
+    setSelectedNoteId((current) => (current === null ? id : current))
+    setRefreshKey((v) => v + 1)
+    setSaveCount((v) => v + 1)
+    setContentLength(computeEditorTextLength(editorRef))
+  }, [])
 
   /**
    * Callback invoked when the lock state of the loaded note is determined.

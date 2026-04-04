@@ -152,7 +152,7 @@ export function useSummarization({
     })
   }, [contentLength, dispatch])
 
-  // Cleanup on unmount / note switch
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional — abort previous request on note switch
   useEffect(() => {
     return () => {
       abortRef.current = true
