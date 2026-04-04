@@ -7,10 +7,7 @@ import {
   defaultBlockSpecs,
   defaultStyleSpecs,
 } from '@blocknote/core'
-import {
-  type DefaultSuggestionItem,
-  filterSuggestionItems,
-} from '@blocknote/core/extensions'
+import { filterSuggestionItems } from '@blocknote/core/extensions'
 import * as locales from '@blocknote/core/locales'
 import {
   AddBlockButton,
@@ -37,7 +34,7 @@ import {
 import { invoke } from '@tauri-apps/api/core'
 import { save } from '@tauri-apps/plugin-dialog'
 import { Code } from '@tiptap/extension-code'
-import { Copy, Download, Link, Trash2 } from 'lucide-react'
+import { Copy, Download, Languages, Link, Trash2 } from 'lucide-react'
 import type { Transaction } from 'prosemirror-state'
 import {
   forwardRef,
@@ -48,7 +45,6 @@ import {
   useRef,
   useState,
 } from 'react'
-import { Languages } from 'lucide-react'
 import { toast } from 'sonner'
 import { useEditorFont } from '@/app/providers/editor-font-provider'
 import { useTheme } from '@/app/providers/theme-provider'
@@ -118,11 +114,6 @@ import '@blocknote/core/fonts/inter.css'
 const BLOCKS = DEFAULT_BLOCKS as any
 
 /**
- * Slash menu item keys permanently hidden because the upload handler only
- * supports images. Audio, Video, and File commands would fail on use.
- */
-const HIDDEN_SLASH_MENU_KEYS = new Set<string>(['audio', 'video', 'file'])
-
 /**
  * Extracts the file extension from a filename or URL (lowercase, without dot).
  * Returns `undefined` if the string has no recognisable extension.
@@ -452,7 +443,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     async (query: string) => {
       const defaults = combineByGroup(
         getDefaultReactSlashMenuItems(editor),
-        getMultiColumnSlashMenuItems(editor),
+        getMultiColumnSlashMenuItems(editor)
       )
       if (!onTranslate) return filterSuggestionItems(defaults, query)
       const translateItem = {
@@ -466,7 +457,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       const all = [...defaults, translateItem]
       return filterSuggestionItems(all, query)
     },
-    [editor, onTranslate],
+    [editor, onTranslate]
   )
 
   // Sync the locked prop to the module-level flag read by the ProseMirror plugin.

@@ -8,7 +8,17 @@ export interface TranslatedBlock {
 
 /** Events streamed from the backend during parallel translation. */
 export type TranslationStreamEvent =
-  | { event: 'started'; data: { totalChunks: number; totalBlocks: number } }
+  | {
+      event: 'started'
+      data: {
+        totalChunks: number
+        totalBlocks: number
+        paramMap: string[]
+        paramCodeCount: number
+        paramTcCount: number
+        paramBcCount: number
+      }
+    }
   | {
       event: 'chunkCompleted'
       data: {
@@ -34,7 +44,7 @@ export async function translateBlocksStreaming(
   content: string,
   sourceLang: string,
   targetLang: string,
-  onEvent: (event: TranslationStreamEvent) => void,
+  onEvent: (event: TranslationStreamEvent) => void
 ): Promise<void> {
   const channel = new Channel<TranslationStreamEvent>()
   channel.onmessage = onEvent

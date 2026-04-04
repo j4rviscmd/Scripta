@@ -16,22 +16,59 @@ const TRANSLATABLE_BLOCK_TYPES = new Set([
 // Decodes placeholder tokens produced by the Rust backend back into
 // BlockNote inline content arrays.  Token format:
 //
-//   {{C:text}}            code
-//   {{B:text}}            bold
-//   {{I:text}}            italic
-//   {{S:text}}            strikethrough
-//   {{U:text}}            underline
-//   {{TC:#hexcolor|text}}  textColor
-//   {{BC:#hexcolor|text}}  backgroundColor
-//   {{L:href|text}}       link (inner text is recursively encoded)
+//   [[0]]...[[/0]]    code
+//   [[1]]...[[/1]]    bold
+//   [[2]]...[[/2]]    italic
+//   [[3]]...[[/3]]    strikethrough
+//   [[4]]...[[/4]]    underline
+//   [[5]]...[[/5]]    textColor
+//   [[9]]...[[/9]]    backgroundColor
+//   [[7]]...[[/7]]    link (inner text is recursively encoded)
 
 type Tok =
   | { kind: 'Text'; value: string }
-  | { kind: 'Open'; key: string; param?: string }
+  | { kind: 'Open'; key: string }
   | { kind: 'Close' }
 
-const KNOWN_KEYS = new Set(['C', 'B', 'I', 'S', 'U', 'TC', 'BC', 'L'])
-const PARAM_KEYS = new Set(['TC', 'BC', 'L'])
+const KNOWN_KEYS = new Set(['0', '1', '2', '3', '4', '5', '7', '9'])
+
+/** Returns true if the key is a recognized style key. */
+function isKnownKey(key: string): boolean {
+  return KNOWN_KEYS.has(key)
+}
+
+/** Returns the base key (the key itself, since keys are '0'-'7'). */
+function baseKey(key: string): string {
+  return key
+}
+
+/**
+ * Per-style counters used during decoding to sequentially resolve
+ * param_map entries for styles 0 (code), 5 (textColor), 6 (backgroundColor), 7 (link).
+ * Initialise with section offsets matching the paramMap layout from the backend:
+ * `[code_params..., tc_params..., bc_params..., link_params...]`.
+ */
+export class StyleCounters {
+  private c0 = 0
+  private c5 = 0
+  private c6 = 0
+  private c7 = 0
+
+  constructor(
+    private off0: number = 0,
+    private off5: number = 0,
+    private off6: number = 0,
+    private off7: number = 0
+  ) {}
+
+  next(base: string): number {
+    if (base === '0') return this.off0 + this.c0++
+    if (base === '5') return this.off5 + this.c5++
+    if (base === '9') return this.off6 + this.c6++
+    if (base === '7') return this.off7 + this.c7++
+    return 0
+  }
+}
 
 function tokenize(s: string): Tok[] {
   const tokens: Tok[] = []
@@ -46,43 +83,34 @@ function tokenize(s: string): Tok[] {
   }
 
   while (i < s.length) {
-    if (s[i] === '{' && s[i + 1] === '{') {
-      flushText()
-      i += 2
+    if (s[i] === '[' && s[i + 1] === '[') {
+      // Look ahead for closing `]]`
+      const innerStart = i + 2
+      let k = innerStart
+      while (k + 1 < s.length && !(s[k] === ']' && s[k + 1] === ']')) k++
 
-      let key = ''
-      while (i < s.length && s[i] !== ':' && s[i] !== '~' && s[i] !== '}') {
-        key += s[i]
-        i++
-      }
+      if (k + 1 < s.length && s[k] === ']' && s[k + 1] === ']') {
+        const inner = s.slice(innerStart, k)
+        flushText()
+        i = k + 2
 
-      if (!KNOWN_KEYS.has(key) || i >= s.length || s[i] !== ':') {
-        tokens.push({ kind: 'Text', value: '{{' })
-        tokens.push({ kind: 'Text', value: key })
-        if (i < s.length && s[i] === ':') {
-          tokens.push({ kind: 'Text', value: ':' })
-          i++
+        if (inner.startsWith('/')) {
+          const key = inner.slice(1)
+          if (isKnownKey(key)) {
+            tokens.push({ kind: 'Close' })
+          } else {
+            tokens.push({ kind: 'Text', value: `[[${inner}]]` })
+          }
+        } else if (isKnownKey(inner)) {
+          tokens.push({ kind: 'Open', key: inner })
+        } else {
+          tokens.push({ kind: 'Text', value: `[[${inner}]]` })
         }
-        continue
+      } else {
+        // No closing `]]` found: treat `[[` as literal
+        textBuf += '[['
+        i += 2
       }
-      i++ // skip ':'
-
-      let param: string | undefined
-      if (PARAM_KEYS.has(key)) {
-        let p = ''
-        while (i < s.length && s[i] !== '~') {
-          p += s[i]
-          i++
-        }
-        if (i < s.length && s[i] === '~') i++
-        param = p
-      }
-
-      tokens.push({ kind: 'Open', key, param })
-    } else if (s[i] === '}' && s[i + 1] === '}') {
-      flushText()
-      tokens.push({ kind: 'Close' })
-      i += 2
     } else {
       textBuf += s[i]
       i++
@@ -95,54 +123,68 @@ function tokenize(s: string): Tok[] {
 function applyStyle(
   styles: Record<string, any>,
   key: string,
-  param?: string,
-): void {
+  paramMap: string[],
+  counters: StyleCounters
+): number | undefined {
   switch (key) {
-    case 'C':
+    case '0': {
+      // Code: index into paramMap returned so Close handler can look up the text.
+      const idx = counters.next('0')
       styles.code = true
-      break
-    case 'B':
+      return idx
+    }
+    case '1':
       styles.bold = true
-      break
-    case 'I':
+      return undefined
+    case '2':
       styles.italic = true
-      break
-    case 'S':
-      styles.strikethrough = true
-      break
-    case 'U':
+      return undefined
+    case '3':
+      styles.strike = true
+      return undefined
+    case '4':
       styles.underline = true
-      break
-    case 'TC':
-      if (param) styles.textColor = param
-      break
-    case 'BC':
-      if (param) styles.backgroundColor = param
-      break
+      return undefined
+    case '5': {
+      const idx = counters.next('5')
+      if (idx < paramMap.length) styles.textColor = paramMap[idx]
+      return idx
+    }
+    case '9': {
+      const idx = counters.next('9')
+      if (idx < paramMap.length) styles.backgroundColor = paramMap[idx]
+      return idx
+    }
+    case '7': {
+      const idx = counters.next('7')
+      return idx
+    }
+    default:
+      return undefined
   }
 }
 
 function removeStyle(styles: Record<string, any>, key: string): void {
-  switch (key) {
-    case 'C':
+  switch (baseKey(key)) {
+    case '0':
       delete styles.code
       break
-    case 'B':
+    case '1':
       delete styles.bold
       break
-    case 'I':
+    case '2':
       delete styles.italic
       break
-    case 'S':
-      delete styles.strikethrough
+    case '3':
+      delete styles.strike
       break
-    case 'U':
+    case '4':
       delete styles.underline
       break
-    case 'TC':
+    case '5':
       delete styles.textColor
       break
-    case 'BC':
+    case '9':
       delete styles.backgroundColor
       break
   }
@@ -151,11 +193,14 @@ function removeStyle(styles: Record<string, any>, key: string): void {
 function decodeRecursive(
   tokens: Tok[],
   pos: { i: number },
+  paramMap: string[],
+  counters: StyleCounters
 ): any[] {
   const result: any[] = []
   let textBuf = ''
   const activeStyles: Record<string, any> = {}
-  const styleStack: { key: string; param?: string; start: number }[] = []
+  const styleStack: { key: string; pidx: number | undefined; start: number }[] =
+    []
 
   while (pos.i < tokens.length) {
     const tok = tokens[pos.i]
@@ -172,8 +217,8 @@ function decodeRecursive(
           })
           textBuf = ''
         }
-        styleStack.push({ key: tok.key, param: tok.param, start: result.length })
-        applyStyle(activeStyles, tok.key, tok.param)
+        const pidx = applyStyle(activeStyles, tok.key, paramMap, counters)
+        styleStack.push({ key: tok.key, pidx, start: result.length })
         break
       }
       case 'Close': {
@@ -187,12 +232,29 @@ function decodeRecursive(
         }
         const frame = styleStack.pop()
         if (frame) {
+          if (frame.key === '0') {
+            // Emit code text from paramMap BEFORE removing code style so the
+            // resulting node carries {code: true}.
+            const codeText =
+              frame.pidx != null && frame.pidx < paramMap.length
+                ? paramMap[frame.pidx]
+                : ''
+            result.push({
+              type: 'text',
+              text: codeText,
+              styles: { ...activeStyles },
+            })
+          }
           removeStyle(activeStyles, frame.key)
-          if (frame.key === 'L') {
+          if (frame.key === '7') {
+            const href =
+              frame.pidx != null && frame.pidx < paramMap.length
+                ? paramMap[frame.pidx]
+                : ''
             const inner = result.splice(frame.start)
             result.push({
               type: 'link',
-              href: frame.param ?? '',
+              href,
               content: inner,
             })
           }
@@ -218,11 +280,15 @@ function decodeRecursive(
  * `encode_inline_content`) back into a BlockNote inline content array.
  * Falls back to a single plain-text node on parse failure.
  */
-export function decodeEncodedInline(encoded: string): any[] {
+export function decodeEncodedInline(
+  encoded: string,
+  paramMap: string[] = [],
+  counters: StyleCounters = new StyleCounters()
+): any[] {
   try {
     const tokens = tokenize(encoded)
     const pos = { i: 0 }
-    const nodes = decodeRecursive(tokens, pos)
+    const nodes = decodeRecursive(tokens, pos, paramMap, counters)
     if (nodes.length > 0) return nodes
   } catch {
     // Fall through to plain-text fallback
@@ -237,7 +303,7 @@ export function decodeEncodedInline(encoded: string): any[] {
  */
 export function withSuppressedHistory(
   editor: BlockNoteEditor,
-  fn: () => void,
+  fn: () => void
 ): void {
   const view = editor.prosemirrorView
   const originalDispatch = view.dispatch
@@ -267,7 +333,11 @@ export function collectTranslatableBlockIds(editor: BlockNoteEditor): string[] {
       if (TRANSLATABLE_BLOCK_TYPES.has(block.type)) {
         if (
           Array.isArray(block.content) &&
-          block.content.some((n: any) => typeof n.text === 'string' && n.text.length > 0)
+          block.content.some(
+            (n: any) =>
+              n.type === 'link' ||
+              (typeof n.text === 'string' && n.text.length > 0)
+          )
         ) {
           ids.push(block.id)
         }
@@ -291,6 +361,8 @@ export function updateBlockTextByIndex(
   flatIndex: number,
   translatedText: string,
   blockIds: string[],
+  paramMap: string[] = [],
+  counters: StyleCounters = new StyleCounters()
 ): void {
   if (flatIndex >= blockIds.length) return
   const blockId = blockIds[flatIndex]
@@ -299,7 +371,7 @@ export function updateBlockTextByIndex(
     try {
       editor.updateBlock(blockId, {
         type: undefined as any,
-        content: decodeEncodedInline(translatedText),
+        content: decodeEncodedInline(translatedText, paramMap, counters),
       } as any)
     } catch {
       // Block may have been removed during streaming; skip silently.
@@ -320,7 +392,7 @@ export function updateBlockTextByIndex(
  */
 export function commitTranslation(
   editor: BlockNoteEditor,
-  originalBlocks: any[],
+  originalBlocks: any[]
 ): void {
   const translatedDoc = structuredClone(editor.document)
 

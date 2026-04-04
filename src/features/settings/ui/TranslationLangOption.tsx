@@ -10,9 +10,9 @@ import {
   DEFAULT_SOURCE_LANG,
   DEFAULT_TARGET_LANG,
   getSupportedLanguages,
+  type SupportedLanguage,
   TRANSLATION_SOURCE_LANG_KEY,
   TRANSLATION_TARGET_LANG_KEY,
-  type SupportedLanguage,
 } from '@/features/translation'
 
 /**
@@ -29,7 +29,7 @@ export function TranslationLangOption() {
   const langName = (code: string) =>
     code === 'auto'
       ? 'Auto (Detect)'
-      : languages.find((l) => l.code === code)?.name ?? code
+      : (languages.find((l) => l.code === code)?.name ?? code)
 
   useEffect(() => {
     getSupportedLanguages()
@@ -99,7 +99,10 @@ export function TranslationLangOption() {
                 <SelectItem
                   key={lang.code}
                   value={lang.code}
-                  disabled={sourceLang !== 'auto' && baseCode(lang.code) === baseCode(sourceLang)}
+                  disabled={
+                    sourceLang !== 'auto' &&
+                    baseCode(lang.code) === baseCode(sourceLang)
+                  }
                 >
                   {lang.name}
                 </SelectItem>

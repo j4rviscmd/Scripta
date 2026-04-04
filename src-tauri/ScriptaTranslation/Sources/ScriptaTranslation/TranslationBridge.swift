@@ -156,7 +156,9 @@ public func scriptaTranslateBatch(
     nonisolated(unsafe) var errorMessage: String? = nil
     let semaphore = DispatchSemaphore(value: 0)
 
-    nonisolated(unsafe) let requests = inputTexts.map { TranslationSession.Request(sourceText: $0) }
+    nonisolated(unsafe) let requests = inputTexts.map {
+        TranslationSession.Request(sourceText: $0)
+    }
 
     Task { @MainActor in
         do {

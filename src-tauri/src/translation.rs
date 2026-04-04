@@ -53,21 +53,79 @@ const TRANSLATABLE_BLOCK_TYPES: &[&str] = &[
     "checkListItem",
 ];
 
-fn extract_block_texts(content_json: &str) -> Result<Vec<String>, String> {
+/// State accumulated while encoding one or more blocks into token strings.
+/// After encoding, `into_param_map()` returns a flat `Vec<String>` in the
+/// layout `[code_params..., tc_params..., bc_params..., link_params...]` that
+/// the frontend and the non-streaming Rust decoder use to restore values.
+/// Code text is separated so the translation engine never sees it.
+struct EncoderState {
+    code_params: Vec<String>,
+    tc_params: Vec<String>,
+    bc_params: Vec<String>,
+    link_params: Vec<String>,
+}
+
+impl EncoderState {
+    fn new() -> Self {
+        Self {
+            code_params: Vec::new(),
+            tc_params: Vec::new(),
+            bc_params: Vec::new(),
+            link_params: Vec::new(),
+        }
+    }
+
+    fn code_count(&self) -> usize {
+        self.code_params.len()
+    }
+
+    fn tc_count(&self) -> usize {
+        self.tc_params.len()
+    }
+
+    fn bc_count(&self) -> usize {
+        self.bc_params.len()
+    }
+
+    /// Returns the flat param_map: `[code_params..., tc_params..., bc_params..., link_params...]`.
+    fn into_param_map(self) -> Vec<String> {
+        let mut map = self.code_params;
+        map.extend(self.tc_params);
+        map.extend(self.bc_params);
+        map.extend(self.link_params);
+        map
+    }
+}
+
+/// Extracts encoded token strings and a flat param_map from BlockNote JSON.
+///
+/// Returns `(texts, param_map, code_count, tc_count, bc_count)` where the counts
+/// are the section boundaries needed to partition `param_map`:
+/// `[0, code_count)` → code texts, `[code_count, code_count+tc_count)` →
+/// textColor values, `[code_count+tc_count, code_count+tc_count+bc_count)` →
+/// backgroundColor values, `[code_count+tc_count+bc_count, ..)` → link hrefs.
+fn extract_block_texts(
+    content_json: &str,
+) -> Result<(Vec<String>, Vec<String>, usize, usize, usize), String> {
     let blocks: Vec<Value> =
         serde_json::from_str(content_json).map_err(|e| format!("invalid JSON: {e}"))?;
     let mut texts = Vec::new();
-    collect_texts_from_blocks(&blocks, &mut texts);
-    Ok(texts)
+    let mut state = EncoderState::new();
+    collect_texts_from_blocks(&blocks, &mut texts, &mut state);
+    let code_count = state.code_count();
+    let tc_count = state.tc_count();
+    let bc_count = state.bc_count();
+    let param_map = state.into_param_map();
+    Ok((texts, param_map, code_count, tc_count, bc_count))
 }
 
-fn collect_texts_from_blocks(blocks: &[Value], texts: &mut Vec<String>) {
+fn collect_texts_from_blocks(blocks: &[Value], texts: &mut Vec<String>, state: &mut EncoderState) {
     for block in blocks {
         let block_type = block.get("type").and_then(|t| t.as_str()).unwrap_or("");
 
         if TRANSLATABLE_BLOCK_TYPES.contains(&block_type) {
             if let Some(inline) = block.get("content").and_then(|c| c.as_array()) {
-                let block_text = encode_inline_content(inline);
+                let block_text = encode_inline_content(inline, state);
                 if !block_text.is_empty() {
                     texts.push(block_text);
                 }
@@ -75,7 +133,7 @@ fn collect_texts_from_blocks(blocks: &[Value], texts: &mut Vec<String>) {
         }
 
         if let Some(children) = block.get("children").and_then(|c| c.as_array()) {
-            collect_texts_from_blocks(children, texts);
+            collect_texts_from_blocks(children, texts, state);
         }
     }
 }
@@ -86,39 +144,47 @@ fn collect_texts_from_blocks(blocks: &[Value], texts: &mut Vec<String>) {
 //   { "type": "text", "text": "...", "styles": { "bold": true, "code": true, ... } }
 //   { "type": "link", "href": "...", "content": [ ... ] }
 //
-// To preserve styles across translation we encode styled spans as
-// placeholder tokens that Apple's translator treats as opaque text:
+// To preserve styles across translation, styled spans are encoded as
+// placeholder tokens that Apple's translator treats as opaque text.
+// Style parameters (colors, hrefs) are collected into a separate param_map
+// so they survive translation without being altered by the engine.
 //
-//   {{C:text}}            code
-//   {{B:text}}            bold
-//   {{I:text}}            italic
-//   {{S:text}}            strikethrough
-//   {{U:text}}            underline
-//   {{TC:#hexcolor~text}}  textColor
-//   {{BC:#hexcolor~text}}  backgroundColor
-//   {{L:href~text}}       link (text is recursively encoded)
+//   [[0]]    code             (param_map[code_off + code_idx] holds the original text)
+//   [[1]]    bold
+//   [[2]]    italic
+//   [[3]]    strike
+//   [[4]]    underline
+//   [[5]]    textColor        (param_map[tc_off + tc_idx])
+//   [[9]]    backgroundColor  (param_map[bc_off + bc_idx])
+//   [[7]]    link             (param_map[link_off + link_idx])
 //
-// Multiple styles are nested: {{B:{{I:bold italic}}}}
+// Multiple styles use nested open/close pairs: [[1]][[2]]bold italic[[/2]][[/1]]
+// param_map layout: [code_params..., tc_params..., bc_params..., link_params...]
+// Code text is stored in param_map so the translation engine never modifies it.
+//
+// IMPORTANT: Styled text sits BETWEEN [[N]] and [[/N]] markers so that Apple
+// Translation can translate it while leaving the opaque double-bracket markers
+// unchanged. The [[...]] format is preserved reliably by Apple Translation.
 
 /// Encodes a BlockNote inline content array into a string with style
 /// placeholder tokens, suitable for passing to the translation engine.
-fn encode_inline_content(inline: &[Value]) -> String {
+/// Color and link parameters are collected into `state` for later retrieval.
+fn encode_inline_content(inline: &[Value], state: &mut EncoderState) -> String {
     let mut out = String::new();
     for node in inline {
         let node_type = node.get("type").and_then(|t| t.as_str()).unwrap_or("");
 
         if node_type == "link" {
             if let Some(href) = node.get("href").and_then(|h| h.as_str()) {
+                // Push href before encoding inner content so that nested links
+                // are ordered consistently with pre-order traversal during decode.
+                state.link_params.push(href.to_owned());
                 let inner = node
                     .get("content")
                     .and_then(|c| c.as_array())
-                    .map(|arr| encode_inline_content(arr))
+                    .map(|arr| encode_inline_content(arr, state))
                     .unwrap_or_default();
-                out.push_str("{{L:");
-                out.push_str(href);
-                out.push('~');
-                out.push_str(&inner);
-                out.push_str("}}");
+                out.push_str(&wrap_style("7", &inner));
             }
         } else if node_type == "text" {
             if let Some(text) = node.get("text").and_then(|t| t.as_str()) {
@@ -126,7 +192,7 @@ fn encode_inline_content(inline: &[Value]) -> String {
                     continue;
                 }
                 let styles = node.get("styles").unwrap_or(&Value::Null);
-                let encoded = wrap_with_styles(text, styles);
+                let encoded = wrap_with_styles(text, styles, state);
                 out.push_str(&encoded);
             }
         }
@@ -135,52 +201,134 @@ fn encode_inline_content(inline: &[Value]) -> String {
 }
 
 /// Wraps text with style placeholder tokens based on the `styles` object.
-/// Canonical nesting order (outermost applied last): C → U → S → I → B → TC → BC.
-fn wrap_with_styles(text: &str, styles: &Value) -> String {
+/// Canonical nesting order (outermost applied last): 0→4→3→2→1→5→6.
+/// Code text is stored in `state.code_params` and replaced with an empty
+/// placeholder so the translation engine never sees it.
+fn wrap_with_styles(text: &str, styles: &Value, state: &mut EncoderState) -> String {
     let mut s = text.to_owned();
 
-    if styles.get("code").and_then(|v| v.as_bool()).unwrap_or(false) {
-        s = style_token("C", &s);
+    if styles
+        .get("code")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
+        // Store the original text in code_params; use an empty placeholder
+        // so the translation engine cannot modify it.
+        state.code_params.push(s.clone());
+        s = wrap_style("0", "");
     }
-    if styles.get("underline").and_then(|v| v.as_bool()).unwrap_or(false) {
-        s = style_token("U", &s);
+    if styles
+        .get("underline")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
+        s = wrap_style("4", &s);
     }
-    if styles.get("strikethrough").and_then(|v| v.as_bool()).unwrap_or(false) {
-        s = style_token("S", &s);
+    if styles
+        .get("strike")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
+        s = wrap_style("3", &s);
     }
-    if styles.get("italic").and_then(|v| v.as_bool()).unwrap_or(false) {
-        s = style_token("I", &s);
+    if styles
+        .get("italic")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
+        s = wrap_style("2", &s);
     }
-    if styles.get("bold").and_then(|v| v.as_bool()).unwrap_or(false) {
-        s = style_token("B", &s);
+    if styles
+        .get("bold")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
+        s = wrap_style("1", &s);
     }
     if let Some(color) = styles.get("textColor").and_then(|v| v.as_str()) {
-        s = style_token_param("TC", color, &s);
+        state.tc_params.push(color.to_owned());
+        s = wrap_style("5", &s);
     }
-    if let Some(color) = styles
-        .get("backgroundColor")
-        .and_then(|v| v.as_str())
-    {
-        s = style_token_param("BC", color, &s);
+    if let Some(color) = styles.get("backgroundColor").and_then(|v| v.as_str()) {
+        state.bc_params.push(color.to_owned());
+        s = wrap_style("9", &s);
     }
 
     s
 }
 
-fn style_token(key: &str, text: &str) -> String {
-    format!("{{{{{key}:{text}}}}}")
+/// Returns an open/close marker pair: `[[key]]content[[/key]]`.
+/// Text content sits OUTSIDE the opaque `[[...]]` delimiters so the
+/// translation engine can translate it while leaving the markers intact.
+fn wrap_style(key: &str, content: &str) -> String {
+    format!("[[{key}]]{content}[[/{key}]]")
 }
 
-fn style_token_param(key: &str, param: &str, text: &str) -> String {
-    format!("{{{{{key}:{param}~{text}}}}}")
+/// State shared across all block decodings so that paramMap indices advance
+/// consistently. Layout: `[0, code_count)` → code texts,
+/// `[code_count, code_count+tc_count)` → textColor values,
+/// `[code_count+tc_count, code_count+tc_count+bc_count)` → backgroundColor values,
+/// `[code_count+tc_count+bc_count, ..)` → link hrefs.
+struct DecoderState<'a> {
+    param_map: &'a [String],
+    code_off: usize,
+    tc_off: usize,
+    bc_off: usize,
+    link_off: usize,
+    code_idx: usize,
+    tc_idx: usize,
+    bc_idx: usize,
+    link_idx: usize,
+}
+
+impl<'a> DecoderState<'a> {
+    fn new(param_map: &'a [String], code_count: usize, tc_count: usize, bc_count: usize) -> Self {
+        Self {
+            param_map,
+            code_off: 0,
+            tc_off: code_count,
+            bc_off: code_count + tc_count,
+            link_off: code_count + tc_count + bc_count,
+            code_idx: 0,
+            tc_idx: 0,
+            bc_idx: 0,
+            link_idx: 0,
+        }
+    }
+
+    fn next_code(&mut self) -> Option<&str> {
+        let idx = self.code_off + self.code_idx;
+        self.code_idx += 1;
+        self.param_map.get(idx).map(|s| s.as_str())
+    }
+
+    fn next_tc(&mut self) -> Option<&str> {
+        let idx = self.tc_off + self.tc_idx;
+        self.tc_idx += 1;
+        self.param_map.get(idx).map(|s| s.as_str())
+    }
+
+    fn next_bc(&mut self) -> Option<&str> {
+        let idx = self.bc_off + self.bc_idx;
+        self.bc_idx += 1;
+        self.param_map.get(idx).map(|s| s.as_str())
+    }
+
+    /// Returns the absolute param_map index for the next link href,
+    /// advancing the internal link counter.
+    fn next_link_param_idx(&mut self) -> usize {
+        let idx = self.link_off + self.link_idx;
+        self.link_idx += 1;
+        idx
+    }
 }
 
 /// Decodes a style-encoded string back into a BlockNote inline content
 /// JSON array. Falls back to a single plain-text node on parse failure.
-fn decode_inline_content(encoded: &str) -> Vec<Value> {
+fn decode_inline_content_with_state(encoded: &str, state: &mut DecoderState) -> Vec<Value> {
     let tokens = tokenize(encoded);
     let mut pos = 0;
-    let nodes = decode_recursive(&tokens, &mut pos);
+    let nodes = decode_recursive(&tokens, &mut pos, state);
     if !nodes.is_empty() {
         nodes
     } else {
@@ -195,11 +343,16 @@ fn decode_inline_content(encoded: &str) -> Vec<Value> {
 #[derive(Debug, Clone, PartialEq)]
 enum Tok {
     Text(String),
-    Open { key: String, param: Option<String> },
+    Open { key: String },
     Close,
 }
 
+fn is_known_key(key: &str) -> bool {
+    matches!(key, "0" | "1" | "2" | "3" | "4" | "5" | "7" | "9")
+}
+
 /// Tokenizes an encoded string into `Tok` values.
+/// Token format: `[[N]]` for Open, `[[/N]]` for Close, anything else is Text.
 fn tokenize(s: &str) -> Vec<Tok> {
     let mut tokens = Vec::new();
     let chars: Vec<char> = s.chars().collect();
@@ -213,51 +366,38 @@ fn tokenize(s: &str) -> Vec<Tok> {
     };
 
     while i < chars.len() {
-        // Check for `{{`
-        if i + 1 < chars.len() && chars[i] == '{' && chars[i + 1] == '{' {
-            flush_text(&mut text_buf, &mut tokens);
-            i += 2;
-
-            // Scan the key up to `:` or `~`
-            let mut key = String::new();
-            while i < chars.len() && chars[i] != ':' && chars[i] != '~' && chars[i] != '}' {
-                key.push(chars[i]);
-                i += 1;
+        // Check for `[[`
+        if i + 1 < chars.len() && chars[i] == '[' && chars[i + 1] == '[' {
+            // Look ahead for the matching `]]`
+            let inner_start = i + 2;
+            let mut k = inner_start;
+            while k + 1 < chars.len() && !(chars[k] == ']' && chars[k + 1] == ']') {
+                k += 1;
             }
 
-            let known = matches!(key.as_str(), "C" | "B" | "I" | "S" | "U" | "TC" | "BC" | "L");
-            if !known || i >= chars.len() || chars[i] != ':' {
-                // Not a recognized token, emit literal `{{`
-                tokens.push(Tok::Text("{{".to_owned()));
-                tokens.push(Tok::Text(key));
-                if i < chars.len() && chars[i] == ':' {
-                    tokens.push(Tok::Text(":".to_owned()));
-                    i += 1;
-                }
-                continue;
-            }
-            i += 1; // skip `:`
+            if k + 1 < chars.len() && chars[k] == ']' && chars[k + 1] == ']' {
+                // Found `]]` at position k
+                let inner: String = chars[inner_start..k].iter().collect();
+                flush_text(&mut text_buf, &mut tokens);
+                i = k + 2;
 
-            let param = if matches!(key.as_str(), "TC" | "BC" | "L") {
-                // Scan until `|`
-                let mut p = String::new();
-                while i < chars.len() && chars[i] != '~' {
-                    p.push(chars[i]);
-                    i += 1;
+                if let Some(key) = inner.strip_prefix('/') {
+                    if is_known_key(key) {
+                        tokens.push(Tok::Close);
+                    } else {
+                        tokens.push(Tok::Text(format!("[[{inner}]]")));
+                    }
+                } else if is_known_key(&inner) {
+                    tokens.push(Tok::Open { key: inner });
+                } else {
+                    tokens.push(Tok::Text(format!("[[{inner}]]")));
                 }
-                if i < chars.len() && chars[i] == '~' {
-                    i += 1;
-                }
-                Some(p)
             } else {
-                None
-            };
-
-            tokens.push(Tok::Open { key, param });
-        } else if i + 1 < chars.len() && chars[i] == '}' && chars[i + 1] == '}' {
-            flush_text(&mut text_buf, &mut tokens);
-            tokens.push(Tok::Close);
-            i += 2;
+                // No closing `]]`: treat `[[` as literal text
+                text_buf.push('[');
+                text_buf.push('[');
+                i += 2;
+            }
         } else {
             text_buf.push(chars[i]);
             i += 1;
@@ -268,18 +408,19 @@ fn tokenize(s: &str) -> Vec<Tok> {
 }
 
 /// Recursive decode that handles link nodes by wrapping inner content.
-fn decode_recursive(tokens: &[Tok], pos: &mut usize) -> Vec<Value> {
+fn decode_recursive(tokens: &[Tok], pos: &mut usize, state: &mut DecoderState) -> Vec<Value> {
     let mut result = Vec::new();
     let mut text_buf = String::new();
     let mut active_styles: serde_json::Map<String, Value> = serde_json::Map::new();
-    let mut style_stack: Vec<(String, Option<String>, usize)> = Vec::new();
+    // (key, optional param_map index for link hrefs, start index in result)
+    let mut style_stack: Vec<(String, Option<usize>, usize)> = Vec::new();
 
     while *pos < tokens.len() {
         match &tokens[*pos] {
             Tok::Text(t) => {
                 text_buf.push_str(t);
             }
-            Tok::Open { key, param } => {
+            Tok::Open { key } => {
                 if !text_buf.is_empty() {
                     result.push(serde_json::json!({
                         "type": "text",
@@ -287,8 +428,8 @@ fn decode_recursive(tokens: &[Tok], pos: &mut usize) -> Vec<Value> {
                         "styles": active_styles.clone()
                     }));
                 }
-                style_stack.push((key.clone(), param.clone(), result.len()));
-                apply_style(&mut active_styles, key, param);
+                let param_idx = apply_style(&mut active_styles, key, state);
+                style_stack.push((key.clone(), param_idx, result.len()));
             }
             Tok::Close => {
                 if !text_buf.is_empty() {
@@ -298,12 +439,23 @@ fn decode_recursive(tokens: &[Tok], pos: &mut usize) -> Vec<Value> {
                         "styles": active_styles.clone()
                     }));
                 }
-                if let Some((key, param, start)) = style_stack.pop() {
-                    remove_style(&mut active_styles, &key, &param);
-                    // If this was a link, wrap only the inner nodes collected
-                    // since the Open token (not all preceding nodes).
-                    if key == "L" {
-                        let href = param.unwrap_or_default();
+                if let Some((key, param_idx, start)) = style_stack.pop() {
+                    if key == "0" {
+                        // Emit code text from param_map BEFORE removing the code
+                        // style so the resulting node carries {code: true}.
+                        let code_text = state.next_code().unwrap_or("").to_owned();
+                        result.push(serde_json::json!({
+                            "type": "text",
+                            "text": code_text,
+                            "styles": active_styles.clone()
+                        }));
+                    }
+                    remove_style(&mut active_styles, &key);
+                    if key == "7" {
+                        let href = param_idx
+                            .and_then(|idx| state.param_map.get(idx))
+                            .map(|s| s.as_str())
+                            .unwrap_or("");
                         let inner: Vec<Value> = result.drain(start..).collect();
                         result.push(serde_json::json!({
                             "type": "link",
@@ -327,69 +479,112 @@ fn decode_recursive(tokens: &[Tok], pos: &mut usize) -> Vec<Value> {
     result
 }
 
-fn apply_style(styles: &mut serde_json::Map<String, Value>, key: &str, param: &Option<String>) {
+/// Applies the style for `key` to `active_styles`, consuming the next entry
+/// from `state.param_map` for parameterised styles (textColor, backgroundColor).
+/// Returns the param_map index for link tokens so the Close handler can look
+/// up the href; returns `None` for all other tokens.
+fn apply_style(
+    styles: &mut serde_json::Map<String, Value>,
+    key: &str,
+    state: &mut DecoderState,
+) -> Option<usize> {
     match key {
-        "C" => {
+        "0" => {
             styles.insert("code".to_owned(), Value::Bool(true));
+            None
         }
-        "B" => {
+        "1" => {
             styles.insert("bold".to_owned(), Value::Bool(true));
+            None
         }
-        "I" => {
+        "2" => {
             styles.insert("italic".to_owned(), Value::Bool(true));
+            None
         }
-        "S" => {
-            styles.insert("strikethrough".to_owned(), Value::Bool(true));
+        "3" => {
+            styles.insert("strike".to_owned(), Value::Bool(true));
+            None
         }
-        "U" => {
+        "4" => {
             styles.insert("underline".to_owned(), Value::Bool(true));
+            None
         }
-        "TC" => {
-            if let Some(color) = param {
-                styles.insert("textColor".to_owned(), Value::String(color.clone()));
+        "5" => {
+            if let Some(color) = state.next_tc() {
+                styles.insert("textColor".to_owned(), Value::String(color.to_owned()));
             }
+            None
         }
-        "BC" => {
-            if let Some(color) = param {
+        "9" => {
+            if let Some(color) = state.next_bc() {
                 styles.insert(
                     "backgroundColor".to_owned(),
-                    Value::String(color.clone()),
+                    Value::String(color.to_owned()),
                 );
             }
+            None
+        }
+        "7" => Some(state.next_link_param_idx()),
+        _ => None,
+    }
+}
+
+fn remove_style(styles: &mut serde_json::Map<String, Value>, key: &str) {
+    match key {
+        "0" => {
+            styles.remove("code");
+        }
+        "1" => {
+            styles.remove("bold");
+        }
+        "2" => {
+            styles.remove("italic");
+        }
+        "3" => {
+            styles.remove("strike");
+        }
+        "4" => {
+            styles.remove("underline");
+        }
+        "5" => {
+            styles.remove("textColor");
+        }
+        "9" => {
+            styles.remove("backgroundColor");
         }
         _ => {}
     }
 }
 
-fn remove_style(styles: &mut serde_json::Map<String, Value>, key: &str, _param: &Option<String>) {
-    match key {
-        "C" => { styles.remove("code"); }
-        "B" => { styles.remove("bold"); }
-        "I" => { styles.remove("italic"); }
-        "S" => { styles.remove("strikethrough"); }
-        "U" => { styles.remove("underline"); }
-        "TC" => { styles.remove("textColor"); }
-        "BC" => { styles.remove("backgroundColor"); }
-        _ => {}
-    }
-}
-
-fn merge_translated_texts(content_json: &str, translated: &[String]) -> Result<String, String> {
+fn merge_translated_texts(
+    content_json: &str,
+    translated: &[String],
+    param_map: &[String],
+    code_count: usize,
+    tc_count: usize,
+    bc_count: usize,
+) -> Result<String, String> {
     let mut blocks: Vec<Value> =
         serde_json::from_str(content_json).map_err(|e| format!("invalid JSON: {e}"))?;
     let mut index = 0usize;
-    merge_into_blocks(&mut blocks, translated, &mut index);
+    let mut state = DecoderState::new(param_map, code_count, tc_count, bc_count);
+    merge_into_blocks(&mut blocks, translated, &mut index, &mut state);
     serde_json::to_string(&blocks).map_err(|e| format!("JSON serialise failed: {e}"))
 }
 
-fn merge_into_blocks(blocks: &mut [Value], translated: &[String], index: &mut usize) {
+fn merge_into_blocks(
+    blocks: &mut [Value],
+    translated: &[String],
+    index: &mut usize,
+    state: &mut DecoderState,
+) {
     for block in blocks.iter_mut() {
         let block_type = block.get("type").and_then(|t| t.as_str()).unwrap_or("");
 
         if TRANSLATABLE_BLOCK_TYPES.contains(&block_type) {
             if let Some(inline) = block.get_mut("content").and_then(|c| c.as_array_mut()) {
                 if *index < translated.len() {
-                    let decoded = decode_inline_content(&translated[*index]);
+                    let decoded = decode_inline_content_with_state(&translated[*index], state);
                     inline.clear();
                     for node in decoded {
                         inline.push(node);
@@ -400,7 +595,7 @@ fn merge_into_blocks(blocks: &mut [Value], translated: &[String], index: &mut us
         }
 
         if let Some(children) = block.get_mut("children").and_then(|c| c.as_array_mut()) {
-            merge_into_blocks(children, translated, index);
+            merge_into_blocks(children, translated, index, state);
         }
     }
 }
@@ -429,10 +624,54 @@ fn extract_title_from_content(content_json: &str) -> String {
 
 // --- Shared translation logic -----------------------------------------------
 
-fn translate_texts(texts: &[String], source_lang: &str, target_lang: &str) -> Result<Vec<String>, String> {
+/// Known style keys used in open/close markers.
+const KNOWN_KEYS_LIST: &[char] = &['0', '1', '2', '3', '4', '5', '7', '9'];
+
+/// Encode style markers before sending to Apple Translation.
+///
+/// Apple Translation recognises `[[...]]` as wiki-link markup and partially or
+/// fully drops close markers `[[/N]]` in certain positions.  We re-encode using
+/// mathematical Unicode brackets that have no markup significance:
+///
+/// - Open  `[[N]]`  → `⟦N⟧`  (U+27E6 / U+27E7, MATHEMATICAL WHITE SQUARE BRACKET)
+/// - Close `[[/N]]` → `⟨N⟩`  (U+27E8 / U+27E9, MATHEMATICAL ANGLE BRACKET)
+///
+/// These are visible, standard Unicode symbols preserved verbatim by translation
+/// models.  We restore the originals after translation before returning.
+fn encode_for_translation(text: &str) -> String {
+    let mut s = text.to_owned();
+    for &key in KNOWN_KEYS_LIST {
+        s = s.replace(&format!("[[{key}]]"), &format!("\u{27E6}{key}\u{27E7}"));
+        s = s.replace(&format!("[[/{key}]]"), &format!("\u{27E8}{key}\u{27E9}"));
+    }
+    s
+}
+
+/// Restore encoded markers back to `[[N]]` / `[[/N]]` after translation.
+fn decode_from_translation(text: &str) -> String {
+    let mut s = text.to_owned();
+    for &key in KNOWN_KEYS_LIST {
+        s = s.replace(&format!("\u{27E6}{key}\u{27E7}"), &format!("[[{key}]]"));
+        s = s.replace(&format!("\u{27E8}{key}\u{27E9}"), &format!("[[/{key}]]"));
+    }
+    s
+}
+
+fn translate_texts(
+    texts: &[String],
+    source_lang: &str,
+    target_lang: &str,
+) -> Result<Vec<String>, String> {
     #[cfg(target_os = "macos")]
     {
-        let joined = texts.join("\0");
+        // Replace [[N]]/[[/N]] style markers with mathematical bracket chars
+        // (⟦N⟧ / ⟨N⟩) before sending to Apple Translation.  The ML model
+        // interprets [[...]] as wiki-link markup and partially drops close
+        // markers (e.g. [[/7]] → ]]) especially at end-of-text.  Mathematical
+        // Unicode brackets are preserved verbatim and are restored after.
+        let safe_texts: Vec<String> = texts.iter().map(|t| encode_for_translation(t)).collect();
+        let joined = safe_texts.join("\0");
+
         let mut last_err = String::new();
         for attempt in 0..3 {
             let result = unsafe {
@@ -452,11 +691,28 @@ fn translate_texts(texts: &[String], source_lang: &str, target_lang: &str) -> Re
                 }
                 return Err(last_err);
             }
-            let translated: Vec<String> = if result_str.is_empty() {
+            if result_str.is_empty() {
                 return Err("Translation returned empty result".to_owned());
-            } else {
-                result_str.split('\0').map(String::from).collect()
-            };
+            }
+            let translated: Vec<String> = result_str
+                .split('\0')
+                .zip(texts.iter())
+                .map(|(raw, original)| {
+                    let decoded = decode_from_translation(raw);
+                    // If the original had balanced [[N]]/[[/N]] pairs but the
+                    // translation dropped some closing markers (Apple
+                    // Translation sometimes strips mathematical brackets from
+                    // segments consisting mainly of proper nouns), fall back to
+                    // the original so the inline structure is preserved.
+                    let orig_close = original.matches("[[/").count();
+                    let decoded_close = decoded.matches("[[/").count();
+                    if orig_close > 0 && decoded_close < orig_close {
+                        original.clone()
+                    } else {
+                        decoded
+                    }
+                })
+                .collect();
             if translated.len() != texts.len() {
                 return Err(format!(
                     "Translation count mismatch: expected {}, got {}",
@@ -477,6 +733,14 @@ fn translate_texts(texts: &[String], source_lang: &str, target_lang: &str) -> Re
 }
 
 // --- Tauri commands --------------------------------------------------------
+
+/// Returns true if the app is running on macOS, false on other platforms.
+/// Used by the frontend to decide whether to show (but disable) or hide the
+/// translation UI entirely on non-macOS systems.
+#[tauri::command]
+pub fn is_macos() -> bool {
+    cfg!(target_os = "macos")
+}
 
 #[tauri::command]
 pub fn is_translation_available(state: tauri::State<TranslationAvailable>) -> bool {
@@ -508,14 +772,21 @@ pub async fn translate_note(
 ) -> Result<Note, String> {
     let note = get_note(app.state::<DbState>(), note_id)?.ok_or("Note not found")?;
 
-    let texts = extract_block_texts(&note.content)?;
+    let (texts, param_map, code_count, tc_count, bc_count) = extract_block_texts(&note.content)?;
     if texts.is_empty() {
         return Err("No translatable text found".to_owned());
     }
 
     let translated = translate_texts(&texts, &source_lang, &target_lang)?;
 
-    let translated_content = merge_translated_texts(&note.content, &translated)?;
+    let translated_content = merge_translated_texts(
+        &note.content,
+        &translated,
+        &param_map,
+        code_count,
+        tc_count,
+        bc_count,
+    )?;
     let title = extract_title_from_content(&translated_content);
     let now = chrono::Utc::now().to_rfc3339();
 
@@ -539,12 +810,19 @@ pub async fn translate_blocks(
     source_lang: String,
     target_lang: String,
 ) -> Result<String, String> {
-    let texts = extract_block_texts(&content)?;
+    let (texts, param_map, code_count, tc_count, bc_count) = extract_block_texts(&content)?;
     if texts.is_empty() {
         return Err("No translatable text found".to_owned());
     }
     let translated = translate_texts(&texts, &source_lang, &target_lang)?;
-    merge_translated_texts(&content, &translated)
+    merge_translated_texts(
+        &content,
+        &translated,
+        &param_map,
+        code_count,
+        tc_count,
+        bc_count,
+    )
 }
 
 #[tauri::command]
@@ -609,14 +887,15 @@ pub async fn translate_text(
     tokio::task::spawn_blocking(move || {
         #[cfg(target_os = "macos")]
         {
+            let encoded = encode_for_translation(&text);
             let result = unsafe {
                 scripta_translate_single(
-                    &SRString::from(text.as_str()),
+                    &SRString::from(encoded.as_str()),
                     &SRString::from(source_lang.as_str()),
                     &SRString::from(target_lang.as_str()),
                 )
             };
-            let translated = result.as_str().to_owned();
+            let translated = decode_from_translation(result.as_str());
             if translated.is_empty() && !text.is_empty() {
                 return Err("Translation failed".to_owned());
             }
@@ -645,11 +924,20 @@ const MAX_CHUNK_CHARS: usize = 50_000;
 /// Event payload sent from the backend to the frontend during streaming
 /// translation via a Tauri [`Channel`].
 #[derive(Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase", rename_all_fields = "camelCase", tag = "event", content = "data")]
+#[serde(
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    tag = "event",
+    content = "data"
+)]
 pub enum TranslationStreamEvent {
     Started {
         total_chunks: usize,
         total_blocks: usize,
+        param_map: Vec<String>,
+        param_code_count: usize,
+        param_tc_count: usize,
+        param_bc_count: usize,
     },
     ChunkCompleted {
         chunk_index: usize,
@@ -715,7 +1003,8 @@ pub async fn translate_blocks_streaming(
     target_lang: String,
     on_event: Channel<TranslationStreamEvent>,
 ) -> Result<(), String> {
-    let texts = extract_block_texts(&content)?;
+    let (texts, param_map, param_code_count, param_tc_count, param_bc_count) =
+        extract_block_texts(&content)?;
     if texts.is_empty() {
         return Err("No translatable text found".to_owned());
     }
@@ -728,6 +1017,10 @@ pub async fn translate_blocks_streaming(
         .send(TranslationStreamEvent::Started {
             total_chunks,
             total_blocks,
+            param_map,
+            param_code_count,
+            param_tc_count,
+            param_bc_count,
         })
         .map_err(|e| e.to_string())?;
 
@@ -743,7 +1036,23 @@ pub async fn translate_blocks_streaming(
         handles.push(tokio::spawn(async move {
             let _guard = permit.acquire().await.unwrap();
             let result = tokio::task::spawn_blocking(move || {
-                translate_texts(&chunk.texts, &src, &tgt)
+                translate_texts(&chunk.texts, &src, &tgt).or_else(|_| {
+                    // Chunk failed: fall back to per-text translation so one
+                    // untranslatable text does not block the rest of the chunk.
+                    // Texts that still fail are kept as-is (original encoded form,
+                    // which the TypeScript decoder will restore with styles intact).
+                    let fallback: Vec<String> = chunk
+                        .texts
+                        .iter()
+                        .map(|text| {
+                            translate_texts(&[text.clone()], &src, &tgt)
+                                .ok()
+                                .and_then(|mut v| v.pop())
+                                .unwrap_or_else(|| text.clone())
+                        })
+                        .collect();
+                    Ok::<Vec<String>, String>(fallback)
+                })
             })
             .await;
 
@@ -758,13 +1067,7 @@ pub async fn translate_blocks_streaming(
                     });
                     Some(count)
                 }
-                Ok(Err(e)) => {
-                    let _ = chan.send(TranslationStreamEvent::Error {
-                        chunk_index,
-                        message: e,
-                    });
-                    None
-                }
+                Ok(Err(_)) => unreachable!("or_else always succeeds"),
                 Err(e) => {
                     let _ = chan.send(TranslationStreamEvent::Error {
                         chunk_index,
@@ -803,46 +1106,72 @@ mod tests {
         text_node(text, json!({}))
     }
 
+    /// Encode helper: creates a fresh EncoderState and returns just the encoded string.
+    fn encode(inline: &[Value]) -> String {
+        let mut state = EncoderState::new();
+        encode_inline_content(inline, &mut state)
+    }
+
+    /// Decode helper: decodes with a given param_map and section counts.
+    fn decode_with(
+        encoded: &str,
+        param_map: &[&str],
+        code_count: usize,
+        tc_count: usize,
+        bc_count: usize,
+    ) -> Vec<Value> {
+        let pm: Vec<String> = param_map.iter().map(|s| s.to_string()).collect();
+        let mut state = DecoderState::new(&pm, code_count, tc_count, bc_count);
+        decode_inline_content_with_state(encoded, &mut state)
+    }
+
     #[test]
     fn test_encode_plain_text() {
         let inline = vec![plain("Hello world")];
-        assert_eq!(encode_inline_content(&inline), "Hello world");
+        assert_eq!(encode(&inline), "Hello world");
     }
 
     #[test]
     fn test_encode_bold() {
         let inline = vec![plain("Hello "), text_node("world", json!({"bold": true}))];
-        assert_eq!(encode_inline_content(&inline), "Hello {{B:world}}");
+        assert_eq!(encode(&inline), "Hello [[1]]world[[/1]]");
     }
 
     #[test]
     fn test_encode_italic() {
         let inline = vec![text_node("ciao", json!({"italic": true}))];
-        assert_eq!(encode_inline_content(&inline), "{{I:ciao}}");
+        assert_eq!(encode(&inline), "[[2]]ciao[[/2]]");
     }
 
     #[test]
     fn test_encode_code() {
+        // Code text is stored in param_map; the encoded token has empty content.
         let inline = vec![plain("use "), text_node("rm -rf", json!({"code": true}))];
-        assert_eq!(encode_inline_content(&inline), "use {{C:rm -rf}}");
+        assert_eq!(encode(&inline), "use [[0]][[/0]]");
     }
 
     #[test]
     fn test_encode_combined_styles() {
-        let inline = vec![text_node("bold italic", json!({"bold": true, "italic": true}))];
-        assert_eq!(encode_inline_content(&inline), "{{B:{{I:bold italic}}}}");
+        let inline = vec![text_node(
+            "bold italic",
+            json!({"bold": true, "italic": true}),
+        )];
+        assert_eq!(encode(&inline), "[[1]][[2]]bold italic[[/2]][[/1]]");
     }
 
     #[test]
     fn test_encode_text_color() {
         let inline = vec![text_node("red text", json!({"textColor": "#ff0000"}))];
-        assert_eq!(encode_inline_content(&inline), "{{TC:#ff0000~red text}}");
+        assert_eq!(encode(&inline), "[[5]]red text[[/5]]");
     }
 
     #[test]
     fn test_encode_bg_color() {
-        let inline = vec![text_node("highlighted", json!({"backgroundColor": "#ffff00"}))];
-        assert_eq!(encode_inline_content(&inline), "{{BC:#ffff00~highlighted}}");
+        let inline = vec![text_node(
+            "highlighted",
+            json!({"backgroundColor": "#ffff00"}),
+        )];
+        assert_eq!(encode(&inline), "[[9]]highlighted[[/9]]");
     }
 
     #[test]
@@ -851,7 +1180,7 @@ mod tests {
             plain("click "),
             json!({"type": "link", "href": "https://example.com", "content": [plain("here")]}),
         ];
-        assert_eq!(encode_inline_content(&inline), "click {{L:https://example.com~here}}");
+        assert_eq!(encode(&inline), "click [[7]]here[[/7]]");
     }
 
     #[test]
@@ -862,20 +1191,20 @@ mod tests {
             "content": [text_node("styled link", json!({"bold": true, "italic": true}))]
         })];
         assert_eq!(
-            encode_inline_content(&inline),
-            "{{L:https://example.com~{{B:{{I:styled link}}}}}}"
+            encode(&inline),
+            "[[7]][[1]][[2]]styled link[[/2]][[/1]][[/7]]"
         );
     }
 
     #[test]
     fn test_decode_plain() {
-        let result = decode_inline_content("Hello world");
+        let result = decode_with("Hello world", &[], 0, 0, 0);
         assert_eq!(result, vec![plain("Hello world")]);
     }
 
     #[test]
     fn test_decode_bold() {
-        let result = decode_inline_content("Hello {{B:world}}");
+        let result = decode_with("Hello [[1]]world[[/1]]", &[], 0, 0, 0);
         assert_eq!(result.len(), 2);
         assert_eq!(result[0], plain("Hello "));
         assert_eq!(result[1], text_node("world", json!({"bold": true})));
@@ -883,14 +1212,16 @@ mod tests {
 
     #[test]
     fn test_decode_code() {
-        let result = decode_inline_content("This is {{C:code}} text");
+        // Code text comes from param_map; close marker is [[/0]].
+        let result = decode_with("This is [[0]][[/0]] text", &["code"], 1, 0, 0);
         assert_eq!(result.len(), 3);
         assert_eq!(result[1], text_node("code", json!({"code": true})));
     }
 
     #[test]
     fn test_decode_link() {
-        let result = decode_inline_content("{{L:https://example.com~click here}}");
+        // link href comes from param_map section [code_count+tc_count+bc_count..)
+        let result = decode_with("[[7]]click here[[/7]]", &["https://example.com"], 0, 0, 0);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0]["type"], "link");
         assert_eq!(result[0]["href"], "https://example.com");
@@ -898,7 +1229,7 @@ mod tests {
 
     #[test]
     fn test_decode_link_with_styles() {
-        let result = decode_inline_content("{{L:https://x.com~{{B:link}}}}");
+        let result = decode_with("[[7]][[1]]link[[/1]][[/7]]", &["https://x.com"], 0, 0, 0);
         assert_eq!(result.len(), 1);
         let content = result[0]["content"].as_array().unwrap();
         assert_eq!(content.len(), 1);
@@ -907,14 +1238,18 @@ mod tests {
 
     #[test]
     fn test_decode_text_color() {
-        let result = decode_inline_content("{{TC:#ff0000~red text}}");
+        // param_map: ["#ff0000"] with code_count=0, tc_count=1, bc_count=0
+        let result = decode_with("[[5]]red text[[/5]]", &["#ff0000"], 0, 1, 0);
         assert_eq!(result.len(), 1);
-        assert_eq!(result[0], text_node("red text", json!({"textColor": "#ff0000"})));
+        assert_eq!(
+            result[0],
+            text_node("red text", json!({"textColor": "#ff0000"}))
+        );
     }
 
     #[test]
     fn test_decode_combined_styles() {
-        let result = decode_inline_content("{{B:{{I:bold italic}}}}");
+        let result = decode_with("[[1]][[2]]bold italic[[/2]][[/1]]", &[], 0, 0, 0);
         assert_eq!(result.len(), 1);
         assert_eq!(
             result[0],
@@ -924,24 +1259,24 @@ mod tests {
 
     #[test]
     fn test_decode_malformed_fallback() {
-        let result = decode_inline_content("{{unknown:stuff");
-        // Should fall back to plain text node
+        let result = decode_with("[[unknown]]stuff", &[], 0, 0, 0);
+        // Unknown key → falls back to plain text node
         assert_eq!(result.len(), 1);
-        assert_eq!(result[0], plain("{{unknown:stuff"));
+        assert_eq!(result[0], plain("[[unknown]]stuff"));
     }
 
     #[test]
-    fn test_decode_double_brace_in_text() {
-        let result = decode_inline_content("normal {{ text");
+    fn test_decode_double_bracket_in_text() {
+        let result = decode_with("normal [[ text", &[], 0, 0, 0);
         assert_eq!(result.len(), 1);
-        assert_eq!(result[0], plain("normal {{ text"));
+        assert_eq!(result[0], plain("normal [[ text"));
     }
 
     #[test]
     fn test_roundtrip_bold() {
         let inline = vec![plain("Hello "), text_node("world", json!({"bold": true}))];
-        let encoded = encode_inline_content(&inline);
-        let decoded = decode_inline_content(&encoded);
+        let encoded = encode(&inline);
+        let decoded = decode_with(&encoded, &[], 0, 0, 0);
         assert_eq!(decoded.len(), 2);
         assert_eq!(decoded[1], text_node("world", json!({"bold": true})));
     }
@@ -958,8 +1293,14 @@ mod tests {
                 text_node("link", json!({"italic": true}))
             ]}),
         ];
-        let encoded = encode_inline_content(&inline);
-        let decoded = decode_inline_content(&encoded);
+        let mut enc_state = EncoderState::new();
+        let encoded = encode_inline_content(&inline, &mut enc_state);
+        let code_count = enc_state.code_count();
+        let tc_count = enc_state.tc_count();
+        let bc_count = enc_state.bc_count();
+        let param_map = enc_state.into_param_map();
+        let pm_refs: Vec<&str> = param_map.iter().map(|s| s.as_str()).collect();
+        let decoded = decode_with(&encoded, &pm_refs, code_count, tc_count, bc_count);
         assert_eq!(decoded.len(), 6);
         assert_eq!(decoded[1], text_node("code", json!({"code": true})));
         assert_eq!(decoded[3], text_node("bold", json!({"bold": true})));
@@ -976,7 +1317,8 @@ mod tests {
                 {"type": "text", "text": "!", "styles": {}}
             ]}
         ]);
-        let result = extract_block_texts(&blocks.to_string()).unwrap();
-        assert_eq!(result, vec!["Hello {{B:world}}!"]);
+        let (texts, _param_map, _code_count, _tc_count, _bc_count) =
+            extract_block_texts(&blocks.to_string()).unwrap();
+        assert_eq!(texts, vec!["Hello [[1]]world[[/1]]!"]);
     }
 }

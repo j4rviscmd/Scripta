@@ -77,6 +77,7 @@ pub fn run() {
             link_preview::check_url_content_type,
             file_io::read_text_file,
             file_io::write_text_file,
+            translation::is_macos,
             translation::is_translation_available,
             translation::translate_note,
             translation::translate_blocks,

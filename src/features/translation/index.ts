@@ -4,31 +4,37 @@
  * Public API for the translation feature module.
  *
  * Provides Apple Intelligence-powered translation via the on-device
- * Translation framework (macOS 15.0+ Sequoia).
+ * Translation framework (macOS 26.0+).
  */
 
 export {
-  isTranslationAvailable,
-  getSupportedLanguages,
-  translateNote,
-  translateBlocks,
-  translateText,
-  detectLanguage,
   checkLanguagePairStatus,
+  detectLanguage,
+  getSupportedLanguages,
+  isMacos,
+  isTranslationAvailable,
   type SupportedLanguage,
+  translateBlocks,
+  translateNote,
+  translateText,
 } from './api/translate'
 
 export {
-  translateBlocksStreaming,
-  type TranslationStreamEvent,
   type TranslatedBlock,
+  type TranslationStreamEvent,
+  translateBlocksStreaming,
 } from './api/translateStreaming'
-
-export { TranslationDialog } from './ui/TranslationDialog'
-
+export {
+  collectTranslatableBlockIds,
+  commitTranslation,
+  StyleCounters,
+  updateBlockTextByIndex,
+} from './lib/blockUpdater'
 export {
   DEFAULT_SOURCE_LANG,
   DEFAULT_TARGET_LANG,
   TRANSLATION_SOURCE_LANG_KEY,
   TRANSLATION_TARGET_LANG_KEY,
 } from './lib/translationConfig'
+export { TranslationDialog } from './ui/TranslationDialog'
+export { TranslationIndicator } from './ui/TranslationIndicator'

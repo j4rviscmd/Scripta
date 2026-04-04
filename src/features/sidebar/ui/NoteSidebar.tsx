@@ -26,7 +26,7 @@ import { BugReportDialog } from '@/features/bug-report'
 import type { Note } from '@/features/editor'
 import { bucketByDate, useGroupCollapse, useGroups } from '@/features/groups'
 import { SettingsDialog } from '@/features/settings'
-import { isTranslationAvailable } from '@/features/translation'
+import { isMacos, isTranslationAvailable } from '@/features/translation'
 import { useSidebarNotes } from '../hooks/useSidebarNotes'
 import { DateGroup } from './DateGroup'
 import { DeleteNoteDialog } from './DeleteNoteDialog'
@@ -121,11 +121,17 @@ export function NoteSidebar({
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [groupManageOpen, setGroupManageOpen] = useState(false)
   const [activeDragNoteId, setActiveDragNoteId] = useState<string | null>(null)
+  const [isMacOS, setIsMacOS] = useState(false)
   const [translationAvailable, setTranslationAvailable] = useState(false)
   const [bugReportOpen, setBugReportOpen] = useState(false)
 
   useEffect(() => {
-    isTranslationAvailable().then(setTranslationAvailable).catch(() => setTranslationAvailable(false))
+    isMacos()
+      .then(setIsMacOS)
+      .catch(() => setIsMacOS(false))
+    isTranslationAvailable()
+      .then(setTranslationAvailable)
+      .catch(() => setTranslationAvailable(false))
   }, [])
 
   const sensors = useSensors(
@@ -262,6 +268,7 @@ export function NoteSidebar({
         onMoveToGroup={handleMoveToGroup}
         onTranslate={onTranslate}
         translationAvailable={translationAvailable}
+        isMacOS={isMacOS}
         groups={groups}
         justPinnedId={justPinnedId}
       />
@@ -275,6 +282,7 @@ export function NoteSidebar({
       onExportNote,
       onTranslate,
       translationAvailable,
+      isMacOS,
       handleMoveToGroup,
       groups,
       justPinnedId,

@@ -8,8 +8,17 @@ export interface SupportedLanguage {
 }
 
 /**
+ * Returns true if the app is running on macOS, false on other platforms.
+ * Used to decide whether to show (but disable) or hide the translation UI
+ * entirely on non-macOS systems.
+ */
+export async function isMacos(): Promise<boolean> {
+  return invoke<boolean>('is_macos')
+}
+
+/**
  * Checks whether the Apple Translation framework is available on the
- * current system (macOS 15.0+ Sequoia required).
+ * current system (macOS 26.0+ required).
  *
  * @returns `true` if translation is available, `false` otherwise.
  */

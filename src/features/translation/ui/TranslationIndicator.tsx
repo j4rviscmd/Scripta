@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
 import { AlertTriangle, ArrowRight, Globe, Loader2, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import {
   Select,
   SelectContent,
@@ -66,18 +66,22 @@ export function TranslationIndicator({
       .catch(() => {
         if (!stale) setPairStatus(null)
       })
-    return () => { stale = true }
+    return () => {
+      stale = true
+    }
   }, [sourceLang, targetLang])
 
   const langName = (code: string) =>
     code === 'auto'
       ? 'Auto'
-      : languages.find((l) => l.code === code)?.name ?? code
+      : (languages.find((l) => l.code === code)?.name ?? code)
 
   const displaySource = () => {
     if (sourceLang !== 'auto') return langName(sourceLang)
     if (!detectedLang) return 'Auto'
-    const name = languages.find((l) => baseCode(l.code) === baseCode(detectedLang))?.name ?? detectedLang
+    const name =
+      languages.find((l) => baseCode(l.code) === baseCode(detectedLang))
+        ?.name ?? detectedLang
     return `Auto (${name})`
   }
 
@@ -131,7 +135,10 @@ export function TranslationIndicator({
                 <SelectItem
                   key={lang.code}
                   value={lang.code}
-                  disabled={sourceLang !== 'auto' && baseCode(lang.code) === baseCode(sourceLang)}
+                  disabled={
+                    sourceLang !== 'auto' &&
+                    baseCode(lang.code) === baseCode(sourceLang)
+                  }
                 >
                   {lang.name}
                 </SelectItem>
