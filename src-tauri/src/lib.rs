@@ -2,6 +2,7 @@ mod db;
 mod file_io;
 mod groups;
 mod link_preview;
+mod translation;
 mod window;
 
 use std::collections::HashMap;
@@ -48,6 +49,7 @@ pub fn run() {
         .setup(|app| {
             db::init_db(app.handle())?;
             app.manage(link_preview::LinkPreviewCache(Mutex::new(HashMap::new())));
+            app.manage(translation::TranslationAvailable(Mutex::new(None)));
             window::create_main_window(app.handle())?;
             Ok(())
         })
@@ -75,6 +77,15 @@ pub fn run() {
             link_preview::check_url_content_type,
             file_io::read_text_file,
             file_io::write_text_file,
+            translation::is_macos,
+            translation::is_translation_available,
+            translation::translate_note,
+            translation::translate_blocks,
+            translation::translate_blocks_streaming,
+            translation::translate_text,
+            translation::get_supported_languages,
+            translation::detect_language,
+            translation::check_language_pair_status,
             file_io::download_file,
             file_io::fetch_image_bytes_base64,
             #[cfg(target_os = "macos")]

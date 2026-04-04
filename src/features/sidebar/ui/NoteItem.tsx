@@ -6,6 +6,7 @@ import {
   FileLock,
   FileText,
   FolderInput,
+  Languages,
   LockOpen,
   Pin,
   PinOff,
@@ -22,6 +23,11 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
 import { SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import type { Note } from '@/features/editor'
 import type { Group } from '@/features/groups'
 import { formatRelativeDate } from '@/features/groups'
@@ -39,6 +45,12 @@ import { cn } from '@/lib/utils'
  * @property onDuplicateNote - Callback invoked to duplicate the note.
  * @property onExportNote - Callback invoked to export the note as Markdown.
  * @property onMoveToGroup - Callback invoked to move the note to a different group.
+ * @property onTranslate - Callback invoked to translate the note to a different language.
+ * @property translationAvailable - Whether Apple Intelligence translation is available
+ *   on the current system (macOS 26+). When `false` the menu item is disabled with a
+ *   tooltip explaining the requirement.
+ * @property isMacOS - Whether the app is running on macOS. When `false` the Translate
+ *   menu item is hidden entirely.
  * @property groups - The full list of groups available for the "Move to group" submenu.
  * @property justPinnedId - The ID of the note that was just pinned (for bounce animation), or `null`.
  */
@@ -52,6 +64,9 @@ interface NoteItemProps {
   onDuplicateNote: (noteId: string) => void
   onExportNote: (noteId: string) => void
   onMoveToGroup: (noteId: string, groupId: string | null) => void
+  onTranslate: (noteId: string) => void
+  translationAvailable: boolean
+  isMacOS: boolean
   groups: Group[]
   justPinnedId: string | null
 }
@@ -59,7 +74,13 @@ interface NoteItemProps {
 /**
  * A single note item in the sidebar with context menu actions.
  *
- * Includes Pin/Unpin, Move to group, Export, and Delete actions.
+ * Includes Pin/Unpin, Lock/Unlock, Move to group, Export, Duplicate, Delete,
+ * and — on macOS — Translate actions.  The Translate item is shown but disabled
+ * (with a tooltip) when the platform is macOS but Apple Intelligence is not yet
+ * available, and hidden entirely on non-macOS systems.
+ *
+ * The component is also a drag source via `@dnd-kit/core` so that notes can be
+ * reordered or moved between groups by dragging.
  */
 export function NoteItem({
   note,
@@ -71,6 +92,9 @@ export function NoteItem({
   onDuplicateNote,
   onExportNote,
   onMoveToGroup,
+  onTranslate,
+  translationAvailable,
+  isMacOS,
   groups,
   justPinnedId,
 }: NoteItemProps) {
@@ -178,6 +202,25 @@ export function NoteItem({
             <Copy className="h-4 w-4" />
             Duplicate
           </ContextMenuItem>
+          {isMacOS &&
+            (translationAvailable ? (
+              <ContextMenuItem onClick={() => onTranslate(note.id)}>
+                <Languages className="h-4 w-4" />
+                Translate
+              </ContextMenuItem>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger render={<span className="block" />}>
+                  <ContextMenuItem disabled>
+                    <Languages className="h-4 w-4" />
+                    Translate
+                  </ContextMenuItem>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <p>Translation requires macOS 26 or later</p>
+                </TooltipContent>
+              </Tooltip>
+            ))}
           <ContextMenuSeparator />
           <ContextMenuItem variant="destructive" onClick={onDeleteNote}>
             <Trash2 />
