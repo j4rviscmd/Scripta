@@ -52,6 +52,12 @@ import {
 import { commandPaletteScrollConfig } from '@/features/editor/lib/commandPaletteScrollConfig'
 import { NoteSidebar } from '@/features/sidebar'
 import {
+  SummarizationManager,
+  SummarizationProvider,
+  SummarizeButton,
+  SummaryAccordion,
+} from '@/features/summarization'
+import {
   collectTranslatableBlockIds,
   commitTranslation,
   DEFAULT_SOURCE_LANG,
@@ -77,6 +83,29 @@ import { CopyablePath } from '@/shared/ui/CopyablePath'
 import { ModeToggle } from '@/shared/ui/ModeToggle'
 import { SaveStatusIndicator } from '@/shared/ui/SaveStatusIndicator'
 import { ScrollToTopButton } from '@/shared/ui/ScrollToTopButton'
+
+/** Computes approximate plaintext length from BlockNote editor document. */
+function computeEditorTextLength(
+  editorRef: React.RefObject<{ editor: { document: any[] } } | null>
+): number {
+  const editor = editorRef.current?.editor
+  if (!editor) return 0
+  let len = 0
+  const walk = (blocks: typeof editor.document) => {
+    for (const block of blocks) {
+      if (block.content && Array.isArray(block.content)) {
+        for (const inline of block.content) {
+          if ('text' in inline && typeof inline.text === 'string') {
+            len += inline.text.length
+          }
+        }
+      }
+      if (block.children?.length) walk(block.children)
+    }
+  }
+  walk(editor.document)
+  return len
+}
 
 /**
  * Root application component.
@@ -116,6 +145,10 @@ function AppContent() {
   const [noteIdInitialized, setNoteIdInitialized] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(configDefaults.sidebarOpen)
   const [refreshKey, setRefreshKey] = useState(0)
+  /** Counter bumped on each auto-save so useAutoSummarize can debounce. */
+  const [saveCount, setSaveCount] = useState(0)
+  /** Approximate plaintext length of the current note, updated on each save. */
+  const [contentLength, setContentLength] = useState(0)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   /**
    * Shared state for the in-place streaming translation feature.
@@ -193,6 +226,8 @@ function AppContent() {
   const handleContentLoaded = useCallback(() => {
     onCursorLoaded()
     onScrollLoaded()
+    setContentLength(computeEditorTextLength(editorRef))
+
     // Execute pending translation synchronously so that the translation is the
     // first undo-stack entry after the editor has loaded.  Using requestAnimationFrame
     // would allow intermediate onChange → backfillImageCaptions transactions to be
@@ -206,7 +241,13 @@ function AppContent() {
         translateNoteHandlerRef.current?.(id)
       })
     }
-  }, [onCursorLoaded, onScrollLoaded, pendingTranslationId, selectedNoteId])
+  }, [
+    onCursorLoaded,
+    onScrollLoaded,
+    pendingTranslationId,
+    selectedNoteId,
+    editorRef,
+  ])
   useScrollIsolation(scrollContainerRef, {
     selectors: [
       '.bn-suggestion-menu',
@@ -374,10 +415,15 @@ function AppContent() {
    *
    * @param id - The ID of the note that was saved.
    */
-  const handleNoteSaved = useCallback((id: string) => {
-    setSelectedNoteId((current) => (current === null ? id : current))
-    setRefreshKey((v) => v + 1)
-  }, [])
+  const handleNoteSaved = useCallback(
+    (id: string) => {
+      setSelectedNoteId((current) => (current === null ? id : current))
+      setRefreshKey((v) => v + 1)
+      setSaveCount((v) => v + 1)
+      setContentLength(computeEditorTextLength(editorRef))
+    },
+    [editorRef]
+  )
 
   /**
    * Callback invoked when the lock state of the loaded note is determined.
@@ -872,94 +918,108 @@ function AppContent() {
           onRefresh={() => setRefreshKey((v) => v + 1)}
         />
         <SidebarInset className="overflow-hidden">
-          <header
-            className={cn(
-              'flex h-12 shrink-0 items-center gap-2 border-b px-4',
-              'overflow-hidden transition-[max-height,opacity,padding,border-width] duration-200 ease-in-out',
-              'max-h-12 opacity-100',
-              isHeaderHidden && '!border-b-0 max-h-0 py-0 opacity-0'
-            )}
-          >
-            <SidebarTrigger className="-ml-1" />
-            <div className="flex-1" />
-            {isMacOS && (
-              <Tooltip>
-                <TooltipTrigger
-                  render={(props) => (
-                    <button
-                      {...props}
-                      type="button"
-                      disabled={
-                        !translationAvailable ||
-                        !selectedNoteId ||
-                        (translationState.visible &&
-                          translationState.progress != null)
-                      }
-                      onClick={() =>
-                        selectedNoteId && handleTranslateNote(selectedNoteId)
-                      }
-                      className="inline-flex items-center justify-center rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
-                    >
-                      <Languages className="h-4 w-4" />
-                    </button>
+          <SummarizationProvider>
+            <SummarizationManager
+              noteId={selectedNoteId}
+              saveCount={saveCount}
+              contentLength={contentLength}
+            >
+              <header
+                className={cn(
+                  'flex h-12 shrink-0 items-center gap-2 border-b px-4',
+                  'overflow-hidden transition-[max-height,opacity,padding,border-width] duration-200 ease-in-out',
+                  'max-h-12 opacity-100',
+                  isHeaderHidden && '!border-b-0 max-h-0 py-0 opacity-0'
+                )}
+              >
+                <SidebarTrigger className="-ml-1" />
+                <div className="flex-1" />
+                {isMacOS && (
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={(props) => (
+                        <button
+                          {...props}
+                          type="button"
+                          disabled={
+                            !translationAvailable ||
+                            !selectedNoteId ||
+                            (translationState.visible &&
+                              translationState.progress != null)
+                          }
+                          onClick={() =>
+                            selectedNoteId &&
+                            handleTranslateNote(selectedNoteId)
+                          }
+                          className="inline-flex items-center justify-center rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
+                        >
+                          <Languages className="h-4 w-4" />
+                        </button>
+                      )}
+                    />
+                    <TooltipContent>
+                      {!translationAvailable
+                        ? 'Translation requires macOS 26 or later'
+                        : !selectedNoteId
+                          ? 'Select a note to translate'
+                          : translationState.visible &&
+                              translationState.progress != null
+                            ? 'Translation in progress…'
+                            : 'Translate note'}
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+                <SummarizeButton />
+                <ModeToggle />
+              </header>
+              <div
+                ref={scrollContainerRef}
+                className="custom-scrollbar relative flex-1 overflow-y-auto overscroll-none"
+              >
+                <div className="pointer-events-none sticky top-5 z-10 flex flex-col items-end gap-1 pr-7">
+                  <SaveStatusIndicator
+                    status={saveStatus}
+                    locked={isNoteLocked}
+                  />
+                  {translationState.visible && (
+                    <div className="pointer-events-auto">
+                      <TranslationIndicator
+                        sourceLang={translationState.sourceLang}
+                        targetLang={translationState.targetLang}
+                        detectedLang={translationState.detectedLang}
+                        progress={translationState.progress}
+                        onRetranslate={handleRetranslate}
+                        onDismiss={handleDismissTranslation}
+                      />
+                    </div>
                   )}
+                </div>
+                <SummaryAccordion />
+                <Editor
+                  ref={editorRef}
+                  key={selectedNoteId ?? 'new'}
+                  noteId={selectedNoteId}
+                  locked={isNoteLocked}
+                  onNoteSaved={handleNoteSaved}
+                  onStatusChange={setSaveStatus}
+                  onContentLoaded={handleContentLoaded}
+                  onSuggestionMenuOpen={scrollCursorToTop}
+                  onTranslate={
+                    selectedNoteId
+                      ? () => handleTranslateNote(selectedNoteId)
+                      : undefined
+                  }
+                  onLockStateChange={handleLockStateChange}
                 />
-                <TooltipContent>
-                  {!translationAvailable
-                    ? 'Translation requires macOS 26 or later'
-                    : !selectedNoteId
-                      ? 'Select a note to translate'
-                      : translationState.visible &&
-                          translationState.progress != null
-                        ? 'Translation in progress…'
-                        : 'Translate note'}
-                </TooltipContent>
-              </Tooltip>
-            )}
-            <ModeToggle />
-          </header>
-          <div
-            ref={scrollContainerRef}
-            className="custom-scrollbar relative flex-1 overflow-y-auto overscroll-none"
-          >
-            <div className="pointer-events-none sticky top-5 z-10 flex flex-col items-end gap-1 pr-7">
-              <SaveStatusIndicator status={saveStatus} locked={isNoteLocked} />
-              {translationState.visible && (
-                <div className="pointer-events-auto">
-                  <TranslationIndicator
-                    sourceLang={translationState.sourceLang}
-                    targetLang={translationState.targetLang}
-                    detectedLang={translationState.detectedLang}
-                    progress={translationState.progress}
-                    onRetranslate={handleRetranslate}
-                    onDismiss={handleDismissTranslation}
+                <div className="pointer-events-none sticky bottom-5 z-10 flex justify-end pr-7">
+                  <ScrollToTopButton
+                    visible={isScrolledDown}
+                    onClick={scrollToTop}
                   />
                 </div>
-              )}
-            </div>
-            <Editor
-              ref={editorRef}
-              key={selectedNoteId ?? 'new'}
-              noteId={selectedNoteId}
-              locked={isNoteLocked}
-              onNoteSaved={handleNoteSaved}
-              onStatusChange={setSaveStatus}
-              onContentLoaded={handleContentLoaded}
-              onSuggestionMenuOpen={scrollCursorToTop}
-              onTranslate={
-                selectedNoteId
-                  ? () => handleTranslateNote(selectedNoteId)
-                  : undefined
-              }
-              onLockStateChange={handleLockStateChange}
-            />
-            <div className="pointer-events-none sticky bottom-5 z-10 flex justify-end pr-7">
-              <ScrollToTopButton
-                visible={isScrolledDown}
-                onClick={scrollToTop}
-              />
-            </div>
-          </div>
+              </div>
+            </SummarizationManager>
+          </SummarizationProvider>
         </SidebarInset>
       </SidebarProvider>
       <Toaster position="bottom-right" />

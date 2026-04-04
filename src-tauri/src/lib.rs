@@ -2,6 +2,7 @@ mod db;
 mod file_io;
 mod groups;
 mod link_preview;
+mod summarization;
 mod translation;
 mod window;
 
@@ -50,6 +51,7 @@ pub fn run() {
             db::init_db(app.handle())?;
             app.manage(link_preview::LinkPreviewCache(Mutex::new(HashMap::new())));
             app.manage(translation::TranslationAvailable(Mutex::new(None)));
+            app.manage(summarization::SummarizationAvailable(Mutex::new(None)));
             window::create_main_window(app.handle())?;
             Ok(())
         })
@@ -86,6 +88,9 @@ pub fn run() {
             translation::get_supported_languages,
             translation::detect_language,
             translation::check_language_pair_status,
+            summarization::is_summarization_available,
+            summarization::get_note_summary,
+            summarization::summarize_note,
             file_io::download_file,
             file_io::fetch_image_bytes_base64,
             #[cfg(target_os = "macos")]
