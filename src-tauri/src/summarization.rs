@@ -343,7 +343,7 @@ fn split_at_sentences(text: &str, max_chars: usize) -> Vec<String> {
     let mut chunks = Vec::new();
     let mut current = String::new();
 
-    for sentence in text.split_inclusive(|c| c == '.' || c == '。' || c == '\n') {
+    for sentence in text.split_inclusive(['.', '。', '\n']) {
         if !current.is_empty() && current.len() + sentence.len() > max_chars {
             chunks.push(std::mem::take(&mut current));
         }
