@@ -7,7 +7,10 @@ import {
   defaultBlockSpecs,
   defaultStyleSpecs,
 } from '@blocknote/core'
-import { filterSuggestionItems } from '@blocknote/core/extensions'
+import {
+  type DefaultSuggestionItem,
+  filterSuggestionItems,
+} from '@blocknote/core/extensions'
 import * as locales from '@blocknote/core/locales'
 import {
   AddBlockButton,
@@ -112,6 +115,12 @@ import '@blocknote/core/fonts/inter.css'
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const BLOCKS = DEFAULT_BLOCKS as any
+
+/**
+ * Slash menu item keys permanently hidden because the upload handler only
+ * supports images. Audio, Video, and File commands would fail on use.
+ */
+const HIDDEN_SLASH_MENU_KEYS = new Set<string>(['audio', 'video', 'file'])
 
 /**
  * Extracts the file extension from a filename or URL (lowercase, without dot).
@@ -894,6 +903,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
                 sideMenu={false}
               >
                 {/* Custom slash menu that includes the default items plus multi-column ones. */}
+                {/* Audio, Video, File are filtered out — the upload handler only supports images. */}
                 <SuggestionMenuController
                   triggerCharacter="/"
                   getItems={async (query) =>
@@ -903,6 +913,11 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
                         getMultiColumnSlashMenuItems(editor)
                       ),
                       query
+                    ).filter(
+                      (item) =>
+                        !HIDDEN_SLASH_MENU_KEYS.has(
+                          (item as DefaultSuggestionItem).key
+                        )
                     )
                   }
                 />
