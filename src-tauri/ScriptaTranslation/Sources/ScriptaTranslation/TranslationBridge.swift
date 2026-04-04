@@ -4,6 +4,9 @@ import SwiftRs
 @preconcurrency import Translation
 
 /// Checks whether the Apple Translation framework is available.
+///
+/// - Returns: `true` if the current system is macOS 26.0 or later,
+///   `false` otherwise.
 @_cdecl("scripta_translation_available")
 public func scriptaTranslationAvailable() -> Bool {
     if #available(macOS 26.0, *) {
@@ -14,7 +17,14 @@ public func scriptaTranslationAvailable() -> Bool {
 
 /// Detects the dominant language of the given text.
 ///
+/// Uses `NLLanguageRecognizer` to analyse the input string and identify
+/// its most likely language.
+///
 /// Returns the BCP-47 base code (e.g. "en", "ja") or empty string on failure.
+///
+/// - Parameter text: The input string to analyse.
+/// - Returns: The BCP-47 base language code of the detected language
+///   (e.g. `"en"`, `"ja"`), or an empty string if detection fails.
 @_cdecl("scripta_detect_language")
 public func scriptaDetectLanguage(text: SRString) -> SRString {
     let recognizer = NLLanguageRecognizer()
@@ -27,7 +37,21 @@ public func scriptaDetectLanguage(text: SRString) -> SRString {
 
 /// Returns the list of supported translation languages as JSON.
 ///
+/// Queries `LanguageAvailability` on a detached `Task` to avoid a
+/// `@MainActor` deadlock when called from the main thread.
+/// The calling thread is blocked for up to **10 seconds** awaiting the result.
+///
+/// Each element in the returned JSON array has the following shape:
+///
+/// ```json
+/// {"code": "en-Latn-US", "name": "English (US)"}
+/// ```
+///
 /// Output: `[{"code":"en","name":"English"}, ...]`
+///
+/// - Returns: A JSON array string of language objects, or `"[]"` when
+///   the system is below macOS 26.0 or the query times out.
+/// - Note: Requires macOS 26.0 or later; returns `"[]"` on older systems.
 @_cdecl("scripta_get_supported_languages")
 public func scriptaGetSupportedLanguages() -> SRString {
     guard #available(macOS 26.0, *) else {
@@ -70,7 +94,20 @@ public func scriptaGetSupportedLanguages() -> SRString {
 
 /// Checks whether a language pair is installed, supported (not downloaded), or unsupported.
 ///
+/// The check is performed asynchronously on the `@MainActor` and the
+/// calling thread is blocked for up to **10 seconds** awaiting the result.
+///
 /// Returns: "installed", "supported", or "unsupported"
+///
+/// - Parameters:
+///   - sourceLang: BCP-47 identifier of the source language (e.g. `"en"`, `"ja"`).
+///   - targetLang: BCP-47 identifier of the target language.
+/// - Returns: One of the following string values:
+///   - `"installed"` — the language pair model is downloaded and ready.
+///   - `"supported"` — the pair is available but not yet downloaded.
+///   - `"unsupported"` — the pair cannot be used for translation.
+/// - Note: Returns `"unsupported"` on macOS versions earlier than 26.0
+///   or if the availability query times out.
 @_cdecl("scripta_check_language_pair_status")
 public func scriptaCheckLanguagePairStatus(
     sourceLang: SRString,
@@ -111,8 +148,26 @@ public func scriptaCheckLanguagePairStatus(
 
 /// Batch translates texts joined by null bytes.
 ///
+/// The input string is split on `\0` to produce individual translation
+/// segments. When `sourceLang` is `"auto"`, `NLLanguageRecognizer` detects
+/// the dominant language from the concatenated segments.
+///
+/// Same-language pairs (e.g. `"en"` → `"en-Latn-US"`) are rejected early
+/// by comparing the base language codes of source and target.
+/// The calling thread is blocked for up to **60 seconds** while the async
+/// `TranslationSession` completes.
+///
 /// Input: texts separated by `\0`
 /// Output: translated texts separated by `\0`, or `ERROR:<message>` on failure
+///
+/// - Parameters:
+///   - text: Null-byte (`\0`) separated list of strings to translate.
+///   - sourceLang: BCP-47 source language identifier, or `"auto"` to
+///     enable automatic language detection using `NLLanguageRecognizer`.
+///   - targetLang: BCP-47 target language identifier.
+/// - Returns: Null-byte (`\0`) separated translated strings in the same
+///   order as the input segments, or an `"ERROR:<message>"` string on failure.
+/// - Note: Requires macOS 26.0 or later.
 @_cdecl("scripta_translate_batch")
 public func scriptaTranslateBatch(
     text: SRString,
@@ -162,6 +217,11 @@ public func scriptaTranslateBatch(
 
     Task { @MainActor in
         do {
+            guard #available(macOS 26.0, *) else {
+                errorMessage = "ERROR:macOS 26.0+ required for translation"
+                semaphore.signal()
+                return
+            }
             // Only block on .unsupported; skip the status check otherwise.
             // LanguageAvailability.status() has a cold-start issue where it
             // returns .supported instead of .installed on first access.
@@ -199,6 +259,23 @@ public func scriptaTranslateBatch(
 }
 
 /// Translates a single text string.
+///
+/// When `sourceLang` is `"auto"`, `NLLanguageRecognizer` is used to detect
+/// the dominant language of `text`. Same-language pairs are rejected by
+/// comparing the base language codes of source and target
+/// (e.g. `"en"` → `"en-Latn-US"` is rejected).
+///
+/// The calling thread is blocked for up to **60 seconds** while the async
+/// `TranslationSession` completes.
+///
+/// - Parameters:
+///   - text: The source string to translate.
+///   - sourceLang: BCP-47 source language identifier, or `"auto"` to
+///     enable automatic language detection using `NLLanguageRecognizer`.
+///   - targetLang: BCP-47 target language identifier.
+/// - Returns: The translated string, or an `"ERROR:<message>"` string
+///   on failure (unsupported pair, detection failure, timeout, etc.).
+/// - Note: Requires macOS 26.0 or later.
 @_cdecl("scripta_translate_single")
 public func scriptaTranslateSingle(
     text: SRString,
@@ -242,6 +319,11 @@ public func scriptaTranslateSingle(
 
     Task { @MainActor in
         do {
+            guard #available(macOS 26.0, *) else {
+                errorMessage = "ERROR:macOS 26.0+ required for translation"
+                semaphore.signal()
+                return
+            }
             // Only block on .unsupported; skip the status check otherwise.
             // LanguageAvailability.status() has a cold-start issue where it
             // returns .supported instead of .installed on first access.
