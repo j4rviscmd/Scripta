@@ -7,7 +7,10 @@ import {
   defaultBlockSpecs,
   defaultStyleSpecs,
 } from '@blocknote/core'
-import { filterSuggestionItems } from '@blocknote/core/extensions'
+import {
+  type DefaultSuggestionItem,
+  filterSuggestionItems,
+} from '@blocknote/core/extensions'
 import * as locales from '@blocknote/core/locales'
 import {
   AddBlockButton,
@@ -114,6 +117,11 @@ import '@blocknote/core/fonts/inter.css'
 const BLOCKS = DEFAULT_BLOCKS as any
 
 /**
+ * Slash menu item keys permanently hidden because the upload handler only
+ * supports images. Audio, Video, and File commands would fail on use.
+ */
+const HIDDEN_SLASH_MENU_KEYS = new Set<string>(['audio', 'video', 'file'])
+
 /**
  * Extracts the file extension from a filename or URL (lowercase, without dot).
  * Returns `undefined` if the string has no recognisable extension.
@@ -439,23 +447,45 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   /** Exposes the editor instance to parent components via the forwarded ref. */
   useImperativeHandle(ref, () => ({ editor: editorAny }), [editorAny])
 
+  /**
+   * Returns the slash menu items filtered by the current query string.
+   *
+   * Merges the default BlockNote slash menu items with the multi-column layout
+   * items, removes entries whose keys are in {@link HIDDEN_SLASH_MENU_KEYS}
+   * (audio, video, file — unsupported upload types), and optionally appends a
+   * "Translate" command when the {@link onTranslate} callback is provided.
+   *
+   * The combined list is then filtered by {@link filterSuggestionItems} which
+   * matches against each item's `title` and `aliases`.
+   *
+   * @param query - The text typed after the "/" trigger character.
+   * @returns A promise resolving to the filtered list of slash menu items.
+   */
   const getSlashMenuItems = useCallback(
     async (query: string) => {
       const defaults = combineByGroup(
         getDefaultReactSlashMenuItems(editor),
         getMultiColumnSlashMenuItems(editor)
+      ).filter(
+        (item) =>
+          !HIDDEN_SLASH_MENU_KEYS.has((item as DefaultSuggestionItem).key)
       )
-      if (!onTranslate) return filterSuggestionItems(defaults, query)
-      const translateItem = {
-        title: 'Translate',
-        onItemClick: () => onTranslate(),
-        subtext: 'Translate this note with Apple Intelligence',
-        aliases: ['translation', 'translate', 'honyaku', '翻訳'],
-        group: 'Actions' as const,
-        icon: <Languages size={18} />,
-      }
-      const all = [...defaults, translateItem]
-      return filterSuggestionItems(all, query)
+
+      const items = onTranslate
+        ? [
+            ...defaults,
+            {
+              title: 'Translate',
+              onItemClick: () => onTranslate(),
+              subtext: 'Translate this note with Apple Intelligence',
+              aliases: ['translation', 'translate', 'honyaku', '翻訳'],
+              group: 'Actions' as const,
+              icon: <Languages size={18} />,
+            },
+          ]
+        : defaults
+
+      return filterSuggestionItems(items, query)
     },
     [editor, onTranslate]
   )
