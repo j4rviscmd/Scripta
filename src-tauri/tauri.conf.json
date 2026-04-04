@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Scripta",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "identifier": "com.scripta.app",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -15,7 +15,9 @@
       "csp": "default-src 'self'; connect-src 'self' https://api.github.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self'; img-src 'self' data: asset: https: http://asset.localhost",
       "assetProtocol": {
         "enable": true,
-        "scope": ["**"]
+        "scope": [
+          "**"
+        ]
       }
     }
   },
