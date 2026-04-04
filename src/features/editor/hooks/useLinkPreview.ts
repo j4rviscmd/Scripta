@@ -55,7 +55,11 @@ function replaceLinkText(
           target: '_blank',
         })
         const textNode = state.schema.text(title, [mark])
-        view.dispatch(state.tr.replaceWith(pos, pos + node.nodeSize, textNode))
+        view.dispatch(
+          state.tr
+            .replaceWith(pos, pos + node.nodeSize, textNode)
+            .setMeta('preventAutolink', true)
+        )
         found = true
         return false
       }
