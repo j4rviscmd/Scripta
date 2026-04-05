@@ -41,26 +41,6 @@ async function getSidebarNoteCount(): Promise<number> {
   });
 }
 
-/** Execute a callback with the ProseMirror editor element. Returns null if not found. */
-function withEditor<T>(fn: (editor: HTMLElement) => T): T | null {
-  const editor = document.querySelector(EDITOR_SELECTOR) as HTMLElement | null;
-  if (!editor) return null;
-  editor.focus();
-  return fn(editor);
-}
-
-/** Find the first sidebar button whose span text matches the predicate. */
-function findSidebarButton(predicate: (text: string) => boolean): HTMLButtonElement | null {
-  const buttons = document.querySelectorAll(SIDEBAR_MENU_BUTTON);
-  for (const btn of buttons) {
-    const span = btn.querySelector("span");
-    if (span?.textContent && predicate(span.textContent)) {
-      return btn as HTMLButtonElement;
-    }
-  }
-  return null;
-}
-
 describe("Scripta E2E Pilot", () => {
   before(() => {
     ensureScreenshotDir();
@@ -144,72 +124,76 @@ describe("Scripta E2E Pilot", () => {
 
   it("should type content and apply editor formatting", async () => {
     // Step 1: テキスト入力
-    const typed = await browser.execute(() => {
-      return withEditor((editor) => {
-        document.execCommand("selectAll", false);
-        document.execCommand("insertText", false, "E2E Test Note");
-        return true;
-      }) ?? false;
-    });
+    const typed = await browser.execute((sel: string) => {
+      const editor = document.querySelector(sel) as HTMLElement | null;
+      if (!editor) return false;
+      editor.focus();
+      document.execCommand("selectAll", false);
+      document.execCommand("insertText", false, "E2E Test Note");
+      return true;
+    }, EDITOR_SELECTOR);
     expect(typed).toBe(true);
     await browser.pause(300);
 
     // Step 2: Italic適用（selectAll → italic）
-    const italic = await browser.execute(() => {
-      return withEditor((editor) => {
-        document.execCommand("selectAll", false);
-        document.execCommand("italic", false);
-        const em = editor.querySelector("em");
-        const i = editor.querySelector("i");
-        return (em?.textContent ?? i?.textContent ?? "").includes("E2E Test Note");
-      }) ?? false;
-    });
+    const italic = await browser.execute((sel: string) => {
+      const editor = document.querySelector(sel) as HTMLElement | null;
+      if (!editor) return false;
+      editor.focus();
+      document.execCommand("selectAll", false);
+      document.execCommand("italic", false);
+      const em = editor.querySelector("em");
+      const i = editor.querySelector("i");
+      return (em?.textContent ?? i?.textContent ?? "").includes("E2E Test Note");
+    }, EDITOR_SELECTOR);
     console.log(`Italic applied: ${italic}`);
     await browser.pause(300);
 
     // Step 3: 新しいブロックを作成してBold適用
-    const bold = await browser.execute(() => {
-      return withEditor((editor) => {
-        const sel = window.getSelection();
-        sel?.removeAllRanges();
-        sel?.selectAllChildren(editor);
-        sel?.collapseToEnd();
-        document.execCommand("insertParagraph", false);
-        document.execCommand("insertText", false, "Bold test content");
+    const bold = await browser.execute((sel: string) => {
+      const editor = document.querySelector(sel) as HTMLElement | null;
+      if (!editor) return false;
+      editor.focus();
+      const s = window.getSelection();
+      s?.removeAllRanges();
+      s?.selectAllChildren(editor);
+      s?.collapseToEnd();
+      document.execCommand("insertParagraph", false);
+      document.execCommand("insertText", false, "Bold test content");
 
-        const blocks = editor.querySelectorAll(
-          '[data-content-type="paragraph"] .bn-inline-content'
-        );
-        const lastBlock = blocks[blocks.length - 1];
-        if (!lastBlock) return false;
+      const blocks = editor.querySelectorAll(
+        '[data-content-type="paragraph"] .bn-inline-content'
+      );
+      const lastBlock = blocks[blocks.length - 1];
+      if (!lastBlock) return false;
 
-        const range = document.createRange();
-        range.selectNodeContents(lastBlock);
-        sel?.removeAllRanges();
-        sel?.addRange(range);
-        document.execCommand("bold", false);
+      const range = document.createRange();
+      range.selectNodeContents(lastBlock);
+      s?.removeAllRanges();
+      s?.addRange(range);
+      document.execCommand("bold", false);
 
-        const strong = editor.querySelector("strong");
-        const b = editor.querySelector("b");
-        return (strong?.textContent ?? b?.textContent ?? "").includes(
-          "Bold test content"
-        );
-      }) ?? false;
-    });
+      const strong = editor.querySelector("strong");
+      const b = editor.querySelector("b");
+      return (strong?.textContent ?? b?.textContent ?? "").includes(
+        "Bold test content"
+      );
+    }, EDITOR_SELECTOR);
     console.log(`Bold applied: ${bold}`);
     await browser.pause(300);
 
     // Step 4: Slash command → /heading → H2変換
-    await browser.execute(() => {
-      withEditor((editor) => {
-        const sel = window.getSelection();
-        sel?.removeAllRanges();
-        sel?.selectAllChildren(editor);
-        sel?.collapseToEnd();
-        document.execCommand("insertParagraph", false);
-        document.execCommand("insertText", false, "/heading");
-      });
-    });
+    await browser.execute((sel: string) => {
+      const editor = document.querySelector(sel) as HTMLElement | null;
+      if (!editor) return;
+      editor.focus();
+      const s = window.getSelection();
+      s?.removeAllRanges();
+      s?.selectAllChildren(editor);
+      s?.collapseToEnd();
+      document.execCommand("insertParagraph", false);
+      document.execCommand("insertText", false, "/heading");
+    }, EDITOR_SELECTOR);
 
     await browser.pause(1000);
 
@@ -232,11 +216,12 @@ describe("Scripta E2E Pilot", () => {
 
     await browser.pause(800);
 
-    await browser.execute(() => {
-      withEditor(() => {
-        document.execCommand("insertText", false, "Formatted Heading");
-      });
-    });
+    await browser.execute((sel: string) => {
+      const editor = document.querySelector(sel) as HTMLElement | null;
+      if (!editor) return;
+      editor.focus();
+      document.execCommand("insertText", false, "Formatted Heading");
+    }, EDITOR_SELECTOR);
     await browser.pause(500);
 
     // 検証
@@ -250,10 +235,16 @@ describe("Scripta E2E Pilot", () => {
 
   it("should persist note title in sidebar", async () => {
     const findTitle = () =>
-      browser.execute(() => {
-        const btn = findSidebarButton((t) => t.includes("E2E Test Note"));
-        return btn?.querySelector("span")?.textContent ?? null;
-      });
+      browser.execute((btnSel: string) => {
+        const buttons = document.querySelectorAll(btnSel);
+        for (const btn of buttons) {
+          const span = btn.querySelector("span");
+          if (span?.textContent?.includes("E2E Test Note")) {
+            return span.textContent;
+          }
+        }
+        return null;
+      }, SIDEBAR_MENU_BUTTON);
 
     await browser.waitUntil(
       async () => (await findTitle()) !== null,

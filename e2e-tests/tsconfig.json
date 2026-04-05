@@ -8,7 +8,8 @@
     "outDir": "dist",
     "rootDir": ".",
     "resolveJsonModule": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": ["@wdio/globals/types", "@types/mocha"]
   },
-  "include": ["test/**/*.ts", "wdio.conf.ts"]
+  "include": ["test/**/*.ts", "helpers/**/*.ts", "wdio.conf.ts"]
 }
