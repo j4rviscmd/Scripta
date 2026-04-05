@@ -101,6 +101,13 @@ pub fn get_note_summary(
 /// If a cached summary exists with a matching content hash, it is returned
 /// without invoking the language model.
 ///
+/// After a summary is obtained (from cache or freshly generated), a sentence
+/// embedding is generated via
+/// [`generate_and_store_embedding`](crate::embedding::generate_and_store_embedding)
+/// as a fire-and-forget side effect. Embedding failures are silently ignored
+/// so they never block summarization. Short notes that fall below the
+/// minimum length threshold also receive an embedding from their plain text.
+///
 /// Runs heavy AI inference on a blocking thread so the Tauri event loop
 /// remains responsive.
 #[tauri::command]
@@ -122,23 +129,32 @@ pub async fn summarize_note(
 
     // 3. Minimum length check
     if plain_text.len() < MIN_CHARS {
+        // Still generate embedding from the plain text so short notes are
+        // included in future semantic search results.
+        let _ = crate::embedding::generate_and_store_embedding(&db, &note_id, &plain_text);
         return Err("ERR::CONTENT_TOO_SHORT".to_string());
     }
 
     // 4. Check cache freshness
     let content_hash = compute_hash(&plain_text);
-    {
+    let cached_summary = {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
         let cached = conn.query_row(
             "SELECT summary, content_hash FROM note_summaries WHERE note_id = ?1",
             [&note_id],
             |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
         );
-        if let Ok((summary, hash)) = cached {
-            if hash == content_hash {
-                return Ok(summary);
-            }
+        match cached {
+            Ok((summary, hash)) if hash == content_hash => Some(summary),
+            _ => None,
         }
+    };
+    // Lock released — safe to call embedding which acquires its own lock.
+
+    if let Some(summary) = cached_summary {
+        // Ensure embedding exists for previously cached summaries (fire-and-forget).
+        let _ = crate::embedding::generate_and_store_embedding(&db, &note_id, &summary);
+        return Ok(summary);
     }
 
     // 5. Run recursive summarization on a blocking thread so we don't freeze
@@ -162,6 +178,9 @@ pub async fn summarize_note(
         )
         .map_err(|e| e.to_string())?;
     }
+
+    // 7. Generate embedding (fire-and-forget — errors never affect summarization).
+    let _ = crate::embedding::generate_and_store_embedding(&db, &note_id, &summary);
 
     Ok(summary)
 }
