@@ -104,6 +104,10 @@ describe("Scripta E2E Pilot", () => {
     const newNoteBtn = await browser.$(
       '[data-slot="sidebar-header"] button'
     );
+    await newNoteBtn.waitForClickable({
+      timeout: 5000,
+      timeoutMsg: "New note button not clickable within 5s",
+    });
     await newNoteBtn.click();
     console.log("Clicked new note button");
 
@@ -123,6 +127,13 @@ describe("Scripta E2E Pilot", () => {
   // ─── Phase 2: Type, Format & Slash Command (all in one note) ───
 
   it("should type content and apply editor formatting", async () => {
+    // エディタが存在するまで待機（前テストでノート作成後のレンダリング完了を保証）
+    const editor = await browser.$(EDITOR_SELECTOR);
+    await editor.waitForExist({
+      timeout: 5000,
+      timeoutMsg: "Editor not found within 5s",
+    });
+
     // Step 1: テキスト入力
     const typed = await browser.execute((sel: string) => {
       const editor = document.querySelector(sel) as HTMLElement | null;
