@@ -51,23 +51,23 @@ describe("Scripta E2E Pilot", () => {
   it("should show splash screen on launch", async () => {
     await browser.waitUntil(
       async () => {
+        const splashExists = await browser.execute(
+          (sel: string) => document.querySelector(sel) !== null,
+          SPLASH_SELECTOR
+        );
+        if (!splashExists) return false;
+
         const h1 = await browser.$("h1");
         const text = await h1.getText().catch(() => "");
         return text.includes("Scripta");
       },
       {
         timeout: 15000,
-        timeoutMsg: "Splash screen h1 not found within 15s",
+        timeoutMsg: "Splash screen not found within 15s",
       }
     );
 
     await saveScreenshot("00-splash-screen.png");
-
-    const splashExists = await browser.execute(
-      (sel: string) => document.querySelector(sel) !== null,
-      SPLASH_SELECTOR
-    );
-    expect(splashExists).toBe(true);
   });
 
   it("should show the main UI after splash", async () => {
