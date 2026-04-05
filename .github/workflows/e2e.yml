@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
 
 concurrency:
@@ -81,13 +81,15 @@ jobs:
             const path = require('path');
             const screenshotDir = 'e2e-tests/screenshots';
             const marker = '<!-- e2e-screenshots-comment -->';
+            const prNumber = context.issue.number;
+            const branch = 'ci-screenshots';
+            const dir = `pr-${prNumber}`;
 
-            // Recursively find all PNG files
-            function findPngs(dir) {
-              if (!fs.existsSync(dir)) return [];
+            function findPngs(d) {
+              if (!fs.existsSync(d)) return [];
               const results = [];
-              for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-                const fullPath = path.join(dir, entry.name);
+              for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+                const fullPath = path.join(d, entry.name);
                 if (entry.isDirectory()) results.push(...findPngs(fullPath));
                 else if (entry.name.endsWith('.png')) results.push(fullPath);
               }
@@ -95,6 +97,85 @@ jobs:
             }
 
             const pngs = findPngs(screenshotDir);
+
+            // Upload screenshots to ci-screenshots branch for inline display
+            if (pngs.length > 0) {
+              const blobs = await Promise.all(pngs.map(async (png) => {
+                const content = fs.readFileSync(png).toString('base64');
+                const { data } = await github.rest.git.createBlob({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  content,
+                  encoding: 'base64',
+                });
+                return {
+                  path: `${dir}/${path.relative(screenshotDir, png)}`,
+                  sha: data.sha,
+                };
+              }));
+
+              let parentSha = null;
+              try {
+                const { data: ref } = await github.rest.git.getRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `heads/${branch}`,
+                });
+                parentSha = ref.object.sha;
+              } catch {
+                // Branch doesn't exist yet
+              }
+
+              const treeItems = blobs.map(b => ({
+                path: b.path,
+                mode: '100644',
+                type: 'blob',
+                sha: b.sha,
+              }));
+
+              let baseTree;
+              if (parentSha) {
+                const { data: parentCommit } = await github.rest.git.getCommit({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  commit_sha: parentSha,
+                });
+                baseTree = parentCommit.tree.sha;
+              }
+
+              const { data: tree } = await github.rest.git.createTree({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tree: treeItems,
+                ...(baseTree ? { base_tree: baseTree } : {}),
+              });
+
+              const { data: commit } = await github.rest.git.createCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                message: `ci: upload E2E screenshots for PR #${prNumber}`,
+                tree: tree.sha,
+                parents: parentSha ? [parentSha] : [],
+              });
+
+              if (parentSha) {
+                await github.rest.git.updateRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `heads/${branch}`,
+                  sha: commit.sha,
+                });
+              } else {
+                await github.rest.git.createRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `refs/heads/${branch}`,
+                  sha: commit.sha,
+                });
+              }
+            }
+
+            // Build comment body with inline images
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const conclusion = '${{ job.status }}';
             const icon = conclusion === 'success' ? '✅' : '❌';
@@ -107,12 +188,14 @@ jobs:
             if (pngs.length === 0) {
               body += `No screenshots were captured.\n`;
             } else {
-              body += `${pngs.length} screenshot(s) captured. [Download artifacts](${runUrl}).\n\n`;
-              body += `| # | Screenshot |\n|---|---|\n`;
+              body += `<details>\n<summary>${pngs.length} screenshot(s) captured (click to expand)</summary>\n\n`;
               pngs.forEach((png, i) => {
                 const rel = path.relative(screenshotDir, png);
-                body += `| ${i + 1} | \`${rel}\` |\n`;
+                const imageUrl = `https://raw.githubusercontent.com/${context.repo.owner}/${context.repo.repo}/${branch}/${dir}/${rel}`;
+                body += `### ${i + 1}. \`${rel}\`\n`;
+                body += `![${rel}](${imageUrl})\n\n`;
               });
+              body += `</details>\n`;
             }
 
             // Find and update existing comment, or create new one
