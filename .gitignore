@@ -34,3 +34,7 @@ src-tauri/ScriptaTranslation/.build/
 # Website build output
 website-dist/
 website/node_modules/
+
+# E2E test artifacts
+e2e-tests/node_modules/
+e2e-tests/screenshots/

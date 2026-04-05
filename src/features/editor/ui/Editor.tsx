@@ -62,6 +62,7 @@ import {
 import { CopyablePath } from '@/shared/ui/CopyablePath'
 import type { SaveStatus } from '..'
 import {
+  autoLinkGuardExtension,
   checklistSplitFixExtension,
   cursorCenteringExtension,
   cursorVimKeysExtension,
@@ -423,6 +424,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       multi_column: multiColumnLocales.en,
     },
     extensions: [
+      autoLinkGuardExtension,
       imeCompositionGuard,
       cursorCenteringExtension,
       searchExtension,
