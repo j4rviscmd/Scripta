@@ -916,6 +916,46 @@ pub async fn translate_text(
     .map_err(|e| e.to_string())?
 }
 
+/// Synchronous single-text translation for internal callers.
+///
+/// This avoids the async/encoding overhead of [`translate_text`] and is
+/// intended for short plain-text inputs (e.g. note summaries) where
+/// BlockNote inline markers are absent.
+///
+/// # Arguments
+///
+/// * `text` - The plain text to translate.
+/// * `source_lang` - BCP-47 source language code, or `"auto"` for auto-detection.
+/// * `target_lang` - BCP-47 target language code (e.g. `"en"`).
+///
+/// # Returns
+///
+/// The translated text on success.
+///
+/// # Errors
+///
+/// Returns an error if the Swift FFI returns an empty string for non-empty
+/// input, indicating a translation failure.
+#[cfg(target_os = "macos")]
+pub fn translate_plain_sync(
+    text: &str,
+    source_lang: &str,
+    target_lang: &str,
+) -> Result<String, String> {
+    let result = unsafe {
+        scripta_translate_single(
+            &SRString::from(text),
+            &SRString::from(source_lang),
+            &SRString::from(target_lang),
+        )
+    };
+    let translated = result.to_string();
+    if translated.is_empty() && !text.is_empty() {
+        return Err("Translation failed".to_owned());
+    }
+    Ok(translated)
+}
+
 // --- Streaming translation --------------------------------------------------
 
 /// Maximum number of concurrent translation sessions.

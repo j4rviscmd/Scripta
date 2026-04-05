@@ -1,4 +1,5 @@
 mod db;
+mod embedding;
 mod file_io;
 mod groups;
 mod link_preview;
@@ -23,8 +24,9 @@ use tauri::Manager;
 ///
 /// During setup the SQLite database is initialized, a
 /// [`LinkPreviewCache`](link_preview::LinkPreviewCache) is registered as
-/// managed state, and the main window is created via
-/// [`window::create_main_window`]. Window position and size are restored
+/// managed state, an [`EmbeddingAvailable`](embedding::EmbeddingAvailable)
+/// cache is registered for NLEmbedding availability checks, and the main
+/// window is created via [`window::create_main_window`]. Window position and size are restored
 /// from `config.json` when the user has enabled the setting; otherwise
 /// the window opens at the default 1200×800 dimensions.
 ///
@@ -52,6 +54,7 @@ pub fn run() {
             app.manage(link_preview::LinkPreviewCache(Mutex::new(HashMap::new())));
             app.manage(translation::TranslationAvailable(Mutex::new(None)));
             app.manage(summarization::SummarizationAvailable(Mutex::new(None)));
+            app.manage(embedding::EmbeddingAvailable(Mutex::new(None)));
             window::create_main_window(app.handle())?;
             Ok(())
         })
@@ -91,6 +94,7 @@ pub fn run() {
             summarization::is_summarization_available,
             summarization::get_note_summary,
             summarization::summarize_note,
+            embedding::is_embedding_available,
             file_io::download_file,
             file_io::fetch_image_bytes_base64,
             #[cfg(target_os = "macos")]
