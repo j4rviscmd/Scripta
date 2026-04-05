@@ -28,6 +28,9 @@ dist-ssr
 *.sln
 *.sw?
 
+# Swift Package Manager build cache
+src-tauri/ScriptaTranslation/.build/
+
 # Website build output
 website-dist/
 website/node_modules/

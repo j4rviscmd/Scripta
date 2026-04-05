@@ -1,0 +1,13 @@
+diff --git a/node_modules/@blocknote/core/dist/TrailingNode-GzE59m_7.js b/node_modules/@blocknote/core/dist/TrailingNode-GzE59m_7.js
+index f1034fd..a3cdce7 100644
+--- a/node_modules/@blocknote/core/dist/TrailingNode-GzE59m_7.js
++++ b/node_modules/@blocknote/core/dist/TrailingNode-GzE59m_7.js
+@@ -878,7 +878,7 @@ const Ut = "bn-drag-exclude", Mo = E(({ editor: n, options: e }) => {
+           l.from,
+           l.from + s.length,
+           c.mark("link", { href: r })
+-        ));
++        ), a.setMeta("preventAutolink", !0));
+       }), n.prosemirrorView.focus();
+     },
+     deleteLink(r = n.transact((s) => s.selection.anchor)) {

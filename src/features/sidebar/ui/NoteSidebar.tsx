@@ -13,7 +13,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { Bug, FolderCog, Search, Settings, Upload } from 'lucide-react'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -26,6 +26,7 @@ import { BugReportDialog } from '@/features/bug-report'
 import type { Note } from '@/features/editor'
 import { bucketByDate, useGroupCollapse, useGroups } from '@/features/groups'
 import { SettingsDialog } from '@/features/settings'
+import { isMacos, isTranslationAvailable } from '@/features/translation'
 import { useSidebarNotes } from '../hooks/useSidebarNotes'
 import { DateGroup } from './DateGroup'
 import { DeleteNoteDialog } from './DeleteNoteDialog'
@@ -59,6 +60,7 @@ interface NoteSidebarProps {
   onToggleLock: (noteId: string, locked: boolean) => void
   onExportNote: (noteId: string) => void
   onDuplicateNote: (noteId: string) => void
+  onTranslate: (noteId: string) => void
   onImportNote: () => void
   refreshKey: number
   onRefresh: () => void
@@ -92,6 +94,7 @@ export function NoteSidebar({
   onToggleLock,
   onExportNote,
   onDuplicateNote,
+  onTranslate,
   onImportNote,
   refreshKey,
   onRefresh,
@@ -118,7 +121,18 @@ export function NoteSidebar({
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [groupManageOpen, setGroupManageOpen] = useState(false)
   const [activeDragNoteId, setActiveDragNoteId] = useState<string | null>(null)
+  const [isMacOS, setIsMacOS] = useState(false)
+  const [translationAvailable, setTranslationAvailable] = useState(false)
   const [bugReportOpen, setBugReportOpen] = useState(false)
+
+  useEffect(() => {
+    isMacos()
+      .then(setIsMacOS)
+      .catch(() => setIsMacOS(false))
+    isTranslationAvailable()
+      .then(setTranslationAvailable)
+      .catch(() => setTranslationAvailable(false))
+  }, [])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -252,6 +266,9 @@ export function NoteSidebar({
         onExportNote={onExportNote}
         onDuplicateNote={onDuplicateNote}
         onMoveToGroup={handleMoveToGroup}
+        onTranslate={onTranslate}
+        translationAvailable={translationAvailable}
+        isMacOS={isMacOS}
         groups={groups}
         justPinnedId={justPinnedId}
       />
@@ -263,6 +280,9 @@ export function NoteSidebar({
       onToggleLock,
       onDuplicateNote,
       onExportNote,
+      onTranslate,
+      translationAvailable,
+      isMacOS,
       handleMoveToGroup,
       groups,
       justPinnedId,

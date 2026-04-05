@@ -138,6 +138,28 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
         [],
     );
 
+    // Migration: create note_summaries table for AI summarization cache.
+    let _ = conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS note_summaries (
+            note_id      TEXT PRIMARY KEY REFERENCES notes(id) ON DELETE CASCADE,
+            summary      TEXT NOT NULL,
+            content_hash TEXT NOT NULL DEFAULT '',
+            updated_at   TEXT NOT NULL DEFAULT ''
+        )",
+    );
+
+    // Migration: create note_embeddings table for NLEmbedding vector storage.
+    let _ = conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS note_embeddings (
+            note_id       TEXT PRIMARY KEY REFERENCES notes(id) ON DELETE CASCADE,
+            embedding     BLOB NOT NULL,
+            language      TEXT NOT NULL DEFAULT '',
+            dimensions    INTEGER NOT NULL DEFAULT 0,
+            summary_hash  TEXT NOT NULL DEFAULT '',
+            updated_at    TEXT NOT NULL DEFAULT ''
+        )",
+    );
+
     app.manage(DbState(Mutex::new(conn)));
     Ok(())
 }

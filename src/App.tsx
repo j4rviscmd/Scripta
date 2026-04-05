@@ -1,5 +1,6 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { open, save } from '@tauri-apps/plugin-dialog'
+import { Languages } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { EditorFontProvider } from '@/app/providers/editor-font-provider'
@@ -21,7 +22,12 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar'
 import { Toaster } from '@/components/ui/sonner'
-import { TooltipProvider } from '@/components/ui/tooltip'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { UpdateDialog, useUpdateCheckOnLaunch } from '@/features/app-update'
 import type { EditorHandle, SaveStatus } from '@/features/editor'
 import {
@@ -45,6 +51,28 @@ import {
 } from '@/features/editor'
 import { commandPaletteScrollConfig } from '@/features/editor/lib/commandPaletteScrollConfig'
 import { NoteSidebar } from '@/features/sidebar'
+import {
+  SummarizationManager,
+  SummarizationProvider,
+  SummarizeButton,
+  SummaryAccordion,
+} from '@/features/summarization'
+import {
+  collectTranslatableBlockIds,
+  commitTranslation,
+  DEFAULT_SOURCE_LANG,
+  DEFAULT_TARGET_LANG,
+  detectLanguage,
+  isMacos,
+  isTranslationAvailable,
+  StyleCounters,
+  TRANSLATION_SOURCE_LANG_KEY,
+  TRANSLATION_TARGET_LANG_KEY,
+  TranslationIndicator,
+  type TranslationStreamEvent,
+  translateBlocksStreaming,
+  updateBlockTextByIndex,
+} from '@/features/translation'
 import { cn } from '@/lib/utils'
 import { useBlockScrollMemory } from '@/shared/hooks/useBlockScrollMemory'
 import { useCursorMemory } from '@/shared/hooks/useCursorMemory'
@@ -55,6 +83,29 @@ import { CopyablePath } from '@/shared/ui/CopyablePath'
 import { ModeToggle } from '@/shared/ui/ModeToggle'
 import { SaveStatusIndicator } from '@/shared/ui/SaveStatusIndicator'
 import { ScrollToTopButton } from '@/shared/ui/ScrollToTopButton'
+
+/** Computes approximate plaintext length from BlockNote editor document. */
+function computeEditorTextLength(
+  editorRef: React.RefObject<{ editor: { document: any[] } } | null>
+): number {
+  const editor = editorRef.current?.editor
+  if (!editor) return 0
+  let len = 0
+  const walk = (blocks: typeof editor.document) => {
+    for (const block of blocks) {
+      if (block.content && Array.isArray(block.content)) {
+        for (const inline of block.content) {
+          if ('text' in inline && typeof inline.text === 'string') {
+            len += inline.text.length
+          }
+        }
+      }
+      if (block.children?.length) walk(block.children)
+    }
+  }
+  walk(editor.document)
+  return len
+}
 
 /**
  * Root application component.
@@ -73,6 +124,18 @@ function AppContent() {
   // Reads cursorAutoHideConfig directly so settings changes from the UI
   // take effect immediately without re-mounting.
   useCursorAutoHideEffect()
+  /** Whether the app is running on macOS. Determines visibility of translation UI. */
+  const [isMacOS, setIsMacOS] = useState(false)
+  /** Whether Apple Intelligence translation is available (requires macOS 26+). */
+  const [translationAvailable, setTranslationAvailable] = useState(false)
+  useEffect(() => {
+    isMacos()
+      .then(setIsMacOS)
+      .catch(() => setIsMacOS(false))
+    isTranslationAvailable()
+      .then(setTranslationAvailable)
+      .catch(() => setTranslationAvailable(false))
+  }, [])
   useUpdateCheckOnLaunch()
   const { enabled: titlePrefixEnabled } = useWindowTitlePrefix()
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
@@ -82,7 +145,57 @@ function AppContent() {
   const [noteIdInitialized, setNoteIdInitialized] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(configDefaults.sidebarOpen)
   const [refreshKey, setRefreshKey] = useState(0)
+  /** Counter bumped on each auto-save so useAutoSummarize can debounce. */
+  const [saveCount, setSaveCount] = useState(0)
+  /** Approximate plaintext length of the current note, updated on each save. */
+  const [contentLength, setContentLength] = useState(0)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
+  /**
+   * Shared state for the in-place streaming translation feature.
+   *
+   * - `visible` — whether the {@link TranslationIndicator} overlay is shown.
+   * - `originalBlocks` — a deep-clone of the editor document captured before
+   *   translation; used as the base for re-translation with different languages.
+   * - `sourceLang` — BCP-47 code of the source language used in the last run.
+   * - `targetLang` — BCP-47 code of the target language used in the last run.
+   * - `detectedLang` — language code detected by {@link detectLanguage} when
+   *   `sourceLang` is `"auto"`; empty string when detection has not run.
+   * - `progress` — current streaming progress (`completed`/`total` block count),
+   *   or `null` when no translation is in progress.
+   */
+  const [translationState, setTranslationState] = useState<{
+    visible: boolean
+    originalBlocks: any[] | null
+    sourceLang: string
+    targetLang: string
+    detectedLang: string
+    progress: { completed: number; total: number } | null
+  }>({
+    visible: false,
+    originalBlocks: null,
+    sourceLang: DEFAULT_SOURCE_LANG,
+    targetLang: DEFAULT_TARGET_LANG,
+    detectedLang: '',
+    progress: null,
+  })
+  /**
+   * The ID of a note that is queued for translation but whose editor content
+   * has not yet been loaded.  When set, {@link handleContentLoaded} will
+   * trigger `handleTranslateNote` via a microtask immediately after the editor
+   * has finished rendering the note, ensuring translation is the first entry
+   * on the ProseMirror undo stack.
+   */
+  const [pendingTranslationId, setPendingTranslationId] = useState<
+    string | null
+  >(null)
+  /**
+   * Stable ref kept in sync with the latest `handleTranslateNote` callback.
+   * Allows {@link handleContentLoaded} to call the handler without capturing
+   * a stale closure, avoiding forward-declaration issues between the two hooks.
+   */
+  const translateNoteHandlerRef = useRef<
+    ((noteId: string) => Promise<void>) | undefined
+  >(undefined)
   const [isNoteLocked, setIsNoteLocked] = useState(false)
   const editorRef = useRef<EditorHandle>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -113,7 +226,22 @@ function AppContent() {
   const handleContentLoaded = useCallback(() => {
     onCursorLoaded()
     onScrollLoaded()
-  }, [onCursorLoaded, onScrollLoaded])
+    setContentLength(computeEditorTextLength(editorRef))
+
+    // Execute pending translation synchronously so that the translation is the
+    // first undo-stack entry after the editor has loaded.  Using requestAnimationFrame
+    // would allow intermediate onChange → backfillImageCaptions transactions to be
+    // recorded first, making the user press Ctrl+Z multiple times.
+    if (pendingTranslationId && pendingTranslationId === selectedNoteId) {
+      const id = pendingTranslationId
+      setPendingTranslationId(null)
+      // Use queueMicrotask to avoid calling setState during render while still
+      // executing before any other effects or RAF callbacks.
+      queueMicrotask(() => {
+        translateNoteHandlerRef.current?.(id)
+      })
+    }
+  }, [onCursorLoaded, onScrollLoaded, pendingTranslationId, selectedNoteId])
   useScrollIsolation(scrollContainerRef, {
     selectors: [
       '.bn-suggestion-menu',
@@ -238,6 +366,14 @@ function AppContent() {
       setSelectedNoteId(id)
       setIsNoteLocked(false)
       persistLastNoteId(id)
+      setTranslationState({
+        visible: false,
+        originalBlocks: null,
+        sourceLang: DEFAULT_SOURCE_LANG,
+        targetLang: DEFAULT_TARGET_LANG,
+        detectedLang: '',
+        progress: null,
+      })
     },
     [selectedNoteId, saveScrollPosition, saveCursorPosition, persistLastNoteId]
   )
@@ -276,6 +412,8 @@ function AppContent() {
   const handleNoteSaved = useCallback((id: string) => {
     setSelectedNoteId((current) => (current === null ? id : current))
     setRefreshKey((v) => v + 1)
+    setSaveCount((v) => v + 1)
+    setContentLength(computeEditorTextLength(editorRef))
   }, [])
 
   /**
@@ -391,6 +529,156 @@ function AppContent() {
   )
 
   /**
+   * Translates the specified note in-place using Apple Intelligence.
+   * Uses the default language pair from settings. The original content
+   * can be restored with Ctrl+Z (undo) via the editor's history stack.
+   *
+   * @param noteId - The ID of the note to translate.
+   */
+  const handleTranslateNote = useCallback(
+    async (noteId: string) => {
+      // If the note is not currently selected, switch to it first and defer
+      // the actual translation until the editor has loaded the new content.
+      if (selectedNoteId !== noteId) {
+        setPendingTranslationId(noteId)
+        selectNote(noteId)
+        return
+      }
+
+      const editor = editorRef.current?.editor
+      if (!editor) return
+      try {
+        const [src, tgt] = await Promise.all([
+          configStore.get<string>(TRANSLATION_SOURCE_LANG_KEY),
+          configStore.get<string>(TRANSLATION_TARGET_LANG_KEY),
+        ])
+        const sourceLang = src ?? DEFAULT_SOURCE_LANG
+        const targetLang = tgt ?? DEFAULT_TARGET_LANG
+        // Save original blocks for re-translation
+        const originalBlocks = structuredClone(editor.document)
+        const content = JSON.stringify(editor.document)
+        const blockIds = collectTranslatableBlockIds(editor)
+
+        // Show indicator with progress immediately
+        setTranslationState({
+          visible: true,
+          originalBlocks,
+          sourceLang,
+          targetLang,
+          detectedLang: '',
+          progress: { completed: 0, total: blockIds.length },
+        })
+
+        // Track whether any blocks were actually translated so that
+        // commitTranslation is only called when the undo entry is meaningful.
+        let anyTranslated = false
+        let streamParamMap: string[] = []
+        let streamCounters = new StyleCounters()
+
+        await translateBlocksStreaming(
+          content,
+          sourceLang,
+          targetLang,
+          (event: TranslationStreamEvent) => {
+            switch (event.event) {
+              case 'started':
+                streamParamMap = event.data.paramMap
+                streamCounters = new StyleCounters(
+                  0,
+                  event.data.paramCodeCount,
+                  event.data.paramCodeCount + event.data.paramTcCount,
+                  event.data.paramCodeCount +
+                    event.data.paramTcCount +
+                    event.data.paramBcCount
+                )
+                setTranslationState((prev) => ({
+                  ...prev,
+                  progress: { completed: 0, total: event.data.totalBlocks },
+                }))
+                break
+              case 'chunkCompleted': {
+                anyTranslated = true
+                const { startIndex, translatedTexts } = event.data
+                for (let i = 0; i < translatedTexts.length; i++) {
+                  updateBlockTextByIndex(
+                    editor,
+                    startIndex + i,
+                    translatedTexts[i],
+                    blockIds,
+                    streamParamMap,
+                    streamCounters
+                  )
+                }
+                setTranslationState((prev) => ({
+                  ...prev,
+                  progress: prev.progress
+                    ? {
+                        ...prev.progress,
+                        completed:
+                          prev.progress.completed + translatedTexts.length,
+                      }
+                    : null,
+                }))
+                break
+              }
+              case 'error':
+                toast.error('Translation chunk failed', {
+                  description: event.data.message,
+                })
+                break
+              // Do NOT call setRefreshKey here.  The Editor component uses
+              // refreshKey as its React key, so incrementing it would remount
+              // the entire editor and destroy the ProseMirror undo history
+              // (making Cmd+Z unable to restore the pre-translation content).
+              case 'finished':
+                break
+            }
+          }
+        )
+
+        // Only consolidate undo entry when blocks were actually translated.
+        // Without this guard, a failed translation (e.g. same-language error)
+        // would create a no-op undo entry, causing Cmd+Z to require an extra
+        // press before restoring the original content.
+        if (anyTranslated) {
+          commitTranslation(editor, originalBlocks)
+        }
+
+        // Detect source language for indicator display
+        let detectedLang = ''
+        if (anyTranslated && sourceLang === 'auto') {
+          const textContent = originalBlocks
+            .map((b: any) =>
+              (b.content ?? []).map((n: any) => n.text ?? '').join('')
+            )
+            .filter(Boolean)
+            .join(' ')
+          detectedLang = await detectLanguage(textContent)
+        }
+
+        setTranslationState((prev) => ({
+          ...prev,
+          detectedLang,
+          progress: null,
+        }))
+      } catch (e) {
+        console.error('Translation error:', e)
+        const msg = String(e)
+        toast.error('Failed to translate note', {
+          description: msg.includes('not downloaded')
+            ? 'Download the language model from System Settings > General > Language & Region > Translation Languages'
+            : msg,
+        })
+        setTranslationState((prev) => ({ ...prev, progress: null }))
+      }
+    },
+    [configStore, selectedNoteId, selectNote]
+  )
+
+  // Keep ref in sync so handleContentLoaded can call it without forward-declaration issues.
+  translateNoteHandlerRef.current = handleTranslateNote
+
+  /**
    * Exports the given note as a Markdown file via a native save dialog.
    *
    * @param noteId - The ID of the note to export.
@@ -454,6 +742,151 @@ function AppContent() {
     }
   }, [selectNote])
 
+  /**
+   * Re-translates the current note from its saved original content using a
+   * new language pair, updating the editor in place via the streaming API.
+   *
+   * The editor is first restored to the pre-translation blocks captured in
+   * `translationState.originalBlocks`, then translation streams are applied
+   * block-by-block.  If any blocks are translated, {@link commitTranslation}
+   * consolidates all changes into a single undo entry so the user can press
+   * Cmd+Z once to revert the entire re-translation.
+   *
+   * When `newSourceLang` is `"auto"`, the detected language is updated
+   * asynchronously after streaming completes and stored in `translationState`.
+   *
+   * @param newSourceLang - BCP-47 language tag for the new source language, or
+   *   `"auto"` to enable automatic detection.
+   * @param newTargetLang - BCP-47 language tag for the new target language.
+   */
+  const handleRetranslate = useCallback(
+    async (newSourceLang: string, newTargetLang: string) => {
+      const editor = editorRef.current?.editor
+      if (!editor || !translationState.originalBlocks) return
+      try {
+        const originalContent = JSON.stringify(translationState.originalBlocks)
+        const blockIds = collectTranslatableBlockIds(editor)
+
+        // Restore original blocks first so re-translation starts from clean state
+        editor.replaceBlocks(
+          editor.document,
+          translationState.originalBlocks as any[]
+        )
+
+        setTranslationState((prev) => ({
+          ...prev,
+          sourceLang: newSourceLang,
+          targetLang: newTargetLang,
+          progress: { completed: 0, total: blockIds.length },
+        }))
+
+        // Track whether any blocks were actually translated so that
+        // commitTranslation is only called when the undo entry is meaningful.
+        let anyTranslated = false
+        let streamParamMap: string[] = []
+        let streamCounters = new StyleCounters()
+
+        await translateBlocksStreaming(
+          originalContent,
+          newSourceLang,
+          newTargetLang,
+          (event: TranslationStreamEvent) => {
+            switch (event.event) {
+              case 'started':
+                streamParamMap = event.data.paramMap
+                streamCounters = new StyleCounters(
+                  0,
+                  event.data.paramCodeCount,
+                  event.data.paramCodeCount + event.data.paramTcCount,
+                  event.data.paramCodeCount +
+                    event.data.paramTcCount +
+                    event.data.paramBcCount
+                )
+                setTranslationState((prev) => ({
+                  ...prev,
+                  progress: { completed: 0, total: event.data.totalBlocks },
+                }))
+                break
+              case 'chunkCompleted': {
+                anyTranslated = true
+                const { startIndex, translatedTexts } = event.data
+                for (let i = 0; i < translatedTexts.length; i++) {
+                  updateBlockTextByIndex(
+                    editor,
+                    startIndex + i,
+                    translatedTexts[i],
+                    blockIds,
+                    streamParamMap,
+                    streamCounters
+                  )
+                }
+                setTranslationState((prev) => ({
+                  ...prev,
+                  progress: prev.progress
+                    ? {
+                        ...prev.progress,
+                        completed:
+                          prev.progress.completed + translatedTexts.length,
+                      }
+                    : null,
+                }))
+                break
+              }
+              case 'error':
+                toast.error('Translation chunk failed', {
+                  description: event.data.message,
+                })
+                break
+              // Do NOT call setRefreshKey here — see handleTranslateNote for details.
+              case 'finished':
+                break
+            }
+          }
+        )
+
+        // Only consolidate undo entry when blocks were actually translated.
+        if (anyTranslated) {
+          commitTranslation(editor, translationState.originalBlocks)
+        }
+
+        // Re-detect language when source is "auto"
+        let detectedLang = translationState.detectedLang
+        if (anyTranslated && newSourceLang === 'auto') {
+          const textContent = translationState.originalBlocks
+            .map((b: any) =>
+              (b.content ?? []).map((n: any) => n.text ?? '').join('')
+            )
+            .filter(Boolean)
+            .join(' ')
+          detectedLang = await detectLanguage(textContent)
+        }
+        setTranslationState((prev) => ({
+          ...prev,
+          detectedLang,
+          progress: null,
+        }))
+      } catch (e) {
+        console.error('Re-translation error:', e)
+        const msg = String(e)
+        toast.error('Failed to re-translate note', {
+          description: msg.includes('not downloaded')
+            ? 'Download the language model from System Settings > General > Language & Region > Translation Languages'
+            : msg,
+        })
+        setTranslationState((prev) => ({ ...prev, progress: null }))
+      }
+    },
+    [translationState.originalBlocks, translationState.detectedLang]
+  )
+
+  /**
+   * Hides the {@link TranslationIndicator} overlay without discarding the
+   * saved original blocks, so the user can still undo via Cmd+Z.
+   */
+  const handleDismissTranslation = useCallback(() => {
+    setTranslationState((prev) => ({ ...prev, visible: false }))
+  }, [])
+
   return (
     <TooltipProvider>
       <SidebarProvider
@@ -469,49 +902,115 @@ function AppContent() {
           onTogglePin={handleTogglePin}
           onToggleLock={handleToggleLock}
           onDuplicateNote={handleDuplicateNote}
+          onTranslate={handleTranslateNote}
           onExportNote={handleExportNote}
           onImportNote={handleImportNote}
           refreshKey={refreshKey}
           onRefresh={() => setRefreshKey((v) => v + 1)}
         />
         <SidebarInset className="overflow-hidden">
-          <header
-            className={cn(
-              'flex h-12 shrink-0 items-center gap-2 border-b px-4',
-              'overflow-hidden transition-[max-height,opacity,padding,border-width] duration-200 ease-in-out',
-              'max-h-12 opacity-100',
-              isHeaderHidden && '!border-b-0 max-h-0 py-0 opacity-0'
-            )}
-          >
-            <SidebarTrigger className="-ml-1" />
-            <div className="flex-1" />
-            <ModeToggle />
-          </header>
-          <div
-            ref={scrollContainerRef}
-            className="custom-scrollbar flex-1 overflow-y-auto overscroll-none"
-          >
-            <div className="pointer-events-none sticky top-5 z-10 flex justify-end pr-7">
-              <SaveStatusIndicator status={saveStatus} locked={isNoteLocked} />
-            </div>
-            <Editor
-              ref={editorRef}
-              key={selectedNoteId ?? 'new'}
+          <SummarizationProvider>
+            <SummarizationManager
               noteId={selectedNoteId}
-              locked={isNoteLocked}
-              onNoteSaved={handleNoteSaved}
-              onStatusChange={setSaveStatus}
-              onContentLoaded={handleContentLoaded}
-              onSuggestionMenuOpen={scrollCursorToTop}
-              onLockStateChange={handleLockStateChange}
-            />
-            <div className="pointer-events-none sticky bottom-5 z-10 flex justify-end pr-7">
-              <ScrollToTopButton
-                visible={isScrolledDown}
-                onClick={scrollToTop}
-              />
-            </div>
-          </div>
+              saveCount={saveCount}
+              contentLength={contentLength}
+            >
+              <header
+                className={cn(
+                  'flex h-12 shrink-0 items-center gap-2 border-b px-4',
+                  'overflow-hidden transition-[max-height,opacity,padding,border-width] duration-200 ease-in-out',
+                  'max-h-12 opacity-100',
+                  isHeaderHidden && '!border-b-0 max-h-0 py-0 opacity-0'
+                )}
+              >
+                <SidebarTrigger className="-ml-1" />
+                <div className="flex-1" />
+                {isMacOS && (
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={(props) => (
+                        <button
+                          {...props}
+                          type="button"
+                          disabled={
+                            !translationAvailable ||
+                            !selectedNoteId ||
+                            (translationState.visible &&
+                              translationState.progress != null)
+                          }
+                          onClick={() =>
+                            selectedNoteId &&
+                            handleTranslateNote(selectedNoteId)
+                          }
+                          className="inline-flex items-center justify-center rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
+                        >
+                          <Languages className="h-4 w-4" />
+                        </button>
+                      )}
+                    />
+                    <TooltipContent>
+                      {!translationAvailable
+                        ? 'Translation requires macOS 26 or later'
+                        : !selectedNoteId
+                          ? 'Select a note to translate'
+                          : translationState.visible &&
+                              translationState.progress != null
+                            ? 'Translation in progress…'
+                            : 'Translate note'}
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+                <SummarizeButton />
+                <ModeToggle />
+              </header>
+              <div
+                ref={scrollContainerRef}
+                className="custom-scrollbar relative flex-1 overflow-y-auto overscroll-none"
+              >
+                <div className="pointer-events-none sticky top-5 z-10 flex flex-col items-end gap-1 pr-7">
+                  <SaveStatusIndicator
+                    status={saveStatus}
+                    locked={isNoteLocked}
+                  />
+                  {translationState.visible && (
+                    <div className="pointer-events-auto">
+                      <TranslationIndicator
+                        sourceLang={translationState.sourceLang}
+                        targetLang={translationState.targetLang}
+                        detectedLang={translationState.detectedLang}
+                        progress={translationState.progress}
+                        onRetranslate={handleRetranslate}
+                        onDismiss={handleDismissTranslation}
+                      />
+                    </div>
+                  )}
+                </div>
+                <SummaryAccordion />
+                <Editor
+                  ref={editorRef}
+                  key={selectedNoteId ?? 'new'}
+                  noteId={selectedNoteId}
+                  locked={isNoteLocked}
+                  onNoteSaved={handleNoteSaved}
+                  onStatusChange={setSaveStatus}
+                  onContentLoaded={handleContentLoaded}
+                  onSuggestionMenuOpen={scrollCursorToTop}
+                  onTranslate={
+                    selectedNoteId
+                      ? () => handleTranslateNote(selectedNoteId)
+                      : undefined
+                  }
+                  onLockStateChange={handleLockStateChange}
+                />
+                <div className="pointer-events-none sticky bottom-5 z-10 flex justify-end pr-7">
+                  <ScrollToTopButton
+                    visible={isScrolledDown}
+                    onClick={scrollToTop}
+                  />
+                </div>
+              </div>
+            </SummarizationManager>
+          </SummarizationProvider>
         </SidebarInset>
       </SidebarProvider>
       <Toaster position="bottom-right" />

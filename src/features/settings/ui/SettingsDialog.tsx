@@ -17,6 +17,7 @@ import { FontSizeOption } from './FontSizeOption'
 import { ImageAutoSaveOption } from './ImageAutoSaveOption'
 import { ThemeOption } from './ThemeOption'
 import { ToolbarOption } from './ToolbarOption'
+import { TranslationLangOption } from './TranslationLangOption'
 import { WindowStateOption } from './WindowStateOption'
 
 /**
@@ -101,6 +102,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         <WindowStateOption />
         <Separator />
         <ImageAutoSaveOption />
+        <Separator />
+        <TranslationLangOption />
         <Separator />
         <CheckForUpdatesOption />
       </DialogContent>

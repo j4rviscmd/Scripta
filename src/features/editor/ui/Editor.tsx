@@ -37,7 +37,7 @@ import {
 import { invoke } from '@tauri-apps/api/core'
 import { save } from '@tauri-apps/plugin-dialog'
 import { Code } from '@tiptap/extension-code'
-import { Copy, Download, Link, Trash2 } from 'lucide-react'
+import { Copy, Download, Languages, Link, Trash2 } from 'lucide-react'
 import type { Transaction } from 'prosemirror-state'
 import {
   forwardRef,
@@ -243,6 +243,8 @@ interface EditorProps {
   onStatusChange?: (status: SaveStatus) => void
   onContentLoaded?: () => void
   onSuggestionMenuOpen?: (cursorClientY: number) => void
+  /** Called when the user triggers translation via the slash menu. */
+  onTranslate?: () => void
   onLockStateChange?: (locked: boolean) => void
 }
 
@@ -303,6 +305,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     onStatusChange,
     onContentLoaded,
     onSuggestionMenuOpen,
+    onTranslate,
     onLockStateChange,
   },
   ref
@@ -443,6 +446,49 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 
   /** Exposes the editor instance to parent components via the forwarded ref. */
   useImperativeHandle(ref, () => ({ editor: editorAny }), [editorAny])
+
+  /**
+   * Returns the slash menu items filtered by the current query string.
+   *
+   * Merges the default BlockNote slash menu items with the multi-column layout
+   * items, removes entries whose keys are in {@link HIDDEN_SLASH_MENU_KEYS}
+   * (audio, video, file — unsupported upload types), and optionally appends a
+   * "Translate" command when the {@link onTranslate} callback is provided.
+   *
+   * The combined list is then filtered by {@link filterSuggestionItems} which
+   * matches against each item's `title` and `aliases`.
+   *
+   * @param query - The text typed after the "/" trigger character.
+   * @returns A promise resolving to the filtered list of slash menu items.
+   */
+  const getSlashMenuItems = useCallback(
+    async (query: string) => {
+      const defaults = combineByGroup(
+        getDefaultReactSlashMenuItems(editor),
+        getMultiColumnSlashMenuItems(editor)
+      ).filter(
+        (item) =>
+          !HIDDEN_SLASH_MENU_KEYS.has((item as DefaultSuggestionItem).key)
+      )
+
+      const items = onTranslate
+        ? [
+            ...defaults,
+            {
+              title: 'Translate',
+              onItemClick: () => onTranslate(),
+              subtext: 'Translate this note with Apple Intelligence',
+              aliases: ['translation', 'translate', 'honyaku', '翻訳'],
+              group: 'Actions' as const,
+              icon: <Languages size={18} />,
+            },
+          ]
+        : defaults
+
+      return filterSuggestionItems(items, query)
+    },
+    [editor, onTranslate]
+  )
 
   // Sync the locked prop to the module-level flag read by the ProseMirror plugin.
   useEffect(() => {
@@ -902,24 +948,9 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
                 slashMenu={false}
                 sideMenu={false}
               >
-                {/* Custom slash menu that includes the default items plus multi-column ones. */}
-                {/* Audio, Video, File are filtered out — the upload handler only supports images. */}
                 <SuggestionMenuController
                   triggerCharacter="/"
-                  getItems={async (query) =>
-                    filterSuggestionItems(
-                      combineByGroup(
-                        getDefaultReactSlashMenuItems(editor),
-                        getMultiColumnSlashMenuItems(editor)
-                      ),
-                      query
-                    ).filter(
-                      (item) =>
-                        !HIDDEN_SLASH_MENU_KEYS.has(
-                          (item as DefaultSuggestionItem).key
-                        )
-                    )
-                  }
+                  getItems={getSlashMenuItems}
                 />
                 {!locked && (
                   <>
